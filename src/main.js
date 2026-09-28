@@ -173,7 +173,7 @@ async function bootstrap() {
   stage.classList.add('is-ready');
   window.addEventListener('resize', resize);
   window.addEventListener('keydown', onKeyDown);
-  render();
+  animationFrame = requestAnimationFrame(render);
 
   window.__HALFPIPE_FOUNDATION__ = {
     halfpipe,
