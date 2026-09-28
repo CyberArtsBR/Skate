@@ -27,6 +27,7 @@ export class HalfpipeSimulation {
     this.pumpWindowHalfWidth = options.pumpWindowHalfWidth ?? pumpDefaults.windowHalfWidth;
     this.pumpMinimumSpeed = options.pumpMinimumSpeed ?? pumpDefaults.minimumSpeed;
     const airDefaults = GAME_CONFIG.air;
+    this.airTakeoffInset = options.airTakeoffInset ?? airDefaults.takeoffInset;
     this.airLaunchMinimumSpeed =
       options.airLaunchMinimumSpeed ?? airDefaults.launchMinimumSpeed;
     this.airMinimumVerticalVelocity =
@@ -266,26 +267,38 @@ export class HalfpipeSimulation {
 
     const minX = this.profile.leftLip + this.lipInset;
     const maxX = this.profile.rightLip - this.lipInset;
+    const takeoffMinX = this.profile.leftLip + this.airTakeoffInset;
+    const takeoffMaxX = this.profile.rightLip - this.airTakeoffInset;
     let launched = false;
 
-    if (nextX <= minX && velocity < 0) {
+    // Coping takeoff is intentionally allowed a few centimeters before the
+    // mathematical lip. The board has finite wheel/deck support geometry, so
+    // requiring its center to reach the exact profile endpoint created a long
+    // artificial wait after the rider was already visually at coping height.
+    if (
+      nextX <= takeoffMinX
+      && velocity < 0
+      && Math.abs(velocity) >= this.airLaunchMinimumSpeed
+    ) {
       this.state.lipContacts += 1;
-      if (Math.abs(velocity) >= this.airLaunchMinimumSpeed) {
-        this._enterAir(-1, velocity);
-        launched = true;
-      } else {
-        nextX = minX;
-        velocity = 0;
-      }
+      this._enterAir(-1, velocity);
+      launched = true;
+    } else if (
+      nextX >= takeoffMaxX
+      && velocity > 0
+      && Math.abs(velocity) >= this.airLaunchMinimumSpeed
+    ) {
+      this.state.lipContacts += 1;
+      this._enterAir(1, velocity);
+      launched = true;
+    } else if (nextX <= minX && velocity < 0) {
+      this.state.lipContacts += 1;
+      nextX = minX;
+      velocity = 0;
     } else if (nextX >= maxX && velocity > 0) {
       this.state.lipContacts += 1;
-      if (Math.abs(velocity) >= this.airLaunchMinimumSpeed) {
-        this._enterAir(1, velocity);
-        launched = true;
-      } else {
-        nextX = maxX;
-        velocity = 0;
-      }
+      nextX = maxX;
+      velocity = 0;
     }
 
     if (launched) {
