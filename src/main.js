@@ -81,7 +81,12 @@ function formatTelemetry(state) {
 function applySimulationState(state, { rotateWheels = true } = {}) {
   if (!rider || !presentationBinder || !simulation) return;
 
-  presentationBinder.apply(simulationToPresentationState(profile, state));
+  const presentationState = simulationToPresentationState(profile, state);
+  presentationBinder.apply(presentationState);
+  cameraController.updateForRider({
+    y: rider.root.position.y,
+    airborne: presentationState.airborne,
+  }, simulation.fixedDt);
 
   if (rotateWheels) {
     const wheelDelta = state.signedDistanceTravelled - lastWheelDistance;
@@ -113,6 +118,7 @@ function resetSimulation() {
   simulationRunning = false;
   lastWheelDistance = state.signedDistanceTravelled;
   applySimulationState(state, { rotateWheels: false });
+  cameraController.resetDynamic();
   updateSessionHUD();
   hud.setDebugText(formatTelemetry(state));
 }
@@ -287,6 +293,7 @@ async function bootstrap() {
       },
     },
     camera: cameraController.camera,
+    cameraController,
     background,
     ground,
     lighting,
