@@ -5,6 +5,16 @@ import { disposeObject3D } from '../core/disposeObject3D.js';
 
 const WHEEL_PATTERN = /pPipe(?:9|13)(?:_|$)/i;
 
+export const SKATEBOARD_COORDINATE_SYSTEM = Object.freeze({
+  forwardAxis: '+X',
+  lateralAxis: '+Z',
+  upAxis: '+Y',
+  noseDirection: '+X',
+  tailDirection: '-X',
+  regularFrontFoot: 'left',
+  regularRearFoot: 'right',
+});
+
 export class SkateboardVisual {
   constructor(url) {
     this.url = url;
@@ -16,7 +26,16 @@ export class SkateboardVisual {
     this.frontTruck = null;
     this.rearTruck = null;
     this.contactPoints = [];
+    this.frontContact = new THREE.Object3D();
+    this.frontContact.name = 'skateboard-front-contact';
+    this.rearContact = new THREE.Object3D();
+    this.rearContact.name = 'skateboard-rear-contact';
     this.deckSurfaceY = 0;
+    this.wheelContactY = 0;
+    this.dimensions = new THREE.Vector3();
+    this.coordinateSystem = SKATEBOARD_COORDINATE_SYSTEM;
+    this.stanceHalfLength = GAME_CONFIG.rider.stanceHalfLength;
+    this.footLateralOffset = GAME_CONFIG.rider.footLateralOffset;
   }
 
   async load() {
@@ -43,7 +62,14 @@ export class SkateboardVisual {
     this.model.position.y -= box.min.y;
     this.root.updateWorldMatrix(true, true);
     box = new THREE.Box3().setFromObject(this.root);
-    this.deckSurfaceY = box.max.y;
+    box.getSize(this.dimensions);
+
+    if (this.deck) {
+      const deckBox = new THREE.Box3().setFromObject(this.deck);
+      this.deckSurfaceY = deckBox.max.y;
+    } else {
+      this.deckSurfaceY = box.max.y;
+    }
 
     const uniqueWheels = [...new Set(wheelCandidates)];
     uniqueWheels.sort((a, b) => {
@@ -61,11 +87,29 @@ export class SkateboardVisual {
       this.contactPoints.push(point);
     }
 
+    this.wheelContactY = this.contactPoints.length
+      ? Math.min(...this.contactPoints.map((point) => point.y))
+      : box.min.y;
+
+    const positiveX = this.contactPoints.filter((point) => point.x >= 0);
+    const negativeX = this.contactPoints.filter((point) => point.x < 0);
+    const averageContact = (points, fallbackX) => {
+      if (!points.length) return new THREE.Vector3(fallbackX, this.wheelContactY, 0);
+      return points.reduce((sum, point) => sum.add(point), new THREE.Vector3())
+        .multiplyScalar(1 / points.length);
+    };
+    this.frontContact.position.copy(averageContact(positiveX, this.dimensions.x * 0.3));
+    this.rearContact.position.copy(averageContact(negativeX, -this.dimensions.x * 0.3));
+    this.root.add(this.frontContact, this.rearContact);
+
     // The source hierarchy nests one axle under the other's parent. Exposing
     // that parent as a mutable truck transform would move both axles, so the
     // safe foundation contract keeps truck transforms null and exposes wheels.
     this.root.userData.wheelCount = this.wheels.length;
     this.root.userData.trucksIndependentlyTransformable = false;
+    this.root.userData.coordinateSystem = this.coordinateSystem;
+    this.root.userData.deckTopHeight = this.deckSurfaceY;
+    this.root.userData.wheelContactHeight = this.wheelContactY;
     return this;
   }
 

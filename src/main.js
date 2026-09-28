@@ -7,6 +7,8 @@ import { createBackground } from './scene/createBackground.js';
 import { HalfpipeVisual } from './halfpipe/HalfpipeVisual.js';
 import { HalfpipeProfile } from './halfpipe/HalfpipeProfile.js';
 import { HalfpipeDebug } from './halfpipe/HalfpipeDebug.js';
+import { HalfpipePresentationBinder } from './halfpipe/HalfpipePresentationBinder.js';
+import { HalfpipePresentationDebug } from './halfpipe/HalfpipePresentationDebug.js';
 import { SkateboardVisual } from './skateboard/SkateboardVisual.js';
 import { ChimpionLoader } from './character/ChimpionLoader.js';
 import { RiderController } from './character/RiderController.js';
@@ -32,6 +34,7 @@ scene.add(profileDebug.root);
 
 let halfpipe = null;
 let rider = null;
+let presentationDebug = null;
 let animationFrame = 0;
 
 function resize() {
@@ -50,6 +53,8 @@ function render() {
 function onKeyDown(event) {
   if (event.repeat) return;
   if (event.code === 'KeyD') profileDebug.toggle();
+  if (event.code === 'BracketLeft' || event.code === 'Comma') presentationDebug?.previous();
+  if (event.code === 'BracketRight' || event.code === 'Period') presentationDebug?.next();
 }
 
 async function bootstrap() {
@@ -72,6 +77,15 @@ async function bootstrap() {
   });
   scene.add(halfpipe.root, rider.root);
 
+  const presentationBinder = new HalfpipePresentationBinder(profile, rider);
+  presentationDebug = new HalfpipePresentationDebug(profile, presentationBinder, {
+    onChange(station, index, count) {
+      hud.setDebugText(`D · PROFILE   [ ] · ${index + 1}/${count} ${station.name}`);
+    },
+  });
+  scene.add(presentationDebug.root);
+  presentationDebug.select(0);
+
   loadingState.classList.add('is-hidden');
   stage.classList.add('is-ready');
   window.addEventListener('resize', resize);
@@ -83,6 +97,8 @@ async function bootstrap() {
     rider,
     profile,
     profileDebug,
+    presentationBinder,
+    presentationDebug,
     camera: cameraController.camera,
     background,
     ground,
@@ -97,6 +113,7 @@ function dispose() {
   halfpipe?.dispose();
   rider?.dispose();
   profileDebug.dispose();
+  presentationDebug?.dispose();
   ground.dispose();
   lighting.dispose();
   background.dispose();

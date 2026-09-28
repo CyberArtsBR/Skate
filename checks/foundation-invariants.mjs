@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { HalfpipeProfile } from '../src/halfpipe/HalfpipeProfile.js';
+import { createRiderPresentationState } from '../src/character/RiderPresentationState.js';
 
 const profile = new HalfpipeProfile();
 const center = profile.sample(0);
@@ -16,6 +17,17 @@ assert.ok(Math.abs(left.y - profile.transitionHeight) < 0.01, 'lip height must m
 assert.ok(Math.abs(right.tangent.length() - 1) < 1e-8, 'surface tangent must be normalized');
 assert.ok(Math.abs(right.normal.length() - 1) < 1e-8, 'surface normal must be normalized');
 assert.ok(Math.abs(right.tangent.dot(right.normal)) < 1e-8, 'normal must be perpendicular');
+
+const presentationState = createRiderPresentationState({
+  pipeX: 4,
+  pumpCompression: 3,
+  landing: -1,
+  speedNormalized: 0.5,
+});
+assert.equal(presentationState.pipeX, 4);
+assert.equal(presentationState.pumpCompression, 1);
+assert.equal(presentationState.landing, 0);
+assert.equal(presentationState.speedNormalized, 0.5);
 
 for (const file of [
   'public/models/halfpipe/halfpipe.glb',

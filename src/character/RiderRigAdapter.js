@@ -84,7 +84,16 @@ export class RiderRigAdapter {
     for (const [bone, quaternion] of this.restPose) bone.quaternion.copy(quaternion);
   }
 
-  applyFoundationPose({ crouch = 0.55, torsoTurn = 0.08 } = {}) {
+  applySkatePose({
+    stance = 'regular',
+    compression = 0.45,
+    hipFlex = 0.14,
+    kneeFlex = 0.56,
+    ankleFlex = -0.12,
+    torsoCounter = 0.12,
+    headLook = 0.42,
+    armBalance = 0.62,
+  } = {}) {
     this.resetPose();
     const rotation = new THREE.Quaternion();
     const euler = new THREE.Euler();
@@ -95,21 +104,31 @@ export class RiderRigAdapter {
       bone.quaternion.multiply(rotation);
     };
 
-    apply('hips', -0.08 * crouch, 0, 0);
-    apply('spine', -0.055 * crouch, torsoTurn * 0.45, 0);
-    apply('chest', -0.025 * crouch, torsoTurn, 0);
-    apply('neck', 0, -torsoTurn * 0.65, 0);
-    apply('head', 0, -torsoTurn * 0.35, 0);
+    const stanceDirection = stance === 'goofy' ? -1 : 1;
+    apply('hips', -hipFlex, 0, 0);
+    apply('spine', -0.055 * compression, -torsoCounter * 0.35 * stanceDirection, 0);
+    apply('chest', -0.025 * compression, -torsoCounter * 0.65 * stanceDirection, 0);
+    apply('neck', 0, headLook * 0.42 * stanceDirection, 0);
+    apply('head', 0, headLook * 0.58 * stanceDirection, 0);
 
     for (const side of ['left', 'right']) {
       const sign = side === 'left' ? -1 : 1;
-      apply(`${side}Thigh`, -0.34 * crouch, sign * 0.045, sign * 0.055);
-      apply(`${side}Shin`, 0.61 * crouch, 0, 0);
-      apply(`${side}Foot`, -0.12 * crouch, sign * 0.025, 0);
-      apply(`${side}UpperArm`, -0.1, 0, sign * 0.58);
-      apply(`${side}Forearm`, -0.12, 0, sign * 0.08);
+      const footRoleSign = side === 'left' ? stanceDirection : -stanceDirection;
+      apply(`${side}Thigh`, -0.28 - compression * 0.12, sign * 0.035, footRoleSign * 0.09);
+      apply(`${side}Shin`, kneeFlex, 0, 0);
+      apply(`${side}Foot`, ankleFlex, sign * 0.025, -footRoleSign * 0.025);
+      apply(`${side}UpperArm`, -0.12, -torsoCounter * 0.18, sign * armBalance);
+      apply(`${side}Forearm`, -0.16, 0, sign * 0.11);
     }
 
     this.model.updateWorldMatrix(true, true);
+  }
+
+  applyFoundationPose(options = {}) {
+    const crouch = options.crouch ?? 0.55;
+    this.applySkatePose({
+      compression: crouch,
+      torsoCounter: options.torsoTurn ?? 0.08,
+    });
   }
 }

@@ -47,14 +47,63 @@ const state = await page.evaluate(() => {
     groundGridVisible: foundation.ground.grid.visible,
     cameraPosition: foundation.camera.position.toArray(),
     cameraRoll: foundation.camera.rotation.z,
+    skateboardCoordinateSystem: foundation.rider.skateboard.coordinateSystem,
+    skateboardDimensions: foundation.rider.skateboard.dimensions.toArray(),
+    deckTopHeight: foundation.rider.skateboard.deckSurfaceY,
+    wheelContactHeight: foundation.rider.skateboard.wheelContactY,
+    footIK: { ...foundation.rider.footIK.result },
+    stance: foundation.rider.root.userData.stance,
+    stationCount: foundation.presentationDebug.stations.length,
+    station: foundation.presentationDebug.current.name,
+    boardAngle: foundation.presentationBinder.lastAngle,
     renderer: canvas.getContext('webgl2') ? 'webgl2' : 'webgl',
   };
 });
 
 await page.screenshot({
-  path: path.resolve('docs/background-integration-preview.png'),
+  path: path.resolve('docs/rider-integration-center.png'),
   fullPage: true,
 });
+await page.screenshot({
+  path: path.resolve('docs/rider-integration-center-detail.png'),
+  clip: { x: 610, y: 470, width: 380, height: 360 },
+});
+
+const stationStates = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  return foundation.presentationDebug.stations.map((_, index) => {
+    foundation.presentationDebug.select(index);
+    return {
+      station: foundation.presentationDebug.current.name,
+      pipeX: foundation.rider.presentationState.pipeX,
+      boardAngle: foundation.presentationBinder.lastAngle,
+      tangent: foundation.presentationBinder.lastSample.tangent.toArray(),
+      normal: foundation.presentationBinder.lastSample.normal.toArray(),
+      footIK: { ...foundation.rider.footIK.result },
+    };
+  });
+});
+await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.presentationDebug.select(5));
+const transitionState = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  return {
+    station: foundation.presentationDebug.current.name,
+    pipeX: foundation.rider.presentationState.pipeX,
+    boardAngle: foundation.presentationBinder.lastAngle,
+    tangent: foundation.presentationBinder.lastSample.tangent.toArray(),
+    normal: foundation.presentationBinder.lastSample.normal.toArray(),
+    footIK: { ...foundation.rider.footIK.result },
+  };
+});
+await page.screenshot({
+  path: path.resolve('docs/rider-integration-transition.png'),
+  fullPage: true,
+});
+await page.screenshot({
+  path: path.resolve('docs/rider-integration-transition-detail.png'),
+  clip: { x: 1020, y: 360, width: 360, height: 330 },
+});
+await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.presentationDebug.select(0));
 
 await page.keyboard.press('d');
 const profileDebugVisible = await page.evaluate(
@@ -82,10 +131,54 @@ assert.equal(state.groundDepthWrite, false);
 assert.equal(state.groundGridVisible, false);
 assert.equal(state.cameraPosition[0], 0);
 assert.ok(Math.abs(state.cameraRoll) < 1e-8);
+assert.deepEqual(state.skateboardCoordinateSystem, {
+  forwardAxis: '+X',
+  lateralAxis: '+Z',
+  upAxis: '+Y',
+  noseDirection: '+X',
+  tailDirection: '-X',
+  regularFrontFoot: 'left',
+  regularRearFoot: 'right',
+});
+assert.equal(state.stance, 'regular');
+assert.equal(state.stationCount, 7);
+assert.equal(state.station, 'CENTER / FLAT');
+assert.ok(state.deckTopHeight > state.wheelContactHeight);
+assert.ok(state.footIK.enabled);
+assert.ok(state.footIK.maxError < 0.2, `center foot IK error is ${state.footIK.maxError}`);
+assert.equal(transitionState.station, 'UPPER RIGHT');
+assert.ok(transitionState.pipeX > 0);
+assert.ok(transitionState.boardAngle > 0);
+assert.ok(transitionState.tangent[0] > 0);
+assert.ok(transitionState.normal[1] > 0);
+assert.ok(transitionState.footIK.maxError < 0.2, `transition foot IK error is ${transitionState.footIK.maxError}`);
+assert.deepEqual(stationStates.map((station) => station.station), [
+  'CENTER / FLAT',
+  'LOWER LEFT',
+  'UPPER LEFT',
+  'LEFT LIP',
+  'LOWER RIGHT',
+  'UPPER RIGHT',
+  'RIGHT LIP',
+]);
+for (const station of stationStates) {
+  assert.ok(station.tangent[0] > 0, `${station.station} tangent must preserve +X nose convention`);
+  assert.ok(station.normal[1] > 0, `${station.station} normal must point upward`);
+  assert.ok(station.footIK.maxError < 0.2, `${station.station} foot IK error is ${station.footIK.maxError}`);
+}
+assert.ok(stationStates[2].boardAngle < 0, 'left transition must slope down toward center');
+assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away from center');
 assert.equal(profileDebugVisible, true);
 assert.ok(state.hiddenGroundNodes.includes('halfpipe-ground_Baked_1'));
 assert.deepEqual(consoleErrors, []);
 assert.deepEqual(pageErrors, []);
 assert.deepEqual(failedRequests, []);
 
-console.log(JSON.stringify({ state, consoleErrors, pageErrors, failedRequests }, null, 2));
+console.log(JSON.stringify({
+  state,
+  transitionState,
+  stationStates,
+  consoleErrors,
+  pageErrors,
+  failedRequests,
+}, null, 2));

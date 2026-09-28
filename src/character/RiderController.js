@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/gameConfig.js';
+import { createRiderPresentationState } from './RiderPresentationState.js';
+import { RiderFootIK } from './RiderFootIK.js';
+import { SkatePoseController } from './SkatePoseController.js';
 
 export class RiderController {
   constructor({ skateboard, chimpion }) {
@@ -7,22 +10,36 @@ export class RiderController {
     this.chimpion = chimpion;
     this.root = new THREE.Group();
     this.root.name = 'rider-and-board-presentation-root';
-    this.root.position.fromArray(GAME_CONFIG.rider.position);
 
     this.root.add(skateboard.root, chimpion.root);
     chimpion.root.position.y = skateboard.deckSurfaceY + GAME_CONFIG.rider.deckClearance;
     chimpion.root.position.z = 0.015;
 
-    this.presentationState = {
-      crouch: 0.55,
-      torsoTurn: 0.08,
-    };
-    this.chimpion.updatePose(this.presentationState);
+    this.poseController = new SkatePoseController({ stance: GAME_CONFIG.rider.stance });
+    this.presentationState = createRiderPresentationState();
+    this.footIK = new RiderFootIK({
+      rigAdapter: chimpion.rigAdapter,
+      riderRoot: this.root,
+      skateboard,
+      chimpionRoot: chimpion.root,
+      stance: GAME_CONFIG.rider.stance,
+    });
+    this.setPresentationState(this.presentationState);
+
+    this.root.userData.presentationOnly = true;
+    this.root.userData.stance = GAME_CONFIG.rider.stance;
   }
 
   setPresentationState(nextState = {}) {
-    Object.assign(this.presentationState, nextState);
-    this.chimpion.updatePose(this.presentationState);
+    this.presentationState = createRiderPresentationState({
+      ...this.presentationState,
+      ...nextState,
+    });
+    const pose = this.poseController.evaluate(this.presentationState);
+    this.chimpion.updatePose(pose);
+    this.root.updateWorldMatrix(true, true);
+    this.footIK.update(this.presentationState);
+    return this.presentationState;
   }
 
   dispose() {

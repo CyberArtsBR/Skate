@@ -57,7 +57,7 @@ export class ChimpionLoader {
     // that authored facing makes the rider side-on to travel and front-facing
     // to the fixed presentation camera.
     this.modelCarrier.rotation.y = 0;
-    this.rigAdapter.applyFoundationPose();
+    this.rigAdapter.applySkatePose({ stance: GAME_CONFIG.rider.stance });
     this.root.userData.rigCapabilities = this.rigAdapter.capabilities;
     this.root.userData.poseMode = 'skateboard-side-stance';
     this.root.userData.modelForwardAxis = '+Z';
@@ -65,7 +65,7 @@ export class ChimpionLoader {
   }
 
   updatePose(presentationState = {}) {
-    this.rigAdapter?.applyFoundationPose(presentationState);
+    this.rigAdapter?.applySkatePose(presentationState);
   }
 
   dispose() {

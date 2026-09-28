@@ -13,11 +13,14 @@ export const GAME_CONFIG = Object.freeze({
   skateboard: Object.freeze({
     scale: 0.095,
     wheelRadius: 0.036,
+    surfaceClearance: 0.18,
   }),
   rider: Object.freeze({
     targetHeight: 2.15,
     deckClearance: 0.025,
-    position: Object.freeze([0, 0.16, 0]),
+    stance: 'regular',
+    stanceHalfLength: 0.24,
+    footLateralOffset: 0.015,
   }),
   halfpipeProfile: Object.freeze({
     flatHalfWidth: 2.35,

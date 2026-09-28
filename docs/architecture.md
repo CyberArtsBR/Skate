@@ -131,3 +131,30 @@ To replace the backdrop later:
 3. adjust the optional position passed to `createBackground()` only if the new plate has a different visual center.
 
 The independent 3D ground remains in the scene as a transparent `ShadowMaterial` receiver. This preserves real-time grounding shadows while allowing the photographed venue floor to remain visible through the WebGL canvas. The retained grid helper is disabled for presentation and can still be enabled later for diagnostics.
+
+## 9. Phase 2 rider presentation integration
+
+Phase 2 keeps the Phase 1 scene, fixed camera, background, HUD and visual halfpipe intact. It adds a strictly presentation-only chain:
+
+```text
+future physics (not implemented)
+  -> RiderPresentationState
+  -> HalfpipePresentationBinder
+  -> RiderController
+     -> SkatePoseController
+     -> RiderRigAdapter
+     -> RiderFootIK
+     -> SkateboardVisual
+```
+
+`RiderPresentationState` is a normalized input contract containing `pipeX`, tangent and vertical velocities, ascent/descent flags, pump compression, airborne/landing values, visual rotation and future trick fields. Phase 2 does not calculate those values from gameplay. The debug stations provide fixed preview values only.
+
+`HalfpipePresentationBinder` samples `HalfpipeProfile`, places the shared rider/board root on the sampled surface and aligns local +X to the undirected tangent while local +Y follows the upward normal. On the left transition the sampled tangent is direction-normalized toward world +X; this avoids a 180-degree visual flip while preserving the same tangent line. A configurable `surfaceClearance` reconciles the mathematical profile with the thickness of the baked visual skin. It is presentation calibration, not collision data.
+
+The skateboard wrapper defines +X as forward/nose, -X as tail, +Z as lateral and +Y as up. Regular stance uses the left foot at the +X/front target and right foot at the -X/rear target. Goofy stance is supported by configuration without changing rig code. The wrapper exposes deck height, wheel contact height, front/rear contacts, all four wheel objects and the existing visual rotation hook.
+
+`SkatePoseController` maps presentation inputs to restrained compression, torso, gaze and balance-arm values. `RiderRigAdapter` always rebuilds the result from captured rest quaternions. `RiderFootIK` then applies a bounded three-iteration CCD correction to thigh/shin chains so ankle targets remain over the deck. Targets preserve the authored ankle-to-sole height; they do not represent snowboard bindings and do not constrain hands.
+
+Seven diagnostic stations cover the flat bottom, lower/upper left transitions, left lip vicinity, lower/upper right transitions and right lip vicinity. `[` or `,` selects the previous station; `]` or `.` selects the next. `D` continues to toggle the independent profile debug line.
+
+Intentionally absent: gravity, ramp acceleration, energy/pumping gain, collision, trick execution, hand IK, landing physics, scoring, wipeouts and timer logic. Future simulation must produce presentation state; character modules must not query the visual GLB as physics authority.
