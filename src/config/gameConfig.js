@@ -50,7 +50,7 @@ export const GAME_CONFIG = Object.freeze({
     uphillGravityScale: 1.45,
   }),
   pumping: Object.freeze({
-    acceleration: 28,
+    acceleration: 12,
     upperWallRetention: 0.68,
     minimumSpeed: 0.65,
   }),
@@ -64,10 +64,10 @@ export const GAME_CONFIG = Object.freeze({
     aerialOverturnSeconds: 0.5,
   }),
   air: Object.freeze({
-    takeoffInset: 0.2,
+    takeoffInset: 0.005,
     launchMinimumSpeed: 1.2,
     minimumVerticalVelocity: 11,
-    maximumVerticalVelocity: 21,
+    maximumVerticalVelocity: 22,
     gravity: 60,
     launchVelocityScale: 1.3,
     landingVelocityRetention: 0.94,
