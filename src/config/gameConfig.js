@@ -45,10 +45,23 @@ export const GAME_CONFIG = Object.freeze({
   session: Object.freeze({
     durationSeconds: 75,
   }),
+  arcadeMotion: Object.freeze({
+    downhillGravityScale: 1.18,
+    uphillGravityScale: 1.45,
+  }),
   pumping: Object.freeze({
-    specificEnergyPerSecond: 210,
-    windowHalfWidth: 4.8,
+    acceleration: 28,
+    upperWallRetention: 0.68,
     minimumSpeed: 0.65,
+  }),
+  turning: Object.freeze({
+    kickTurnMinFraction: 0.72,
+    kickTurnRetention: 0.93,
+    handPlantMinFraction: 0.92,
+    handPlantRetention: 0.9,
+    aerialIdealHoldSeconds: 0.2,
+    aerialCompleteSeconds: 0.14,
+    aerialOverturnSeconds: 0.5,
   }),
   air: Object.freeze({
     takeoffInset: 0.2,
