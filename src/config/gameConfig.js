@@ -31,7 +31,7 @@ export const GAME_CONFIG = Object.freeze({
   }),
   passivePhysics: Object.freeze({
     fixedHz: 120,
-    gravity: 30,
+    gravity: 40,
     linearDrag: 0.035,
     maxFrameDelta: 0.1,
     maxSubSteps: 20,
@@ -39,14 +39,14 @@ export const GAME_CONFIG = Object.freeze({
     velocityEpsilon: 0.0001,
     startTransitionFraction: 0.72,
     initialVelocity: 0,
-    presentationSpeedReference: 11,
+    presentationSpeedReference: 13,
     presentationVerticalEpsilon: 0.02,
   }),
   session: Object.freeze({
     durationSeconds: 75,
   }),
   pumping: Object.freeze({
-    specificEnergyPerSecond: 78,
+    specificEnergyPerSecond: 104,
     windowHalfWidth: 4.8,
     minimumSpeed: 0.65,
   }),
