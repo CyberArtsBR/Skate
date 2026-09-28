@@ -21,9 +21,22 @@ await page.goto(url, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => document.querySelector('#game-stage')?.classList.contains('is-ready'));
 await page.waitForFunction(() => Boolean(window.__HALFPIPE_FOUNDATION__?.rider));
 await page.waitForFunction(() => Boolean(window.__HALFPIPE_FOUNDATION__?.simulation));
-await page.evaluate(() => {
+const passiveProbe = await page.evaluate(() => {
   const foundation = window.__HALFPIPE_FOUNDATION__;
   foundation.physics.setRunning(false);
+  foundation.simulation.reset();
+  for (let index = 0; index < 240; index += 1) foundation.simulation.stepFixed();
+  foundation.physics.applyCurrentState();
+  const snapshot = foundation.simulation.snapshot();
+  return {
+    ...snapshot,
+    riderX: foundation.rider.root.position.x,
+    boardAngle: foundation.presentationBinder.lastAngle,
+    footIK: { ...foundation.rider.footIK.result },
+  };
+});
+await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
   foundation.presentationDebug.select(0);
 });
 
@@ -152,6 +165,11 @@ assert.deepEqual(state.skateboardCoordinateSystem, {
 assert.equal(state.stance, 'regular');
 assert.equal(state.stationCount, 7);
 assert.equal(state.station, 'CENTER / FLAT');
+assert.ok(passiveProbe.time > 1.99 && passiveProbe.time < 2.01);
+assert.ok(passiveProbe.bottomCrossings >= 1);
+assert.ok(Math.abs(passiveProbe.riderX) > 0.1);
+assert.ok(Number.isFinite(passiveProbe.boardAngle));
+assert.ok(passiveProbe.footIK.maxError < 0.2);
 assert.equal(state.physicsRunning, false);
 assert.equal(state.simulationMode, 'contact');
 assert.ok(Math.abs(state.fixedDt - (1 / 120)) < 1e-12);
