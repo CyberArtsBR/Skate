@@ -32,8 +32,8 @@ export function simulationToPresentationState(profile, simulationState) {
     rotation: 0,
     landing: 0,
     landingQuality: 'none',
-    trickType: null,
-    trickProgress: 0,
+    trickType: simulationState.trickType || null,
+    trickProgress: simulationState.trickProgress || 0,
     speedNormalized: Math.min(
       1,
       Math.abs(airborne ? simulationState.airVerticalVelocity : simulationState.tangentVelocity)
