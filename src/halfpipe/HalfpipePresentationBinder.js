@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { createRiderPresentationState } from '../character/RiderPresentationState.js';
+import { resolveContactClearance } from './HalfpipeContactClearance.js';
 
 const tangent = new THREE.Vector2();
 const normal = new THREE.Vector2();
@@ -11,6 +12,7 @@ export class HalfpipePresentationBinder {
     this.rider = rider;
     this.lastSample = null;
     this.lastAngle = 0;
+    this.lastContact = null;
   }
 
   apply(nextState = {}) {
@@ -28,9 +30,25 @@ export class HalfpipePresentationBinder {
     if (tangent.x < 0) tangent.multiplyScalar(-1);
     if (normal.y < 0) normal.multiplyScalar(-1);
 
-    const clearance = GAME_CONFIG.skateboard.surfaceClearance
-      + GAME_CONFIG.skateboard.wallClearance * Math.abs(tangent.y);
     const angle = Math.atan2(tangent.y, tangent.x) + state.rotation;
+    const baseClearance = GAME_CONFIG.skateboard.surfaceClearance;
+    const measuredWheelDiameter = Math.max(
+      1e-4,
+      Number(this.rider.skateboard.measuredWheelDiameter)
+        || GAME_CONFIG.skateboard.wheelRadius * 2,
+    );
+    const slopeInfluence = Math.abs(tangent.y);
+    const minimumSeparation = baseClearance + measuredWheelDiameter * slopeInfluence;
+    const contact = resolveContactClearance({
+      profile: this.profile,
+      sample,
+      normal,
+      angle,
+      supportPoints: this.rider.skateboard.surfaceSupportPoints,
+      baseClearance,
+      minimumSeparation,
+    });
+    const clearance = contact.clearance;
     this.rider.root.position.set(
       sample.x + normal.x * clearance,
       sample.y + normal.y * clearance,
@@ -45,6 +63,12 @@ export class HalfpipePresentationBinder {
       normal: normal.clone(),
     };
     this.lastAngle = angle;
+    this.lastContact = {
+      ...contact,
+      measuredWheelDiameter,
+      slopeInfluence,
+      supportPointCount: this.rider.skateboard.surfaceSupportPoints.length,
+    };
     this.rider.setPresentationState({ ...state, pipeX: sample.x });
     return this.lastSample;
   }
