@@ -43,7 +43,7 @@ assert.equal(first.final.lipContacts, 0, 'default passive calibration should rem
 assert.equal(first.final.mode, 'contact');
 assert.ok(first.final.lastBottomCrossingTime !== null);
 assert.ok(
-  first.final.bottomCrossingInterval >= 1.7 && first.final.bottomCrossingInterval <= 2.2,
+  first.final.bottomCrossingInterval >= 1.5 && first.final.bottomCrossingInterval <= 1.9,
   `passive crossing cadence drifted outside the current reference band: ${first.final.bottomCrossingInterval}`,
 );
 assert.ok(first.final.lastCrossingSpeed > 0);
@@ -100,8 +100,8 @@ const pumped = runPumped();
 assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
 assert.ok(pumped.maxAbsX > Math.abs(first.initial.pipeX), 'correct pumping should increase amplitude');
 assert.ok(
-  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 4.5,
-  `strong correct pumping should reach 90% lip amplitude within 4.5s, got ${pumped.timeToHighAmplitude}`,
+  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 3.5,
+  `strong correct pumping should reach 90% lip amplitude within 3.5s, got ${pumped.timeToHighAmplitude}`,
 );
 assert.equal(pumped.final.mode, 'contact');
 
