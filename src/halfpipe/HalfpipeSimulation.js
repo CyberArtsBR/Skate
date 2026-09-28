@@ -122,6 +122,9 @@ export class HalfpipeSimulation {
       lastTrick: null,
       lastTrickTime: null,
       lastTrickPoints: 0,
+      facingTurns: 0,
+      lastTrickTurnDirection: 0,
+      lastTrickSide: 0,
 
       airSide: 0,
       airAnchorX: null,
@@ -132,6 +135,7 @@ export class HalfpipeSimulation {
       maxAirY: null,
       lastAirPeakY: null,
       airTurnHold: 0,
+      airTurnDirection: 0,
       airTurnCompleted: false,
       airTurnOverturned: false,
     };
@@ -210,7 +214,7 @@ export class HalfpipeSimulation {
     return this.state.pumpDesiredIntent || 0;
   }
 
-  _recordTrick(type, quality = 1) {
+  _recordTrick(type, quality = 1, turnDirection = 0) {
     const clampedQuality = Math.max(0, Math.min(1, quality));
     const range = type === 'kick-turn'
       ? this.scoring.kickTurn
@@ -225,9 +229,21 @@ export class HalfpipeSimulation {
     this.state.trickProgress = clampedQuality;
     this.state.trickCount += 1;
     this.state.score += points;
+    const normalizedTurnDirection = signWithEpsilon(
+      turnDirection,
+      this.velocityEpsilon,
+    );
+    if (normalizedTurnDirection !== 0) {
+      this.state.facingTurns += normalizedTurnDirection;
+    }
     this.state.lastTrick = type;
     this.state.lastTrickTime = this.state.time;
     this.state.lastTrickPoints = points;
+    this.state.lastTrickTurnDirection = normalizedTurnDirection;
+    this.state.lastTrickSide = signWithEpsilon(
+      this.state.pipeX,
+      this.velocityEpsilon,
+    );
   }
 
   _trySurfaceTurn(previousX, velocity, desiredIntent) {
@@ -244,7 +260,7 @@ export class HalfpipeSimulation {
     ) {
       const quality = (wallFraction - this.handPlantMinFraction)
         / Math.max(1e-4, 1 - this.handPlantMinFraction);
-      this._recordTrick('hand-plant', quality);
+      this._recordTrick('hand-plant', quality, expectedTurn);
       return {
         velocity: -velocity * this.handPlantRetention,
         turned: true,
@@ -258,7 +274,7 @@ export class HalfpipeSimulation {
     ) {
       const quality = (wallFraction - this.kickTurnMinFraction)
         / Math.max(1e-4, 1 - this.kickTurnMinFraction);
-      this._recordTrick('kick-turn', quality);
+      this._recordTrick('kick-turn', quality, expectedTurn);
       return {
         velocity: -velocity * this.kickTurnRetention,
         turned: true,
@@ -297,6 +313,7 @@ export class HalfpipeSimulation {
       : Math.max(this.state.maxAirY, takeoff.y);
     this.state.lastAirPeakY = takeoff.y;
     this.state.airTurnHold = 0;
+    this.state.airTurnDirection = 0;
     this.state.airTurnCompleted = false;
     this.state.airTurnOverturned = false;
     this.state.trickType = null;
@@ -317,6 +334,7 @@ export class HalfpipeSimulation {
 
     const expectedTurn = side < 0 ? 1 : -1;
     if (this.turnIntent === expectedTurn) {
+      this.state.airTurnDirection = expectedTurn;
       this.state.airTurnHold += dt;
       this.state.trickType = 'aerial-turn';
       this.state.trickProgress = Math.min(
@@ -375,6 +393,7 @@ export class HalfpipeSimulation {
         this._recordTrick(
           'aerial-turn',
           heightQuality * 0.6 + holdQuality * 0.4,
+          this.state.airTurnDirection || expectedTurn,
         );
       } else if (this.state.airTurnOverturned) {
         this.state.lastTrick = 'aerial-turn-overrotated';
@@ -390,6 +409,7 @@ export class HalfpipeSimulation {
       this.state.airY = null;
       this.state.airVerticalVelocity = 0;
       this.state.airTurnHold = 0;
+      this.state.airTurnDirection = 0;
       this.state.airTurnCompleted = false;
       this.state.airTurnOverturned = false;
       this._lastDirection = signWithEpsilon(
