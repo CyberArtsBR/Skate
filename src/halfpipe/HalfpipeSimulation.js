@@ -45,6 +45,7 @@ export class HalfpipeSimulation {
       turningPoints: 0,
       lipContacts: 0,
       distanceTravelled: 0,
+      signedDistanceTravelled: 0,
       specificEnergy: 0,
     };
 
@@ -112,7 +113,9 @@ export class HalfpipeSimulation {
     // tangentVelocity is speed along the ramp surface (ds/dt), so travelled
     // distance is arc distance, not horizontal delta-X. This is the quantity
     // later used for visual wheel rotation and telemetry.
-    this.state.distanceTravelled += Math.abs(velocity) * dt;
+    const surfaceDelta = velocity * dt;
+    this.state.distanceTravelled += Math.abs(surfaceDelta);
+    this.state.signedDistanceTravelled += surfaceDelta;
 
     if (
       previousX !== 0
