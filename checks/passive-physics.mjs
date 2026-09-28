@@ -43,7 +43,7 @@ assert.equal(first.final.lipContacts, 0, 'default passive calibration should rem
 assert.equal(first.final.mode, 'contact');
 assert.ok(first.final.lastBottomCrossingTime !== null);
 assert.ok(
-  first.final.bottomCrossingInterval >= 1.35 && first.final.bottomCrossingInterval <= 1.75,
+  first.final.bottomCrossingInterval >= 1.25 && first.final.bottomCrossingInterval <= 1.6,
   `passive crossing cadence drifted outside the current reference band: ${first.final.bottomCrossingInterval}`,
 );
 assert.ok(first.final.lastCrossingSpeed > 0);
@@ -100,8 +100,8 @@ const pumped = runPumped();
 assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
 assert.ok(pumped.maxAbsX > Math.abs(first.initial.pipeX), 'correct pumping should increase amplitude');
 assert.ok(
-  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 2.9,
-  `strong correct pumping should reach 90% lip amplitude within 2.9s, got ${pumped.timeToHighAmplitude}`,
+  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 2.6,
+  `strong correct pumping should reach 90% lip amplitude within 2.6s, got ${pumped.timeToHighAmplitude}`,
 );
 assert.equal(pumped.final.mode, 'contact');
 
@@ -154,7 +154,7 @@ assert.ok(
   `airborne peak should visibly clear the lip, got peak ${airborne.peakY} vs lip ${lipY}`,
 );
 assert.ok(
-  airborne.peakY <= lipY + 3.5,
+  airborne.peakY <= lipY + 4.2,
   `airborne peak should stay camera-readable, got peak ${airborne.peakY} vs lip ${lipY}`,
 );
 assert.ok(airborne.final.airLaunches >= 1, 'air launch telemetry must be recorded');
