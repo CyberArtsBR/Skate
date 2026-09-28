@@ -44,6 +44,10 @@ export class HalfpipePumpInput {
     this.gamepadTurnIntent = 0;
     this.intent = 0;
     this.turnIntent = 0;
+    this.keyboardHandPlantHeld = false;
+    this.gamepadHandPlantHeld = false;
+    this.keyboardHandPlantHeld = false;
+    this.gamepadHandPlantHeld = false;
     this.handPlantHeld = false;
     this.gamepadConnected = false;
     this.gamepadId = '';
@@ -99,7 +103,8 @@ export class HalfpipePumpInput {
   _refreshKeyboard() {
     this.keyboardIntent = this._axisFromKeys(VERTICAL_KEYS);
     this.keyboardTurnIntent = this._axisFromKeys(HORIZONTAL_KEYS);
-    this.handPlantHeld = this.keys.has('KeyK') || this.handPlantHeld;
+    this.keyboardHandPlantHeld = this.keys.has('KeyK');
+    this.handPlantHeld = this.keyboardHandPlantHeld || this.gamepadHandPlantHeld;
     this._refreshIntent();
   }
 
@@ -135,7 +140,8 @@ export class HalfpipePumpInput {
       this.gamepadId = '';
       this.gamepadIntent = 0;
       this.gamepadTurnIntent = 0;
-      this.handPlantHeld = this.keys.has('KeyK');
+      this.gamepadHandPlantHeld = false;
+      this.handPlantHeld = this.keyboardHandPlantHeld;
       this._queueEdge('primary', false);
       this._queueEdge('start', false);
       this._queueEdge('back', false);
@@ -164,8 +170,8 @@ export class HalfpipePumpInput {
       this.gamepadTurnIntent = clampIntent(stickX);
     }
 
-    this.handPlantHeld = this.keys.has('KeyK')
-      || buttonPressed(activePad, GAMEPAD_BUTTON.secondary);
+    this.gamepadHandPlantHeld = buttonPressed(activePad, GAMEPAD_BUTTON.secondary);
+    this.handPlantHeld = this.keyboardHandPlantHeld || this.gamepadHandPlantHeld;
 
     this._queueEdge('primary', buttonPressed(activePad, GAMEPAD_BUTTON.primary));
     this._queueEdge('start', buttonPressed(activePad, GAMEPAD_BUTTON.start));
@@ -187,6 +193,8 @@ export class HalfpipePumpInput {
       intent: this.intent,
       turnIntent: this.turnIntent,
       handPlantHeld: this.handPlantHeld,
+      keyboardHandPlantHeld: this.keyboardHandPlantHeld,
+      gamepadHandPlantHeld: this.gamepadHandPlantHeld,
       keyboardIntent: this.keyboardIntent,
       keyboardTurnIntent: this.keyboardTurnIntent,
       gamepadIntent: this.gamepadIntent,
