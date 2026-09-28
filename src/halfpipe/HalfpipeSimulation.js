@@ -21,6 +21,12 @@ export class HalfpipeSimulation {
     this.velocityEpsilon = options.velocityEpsilon ?? defaults.velocityEpsilon;
     this.startTransitionFraction = options.startTransitionFraction ?? defaults.startTransitionFraction;
     this.initialVelocity = options.initialVelocity ?? defaults.initialVelocity;
+    const pumpDefaults = GAME_CONFIG.pumping;
+    this.pumpSpecificEnergyPerSecond =
+      options.pumpSpecificEnergyPerSecond ?? pumpDefaults.specificEnergyPerSecond;
+    this.pumpWindowHalfWidth = options.pumpWindowHalfWidth ?? pumpDefaults.windowHalfWidth;
+    this.pumpMinimumSpeed = options.pumpMinimumSpeed ?? pumpDefaults.minimumSpeed;
+    this.pumpIntent = 0;
 
     this.accumulator = 0;
     this._lastDirection = 0;
@@ -51,6 +57,13 @@ export class HalfpipeSimulation {
       distanceTravelled: 0,
       signedDistanceTravelled: 0,
       specificEnergy: 0,
+      pumpIntent: 0,
+      pumpDesiredIntent: 0,
+      pumpWindowInfluence: 0,
+      pumpTimingQuality: 0,
+      pumpActive: false,
+      lastPumpWork: 0,
+      pumpWorkTotal: 0,
     };
 
     this.accumulator = 0;
@@ -86,6 +99,24 @@ export class HalfpipeSimulation {
     return sample;
   }
 
+  setPumpIntent(intent) {
+    this.pumpIntent = intent > 0 ? 1 : intent < 0 ? -1 : 0;
+    return this.pumpIntent;
+  }
+
+  _pumpPhase(previousX, previousVelocity) {
+    const phaseSignal = previousX * previousVelocity;
+    if (phaseSignal > this.velocityEpsilon) return 1;
+    if (phaseSignal < -this.velocityEpsilon) return -1;
+    return this.state.pumpDesiredIntent || 0;
+  }
+
+  _pumpInfluence(previousX) {
+    const normalized = Math.min(1, Math.abs(previousX) / Math.max(0.001, this.pumpWindowHalfWidth));
+    const smooth = normalized * normalized * (3 - 2 * normalized);
+    return 1 - smooth;
+  }
+
   stepFixed() {
     const dt = this.fixedDt;
     const previousX = this.state.pipeX;
@@ -100,6 +131,30 @@ export class HalfpipeSimulation {
     const acceleration = gravityAlongTangent + dragAcceleration;
 
     let velocity = previousVelocity + acceleration * dt;
+
+    const desiredIntent = this._pumpPhase(previousX, previousVelocity);
+    const pumpWindowInfluence = this._pumpInfluence(previousX);
+    const speedEligible = Math.abs(previousVelocity) >= this.pumpMinimumSpeed;
+    const timingQuality = (
+      speedEligible
+      && this.pumpIntent !== 0
+      && this.pumpIntent === desiredIntent
+    ) ? pumpWindowInfluence : 0;
+
+    const pumpWork = this.pumpSpecificEnergyPerSecond * timingQuality * dt;
+    if (pumpWork > 0) {
+      const direction = signWithEpsilon(velocity || previousVelocity, this.velocityEpsilon) || 1;
+      const speedSquared = velocity * velocity + 2 * pumpWork;
+      velocity = direction * Math.sqrt(Math.max(0, speedSquared));
+      this.state.pumpWorkTotal += pumpWork;
+    }
+
+    this.state.pumpIntent = this.pumpIntent;
+    this.state.pumpDesiredIntent = desiredIntent;
+    this.state.pumpWindowInfluence = pumpWindowInfluence;
+    this.state.pumpTimingQuality = timingQuality;
+    this.state.pumpActive = pumpWork > 0;
+    this.state.lastPumpWork = pumpWork;
     let nextX = previousX + velocity * sample.tangent.x * dt;
 
     const minX = this.profile.leftLip + this.lipInset;
