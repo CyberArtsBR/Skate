@@ -16,6 +16,8 @@ import { ChimpionLoader } from './character/ChimpionLoader.js';
 import { RiderController } from './character/RiderController.js';
 import { HalfpipeCamera } from './camera/HalfpipeCamera.js';
 import { HalfpipeHUD } from './ui/HalfpipeHUD.js';
+import { HalfpipePumpInput } from './input/HalfpipePumpInput.js';
+import { HalfpipeSession, formatSessionTime } from './game/HalfpipeSession.js';
 
 const stage = document.querySelector('#game-stage');
 const canvas = document.querySelector('#game-canvas');
@@ -31,6 +33,9 @@ const lighting = createLighting(scene);
 const ground = createGround(scene);
 const hud = new HalfpipeHUD(stage);
 const profile = new HalfpipeProfile();
+const session = new HalfpipeSession({
+  durationSeconds: GAME_CONFIG.session.durationSeconds,
+});
 const profileDebug = new HalfpipeDebug(profile);
 scene.add(profileDebug.root);
 
@@ -44,6 +49,7 @@ let animationFrame = 0;
 let lastFrameTime = null;
 let lastWheelDistance = 0;
 let lastTelemetryTime = 0;
+let pumpInput = null;
 
 function resize() {
   const { width, height } = stage.getBoundingClientRect();
@@ -54,7 +60,7 @@ function resize() {
 }
 
 function formatTelemetry(state) {
-  const runState = simulationRunning ? 'RUN' : 'PAUSE';
+  const runState = session.phase.toUpperCase();
   return [
     `P · ${runState}`,
     'R · RESET',
@@ -64,13 +70,27 @@ function formatTelemetry(state) {
     `C ${state.bottomCrossings}`,
     `Δ ${state.bottomCrossingInterval ? state.bottomCrossingInterval.toFixed(2) : '--'}`,
     `T ${state.turningPoints}`,
+    `PUMP ${state.pumpIntent > 0 ? 'UP' : state.pumpIntent < 0 ? 'DOWN' : '-'}`,
+    `Q ${state.pumpTimingQuality.toFixed(2)}`,
+    `TURN ${state.turnIntent < 0 ? 'LEFT' : state.turnIntent > 0 ? 'RIGHT' : '-'}`,
+    state.lastTrick
+      ? `TRICK ${state.lastTrick} +${state.lastTrickPoints || 0}`
+      : 'TRICK -',
+    state.mode === 'airborne'
+      ? `AIR ${state.airVerticalVelocity.toFixed(1)} · H ${(state.airY ?? 0).toFixed(1)}`
+      : 'CONTACT',
   ].join('   ');
 }
 
 function applySimulationState(state, { rotateWheels = true } = {}) {
   if (!rider || !presentationBinder || !simulation) return;
 
-  presentationBinder.apply(simulationToPresentationState(profile, state));
+  const presentationState = simulationToPresentationState(profile, state);
+  presentationBinder.apply(presentationState);
+  cameraController.updateForRider({
+    y: rider.root.position.y,
+    airborne: presentationState.airborne,
+  }, simulation.fixedDt);
 
   if (rotateWheels) {
     const wheelDelta = state.signedDistanceTravelled - lastWheelDistance;
@@ -79,17 +99,55 @@ function applySimulationState(state, { rotateWheels = true } = {}) {
   lastWheelDistance = state.signedDistanceTravelled;
 }
 
+function updateSessionHUD() {
+  const state = session.snapshot();
+  hud.setScore(state.score);
+  hud.setTime(formatSessionTime(state.remaining));
+
+  if (state.phase === 'ready') {
+    hud.setStatus('READY · ↑/↓ OR A / ENTER TO START', 'ready');
+  } else if (state.phase === 'paused') {
+    hud.setStatus('PAUSED · START / A / P TO RESUME', 'paused');
+  } else if (state.phase === 'finished') {
+    hud.setStatus('TIME · RUN COMPLETE · A TO RESTART · VIEW / R TO RESET', 'finished');
+  } else {
+    hud.setStatus('', 'running');
+  }
+}
+
 function resetSimulation() {
   if (!simulation) return;
   const state = simulation.reset();
+  session.reset();
+  simulationRunning = false;
   lastWheelDistance = state.signedDistanceTravelled;
   applySimulationState(state, { rotateWheels: false });
+  cameraController.resetDynamic();
+  updateSessionHUD();
   hud.setDebugText(formatTelemetry(state));
 }
 
-function setSimulationRunning(nextRunning) {
-  simulationRunning = Boolean(nextRunning);
+function startSession() {
+  if (!simulation || session.phase === 'finished') return false;
+  if (session.phase === 'ready' || session.phase === 'paused') session.start();
+  simulationRunning = session.phase === 'running';
   lastFrameTime = null;
+  updateSessionHUD();
+  hud.setDebugText(formatTelemetry(simulation.snapshot()));
+  return simulationRunning;
+}
+
+function setSimulationRunning(nextRunning) {
+  if (nextRunning) {
+    if (session.phase === 'ready') session.start();
+    else if (session.phase === 'paused') session.resume();
+  } else if (session.phase === 'running') {
+    session.pause();
+  }
+
+  simulationRunning = session.phase === 'running';
+  lastFrameTime = null;
+  updateSessionHUD();
   if (simulation) hud.setDebugText(formatTelemetry(simulation.snapshot()));
   return simulationRunning;
 }
@@ -98,13 +156,57 @@ function render(timestamp = 0) {
   const frameDelta = lastFrameTime === null ? 0 : (timestamp - lastFrameTime) / 1000;
   lastFrameTime = timestamp;
 
-  if (simulationRunning && simulation) {
-    const result = simulation.advance(frameDelta);
-    if (result.steps > 0) {
-      applySimulationState(result.state);
-      if (timestamp - lastTelemetryTime >= 100) {
-        hud.setDebugText(formatTelemetry(result.state));
-        lastTelemetryTime = timestamp;
+  if (simulation) {
+    const gamepadIntent = pumpInput?.pollGamepad() ?? 0;
+    const controllerActions = pumpInput?.consumeActions() || {};
+    const pumpIntent = pumpInput?.keyboardIntent || gamepadIntent || 0;
+    const turnIntent = pumpInput?.keyboardTurnIntent
+      || pumpInput?.gamepadTurnIntent
+      || 0;
+    const handPlantHeld = Boolean(pumpInput?.handPlantHeld);
+
+    if (controllerActions.reset) {
+      resetSimulation();
+    } else if (controllerActions.pause) {
+      if (session.phase === 'running') setSimulationRunning(false);
+      else if (session.phase === 'paused') setSimulationRunning(true);
+      else if (session.phase === 'ready') startSession();
+    } else if (controllerActions.confirm) {
+      if (session.phase === 'finished') {
+        resetSimulation();
+        startSession();
+      } else if (session.phase === 'paused') {
+        setSimulationRunning(true);
+      } else if (session.phase === 'ready') {
+        startSession();
+      }
+    }
+
+    if (session.phase === 'ready' && pumpIntent !== 0) startSession();
+
+    simulation.setPumpIntent(session.phase === 'running' ? pumpIntent : 0);
+    simulation.setTurnIntent(session.phase === 'running' ? turnIntent : 0);
+    simulation.setHandPlantHeld(session.phase === 'running' && handPlantHeld);
+
+    if (simulationRunning && session.phase === 'running') {
+      const result = simulation.advance(frameDelta);
+      if (result.steps > 0) {
+        session.step(result.steps * simulation.fixedDt);
+        session.score = result.state.score || 0;
+        applySimulationState(result.state);
+        updateSessionHUD();
+
+        if (session.phase === 'finished') {
+          simulationRunning = false;
+          simulation.setPumpIntent(0);
+          simulation.setTurnIntent(0);
+          simulation.setHandPlantHeld(false);
+        }
+
+        if (timestamp - lastTelemetryTime >= 100) {
+          hud.setDebugText(formatTelemetry(result.state));
+          lastTelemetryTime = timestamp;
+        }
       }
     }
   }
@@ -116,14 +218,25 @@ function render(timestamp = 0) {
 function onKeyDown(event) {
   if (event.repeat) return;
 
-  if (event.code === 'KeyD') profileDebug.toggle();
+  if (event.code === 'F3') profileDebug.toggle();
+
+  if (
+    session.phase === 'ready'
+    && [
+      'Enter', 'Space',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyK',
+    ].includes(event.code)
+  ) {
+    startSession();
+  }
 
   if (event.code === 'KeyP') {
-    setSimulationRunning(!simulationRunning);
+    if (session.phase === 'running') setSimulationRunning(false);
+    else if (session.phase === 'paused') setSimulationRunning(true);
   }
 
   if (event.code === 'KeyR') {
-    setSimulationRunning(false);
     resetSimulation();
   }
 
@@ -167,8 +280,8 @@ async function bootstrap() {
   scene.add(presentationDebug.root);
 
   simulation = new HalfpipeSimulation(profile);
+  pumpInput = new HalfpipePumpInput(window);
   resetSimulation();
-  setSimulationRunning(true);
 
   loadingState.classList.add('is-hidden');
   stage.classList.add('is-ready');
@@ -184,6 +297,8 @@ async function bootstrap() {
     presentationBinder,
     presentationDebug,
     simulation,
+    session,
+    pumpInput,
     physics: {
       get running() {
         return simulationRunning;
@@ -195,6 +310,7 @@ async function bootstrap() {
       },
     },
     camera: cameraController.camera,
+    cameraController,
     background,
     ground,
     lighting,
@@ -212,6 +328,7 @@ function dispose() {
   ground.dispose();
   lighting.dispose();
   background.dispose();
+  pumpInput?.dispose();
   hud.dispose();
   renderer.dispose();
 }

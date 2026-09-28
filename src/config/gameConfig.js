@@ -31,7 +31,7 @@ export const GAME_CONFIG = Object.freeze({
   }),
   passivePhysics: Object.freeze({
     fixedHz: 120,
-    gravity: 30,
+    gravity: 60,
     linearDrag: 0.035,
     maxFrameDelta: 0.1,
     maxSubSteps: 20,
@@ -39,8 +39,43 @@ export const GAME_CONFIG = Object.freeze({
     velocityEpsilon: 0.0001,
     startTransitionFraction: 0.72,
     initialVelocity: 0,
-    presentationSpeedReference: 11,
+    presentationSpeedReference: 19,
     presentationVerticalEpsilon: 0.02,
+  }),
+  session: Object.freeze({
+    durationSeconds: 75,
+  }),
+  arcadeMotion: Object.freeze({
+    downhillGravityScale: 1.18,
+    uphillGravityScale: 1.45,
+  }),
+  pumping: Object.freeze({
+    acceleration: 12,
+    upperWallRetention: 0.68,
+    minimumSpeed: 0.65,
+  }),
+  turning: Object.freeze({
+    kickTurnMinFraction: 0.72,
+    kickTurnRetention: 0.93,
+    handPlantMinFraction: 0.92,
+    handPlantRetention: 0.9,
+    aerialIdealHoldSeconds: 0.2,
+    aerialCompleteSeconds: 0.14,
+    aerialOverturnSeconds: 0.5,
+  }),
+  scoring: Object.freeze({
+    kickTurn: Object.freeze({ min: 100, max: 300 }),
+    handPlant: Object.freeze({ min: 400, max: 700 }),
+    aerialTurn: Object.freeze({ min: 400, max: 999 }),
+  }),
+  air: Object.freeze({
+    takeoffInset: 0.005,
+    launchMinimumSpeed: 1.2,
+    minimumVerticalVelocity: 11,
+    maximumVerticalVelocity: 22,
+    gravity: 60,
+    launchVelocityScale: 1.3,
+    landingVelocityRetention: 0.94,
   }),
   camera: Object.freeze({
     fov: 30,
@@ -48,5 +83,13 @@ export const GAME_CONFIG = Object.freeze({
     far: 180,
     position: Object.freeze([0, 6.0, 24.5]),
     target: Object.freeze([0, 3.9, 0]),
+    dynamicAirFraming: Object.freeze({
+      enterHeight: 7.6,
+      exitHeight: 7.0,
+      maxTrackedHeight: 10.5,
+      maxFov: 38,
+      maxTargetY: 6.6,
+      response: 5.5,
+    }),
   }),
 });
