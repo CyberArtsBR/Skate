@@ -20,6 +20,12 @@ page.on('requestfailed', (request) => {
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => document.querySelector('#game-stage')?.classList.contains('is-ready'));
 await page.waitForFunction(() => Boolean(window.__HALFPIPE_FOUNDATION__?.rider));
+await page.waitForFunction(() => Boolean(window.__HALFPIPE_FOUNDATION__?.simulation));
+await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  foundation.physics.setRunning(false);
+  foundation.presentationDebug.select(0);
+});
 
 const state = await page.evaluate(() => {
   const foundation = window.__HALFPIPE_FOUNDATION__;
@@ -56,6 +62,9 @@ const state = await page.evaluate(() => {
     stationCount: foundation.presentationDebug.stations.length,
     station: foundation.presentationDebug.current.name,
     boardAngle: foundation.presentationBinder.lastAngle,
+    physicsRunning: foundation.physics.running,
+    simulationMode: foundation.simulation.snapshot().mode,
+    fixedDt: foundation.simulation.fixedDt,
     renderer: canvas.getContext('webgl2') ? 'webgl2' : 'webgl',
   };
 });
@@ -143,6 +152,9 @@ assert.deepEqual(state.skateboardCoordinateSystem, {
 assert.equal(state.stance, 'regular');
 assert.equal(state.stationCount, 7);
 assert.equal(state.station, 'CENTER / FLAT');
+assert.equal(state.physicsRunning, false);
+assert.equal(state.simulationMode, 'contact');
+assert.ok(Math.abs(state.fixedDt - (1 / 120)) < 1e-12);
 assert.ok(state.deckTopHeight > state.wheelContactHeight);
 assert.ok(state.footIK.enabled);
 assert.ok(state.footIK.maxError < 0.2, `center foot IK error is ${state.footIK.maxError}`);
