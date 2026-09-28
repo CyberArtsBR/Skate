@@ -60,6 +60,7 @@ const state = await page.evaluate(() => {
     ],
     hiddenGroundNodes: foundation.halfpipe.hiddenGroundNodes,
     wheelCount: foundation.rider.skateboard.wheels.length,
+    wheelSpinSafe: foundation.rider.skateboard.wheelSpinSafe,
     rigCapabilities: foundation.rider.chimpion.rigAdapter.capabilities,
     groundMaterial: foundation.ground.ground.material.type,
     groundDepthWrite: foundation.ground.ground.material.depthWrite,
@@ -147,6 +148,7 @@ assert.ok(state.backgroundDimensions[1] >= 900);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] > 1.76);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] < 1.8);
 assert.equal(state.wheelCount, 4);
+assert.equal(state.wheelSpinSafe, false);
 assert.equal(state.rigCapabilities.gameplayFoundation, true);
 assert.equal(state.groundMaterial, 'ShadowMaterial');
 assert.equal(state.groundDepthWrite, false);
