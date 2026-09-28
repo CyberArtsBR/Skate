@@ -11,7 +11,8 @@
     "check:browser": "node checks/browser-smoke.mjs",
     "audit:assets": "node tools/inspect-glb.mjs",
     "check:physics": "node checks/passive-physics.mjs",
-    "check:contact": "node checks/contact-clearance.mjs"
+    "check:contact": "node checks/contact-clearance.mjs",
+    "check:visual-contact": "node checks/visual-contact.mjs"
   },
   "dependencies": {
     "three": "0.180.0"

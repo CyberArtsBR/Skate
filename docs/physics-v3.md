@@ -139,3 +139,25 @@ The presentation binder now solves clearance from measured skateboard support ge
 The old fixed `wallClearance` heuristic has been removed. Runtime diagnostics are exposed through `HalfpipePresentationBinder.lastContact`, including resolved clearance, extra clearance, target/minimum support separation and support-point count.
 
 This is still presentation-only. It does not alter the 120 Hz authoritative passive simulation or its crossing cadence.
+
+
+## Visual-mesh alignment root cause — right-wall clipping
+
+A direct raycast audit against the rendered halfpipe GLB identified the persistent right-wall skateboard clipping as a visual transform alignment bug, not a failure of the deterministic `HalfpipeProfile` simulation or the contact-aware support solver.
+
+The previous `HalfpipeVisual` loader centered the complete visible GLB from its aggregate bounds. The asset contains asymmetric decorative/support geometry, so that operation changed the authored X transform and shifted the visible riding channel relative to the gameplay profile. Before correction, measured skateboard support penetration against the visible mesh reached approximately:
+
+- LOWER RIGHT: -0.220
+- UPPER RIGHT: -0.354
+- RIGHT LIP: -0.715
+
+The source GLB is authored with its riding-channel X origin aligned to gameplay X=0. The corrected loader therefore preserves the authored model X transform and continues to use geometry bounds only for the established Y/Z presentation framing. `Object_4` is retained as the measured riding-surface subtree for visual diagnostics; its geometric bounding-box center is intentionally not used as a gameplay or alignment centerline.
+
+After preserving the authored X origin, visible-mesh raycasts at all seven presentation stations are positive. Key measured minimum skateboard support separations are:
+
+- CENTER / FLAT: 0.0149
+- LOWER LEFT / RIGHT: 0.0769 / 0.0761
+- UPPER LEFT / RIGHT: 0.3364 / 0.3359
+- LEFT / RIGHT LIP: 0.3017 / 0.3030
+
+The left/right differences are now negligible. `checks/visual-contact.mjs` raycasts the actual skateboard support points against the rendered riding mesh and guards against negative penetration or asymmetric visual alignment. This remains presentation validation only; gameplay physics stays authoritative on `HalfpipeProfile`.
