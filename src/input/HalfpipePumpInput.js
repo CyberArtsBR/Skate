@@ -46,8 +46,6 @@ export class HalfpipePumpInput {
     this.turnIntent = 0;
     this.keyboardHandPlantHeld = false;
     this.gamepadHandPlantHeld = false;
-    this.keyboardHandPlantHeld = false;
-    this.gamepadHandPlantHeld = false;
     this.handPlantHeld = false;
     this.gamepadConnected = false;
     this.gamepadId = '';
@@ -214,6 +212,8 @@ export class HalfpipePumpInput {
     this.gamepadTurnIntent = 0;
     this.intent = 0;
     this.turnIntent = 0;
+    this.keyboardHandPlantHeld = false;
+    this.gamepadHandPlantHeld = false;
     this.handPlantHeld = false;
     this.gamepadConnected = false;
     this.gamepadId = '';
