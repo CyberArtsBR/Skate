@@ -42,7 +42,11 @@ export class HalfpipeSimulation {
       region: 'unknown',
       direction: 0,
       bottomCrossings: 0,
+      lastBottomCrossingTime: null,
+      bottomCrossingInterval: 0,
+      lastCrossingSpeed: 0,
       turningPoints: 0,
+      lastTurningPointX: null,
       lipContacts: 0,
       distanceTravelled: 0,
       signedDistanceTravelled: 0,
@@ -122,25 +126,30 @@ export class HalfpipeSimulation {
       && nextX !== previousX
       && ((previousX < 0 && nextX >= 0) || (previousX > 0 && nextX <= 0))
     ) {
+      const crossingTime = this.state.time + dt;
+      if (this.state.lastBottomCrossingTime !== null) {
+        this.state.bottomCrossingInterval = crossingTime - this.state.lastBottomCrossingTime;
+      }
+      this.state.lastBottomCrossingTime = crossingTime;
+      this.state.lastCrossingSpeed = Math.abs(velocity);
       this.state.bottomCrossings += 1;
     }
 
-    const previousDirection = signWithEpsilon(previousVelocity, this.velocityEpsilon);
     const nextDirection = signWithEpsilon(velocity, this.velocityEpsilon);
     if (
-      previousDirection !== 0
-      && nextDirection !== 0
-      && previousDirection !== nextDirection
+      nextDirection !== 0
+      && this._lastDirection !== 0
+      && nextDirection !== this._lastDirection
     ) {
       this.state.turningPoints += 1;
+      this.state.lastTurningPointX = nextX;
     }
+    if (nextDirection !== 0) this._lastDirection = nextDirection;
 
     this.state.time += dt;
     this.state.pipeX = nextX;
     this.state.tangentVelocity = velocity;
     this.state.tangentialAcceleration = acceleration;
-    this._lastDirection = nextDirection;
-
     this._refreshDerivedState();
     return this.snapshot();
   }
