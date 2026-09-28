@@ -58,7 +58,7 @@ const results = await page.evaluate(() => {
   };
 });
 
-await fs.mkdir(path.resolve('.audit'), { recursive: true });
+await fs.mkdir(path.resolve('audit'), { recursive: true });
 
 for (const [index, name] of [
   [2, 'upper-left'],
@@ -70,23 +70,26 @@ for (const [index, name] of [
     window.__HALFPIPE_FOUNDATION__.presentationDebug.select(stationIndex);
   }, index);
   await page.screenshot({
-    path: path.resolve('.audit', `visual-contact-${name}.png`),
+    path: path.resolve('audit', `visual-contact-${name}.png`),
     fullPage: true,
   });
 }
 
 await fs.writeFile(
-  path.resolve('.audit', 'visual-contact.json'),
+  path.resolve('audit', 'visual-contact.json'),
   JSON.stringify(results, null, 2),
 );
 
 await browser.close();
 
-assert.equal(results.alignment.source, 'riding-surface');
+
+console.log(JSON.stringify(results, null, 2));
+
+assert.equal(results.alignment.source, 'authored-riding-origin');
 assert.ok(results.alignment.ridingSurfaceName, 'riding surface must be named');
 assert.ok(
-  Math.abs(results.ridingCenterX) < 1e-4,
-  `riding surface center drifted from world X=0: ${results.ridingCenterX}`,
+  Math.abs(results.alignment.appliedX - results.alignment.authoredPositionX) < 1e-8,
+  `halfpipe X must preserve authored riding origin: ${results.alignment.appliedX} vs ${results.alignment.authoredPositionX}`,
 );
 
 for (const station of results.stations) {
