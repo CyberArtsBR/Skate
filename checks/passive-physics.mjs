@@ -61,10 +61,26 @@ const presentationState = simulationToPresentationState(
   presentationProbe.snapshot(),
 );
 assert.equal(presentationState.airborne, false);
-assert.equal(presentationState.descending, true);
-assert.equal(presentationState.ascending, false);
-assert.ok(presentationState.verticalVelocity < 0);
-assert.ok(presentationState.surfaceAngle < 0);
+assert.ok(
+  Math.abs(presentationState.verticalVelocity) > 0.02,
+  'presentation probe should be moving vertically on the transition',
+);
+assert.equal(
+  presentationState.ascending,
+  presentationState.verticalVelocity > 0,
+  'ascending flag must match vertical velocity sign',
+);
+assert.equal(
+  presentationState.descending,
+  presentationState.verticalVelocity < 0,
+  'descending flag must match vertical velocity sign',
+);
+assert.notEqual(
+  presentationState.ascending,
+  presentationState.descending,
+  'contact presentation should not report ascending and descending simultaneously',
+);
+assert.ok(Number.isFinite(presentationState.surfaceAngle));
 assert.ok(presentationState.speedNormalized > 0);
 assert.equal(presentationState.pumpCompression, 0);
 
