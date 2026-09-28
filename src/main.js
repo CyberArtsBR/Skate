@@ -16,6 +16,7 @@ import { ChimpionLoader } from './character/ChimpionLoader.js';
 import { RiderController } from './character/RiderController.js';
 import { HalfpipeCamera } from './camera/HalfpipeCamera.js';
 import { HalfpipeHUD } from './ui/HalfpipeHUD.js';
+import { HalfpipePumpInput } from './input/HalfpipePumpInput.js';
 
 const stage = document.querySelector('#game-stage');
 const canvas = document.querySelector('#game-canvas');
@@ -44,6 +45,7 @@ let animationFrame = 0;
 let lastFrameTime = null;
 let lastWheelDistance = 0;
 let lastTelemetryTime = 0;
+let pumpInput = null;
 
 function resize() {
   const { width, height } = stage.getBoundingClientRect();
@@ -64,6 +66,8 @@ function formatTelemetry(state) {
     `C ${state.bottomCrossings}`,
     `Δ ${state.bottomCrossingInterval ? state.bottomCrossingInterval.toFixed(2) : '--'}`,
     `T ${state.turningPoints}`,
+    `PUMP ${state.pumpIntent > 0 ? 'UP' : state.pumpIntent < 0 ? 'DOWN' : '-'}`,
+    `Q ${state.pumpTimingQuality.toFixed(2)}`,
   ].join('   ');
 }
 
@@ -99,6 +103,8 @@ function render(timestamp = 0) {
   lastFrameTime = timestamp;
 
   if (simulationRunning && simulation) {
+    const pumpIntent = pumpInput?.pollGamepad() ?? 0;
+    simulation.setPumpIntent(pumpInput?.keyboardIntent || pumpIntent);
     const result = simulation.advance(frameDelta);
     if (result.steps > 0) {
       applySimulationState(result.state);
@@ -167,6 +173,7 @@ async function bootstrap() {
   scene.add(presentationDebug.root);
 
   simulation = new HalfpipeSimulation(profile);
+  pumpInput = new HalfpipePumpInput(window);
   resetSimulation();
   setSimulationRunning(true);
 
@@ -184,6 +191,7 @@ async function bootstrap() {
     presentationBinder,
     presentationDebug,
     simulation,
+    pumpInput,
     physics: {
       get running() {
         return simulationRunning;
@@ -212,6 +220,7 @@ function dispose() {
   ground.dispose();
   lighting.dispose();
   background.dispose();
+  pumpInput?.dispose();
   hud.dispose();
   renderer.dispose();
 }
