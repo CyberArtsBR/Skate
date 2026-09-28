@@ -64,6 +64,7 @@ assert.equal(presentationState.airborne, false);
 assert.equal(presentationState.descending, true);
 assert.equal(presentationState.ascending, false);
 assert.ok(presentationState.verticalVelocity < 0);
+assert.ok(presentationState.surfaceAngle < 0);
 assert.ok(presentationState.speedNormalized > 0);
 assert.equal(presentationState.pumpCompression, 0);
 
