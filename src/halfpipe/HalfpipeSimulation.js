@@ -109,8 +109,10 @@ export class HalfpipeSimulation {
       this.state.lipContacts += 1;
     }
 
-    const movement = Math.abs(nextX - previousX);
-    this.state.distanceTravelled += movement;
+    // tangentVelocity is speed along the ramp surface (ds/dt), so travelled
+    // distance is arc distance, not horizontal delta-X. This is the quantity
+    // later used for visual wheel rotation and telemetry.
+    this.state.distanceTravelled += Math.abs(velocity) * dt;
 
     if (
       previousX !== 0
