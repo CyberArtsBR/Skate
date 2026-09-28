@@ -19,7 +19,9 @@ export function simulationToPresentationState(profile, simulationState) {
     tangentVelocity: simulationState.tangentVelocity,
     ascending: verticalVelocity > threshold,
     descending: verticalVelocity < -threshold,
-    pumpCompression: 0,
+    pumpCompression: simulationState.pumpIntent < 0
+      ? simulationState.pumpWindowInfluence
+      : 0,
     airborne: false,
     verticalVelocity,
     surfaceAngle,
