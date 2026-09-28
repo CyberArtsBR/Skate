@@ -11,7 +11,13 @@ export class RiderController {
     this.root = new THREE.Group();
     this.root.name = 'rider-and-board-presentation-root';
 
-    this.root.add(skateboard.root, chimpion.root);
+    // Keep authoritative ramp/contact transforms on root. Visible tricks happen
+    // one level below so turns/hand plants never perturb collision or contact.
+    this.trickCarrier = new THREE.Group();
+    this.trickCarrier.name = 'rider-trick-presentation-carrier';
+    this.root.add(this.trickCarrier);
+    this.trickCarrier.add(skateboard.root, chimpion.root);
+
     chimpion.root.position.y = skateboard.deckSurfaceY + GAME_CONFIG.rider.deckClearance;
     chimpion.root.position.z = 0.015;
 
@@ -28,6 +34,7 @@ export class RiderController {
 
     this.root.userData.presentationOnly = true;
     this.root.userData.stance = GAME_CONFIG.rider.stance;
+    this.root.userData.hasTrickCarrier = true;
   }
 
   setPresentationState(nextState = {}) {
@@ -35,6 +42,18 @@ export class RiderController {
       ...this.presentationState,
       ...nextState,
     });
+
+    this.trickCarrier.position.set(
+      this.presentationState.trickOffsetX,
+      this.presentationState.trickOffsetY,
+      0,
+    );
+    this.trickCarrier.rotation.set(
+      0,
+      this.presentationState.facingYaw,
+      this.presentationState.trickRoll,
+    );
+
     const pose = this.poseController.evaluate(this.presentationState);
     this.chimpion.updatePose(pose);
     this.root.updateWorldMatrix(true, true);
