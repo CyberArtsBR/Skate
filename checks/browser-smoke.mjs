@@ -136,6 +136,15 @@ const transitionState = await page.evaluate(() => {
     tangent: foundation.presentationBinder.lastSample.tangent.toArray(),
     normal: foundation.presentationBinder.lastSample.normal.toArray(),
     footIK: { ...foundation.rider.footIK.result },
+    contact: foundation.presentationBinder.lastContact
+      ? {
+        clearance: foundation.presentationBinder.lastContact.clearance,
+        extraClearance: foundation.presentationBinder.lastContact.extraClearance,
+        minimumSeparation: foundation.presentationBinder.lastContact.minimumSeparation,
+        minSeparation: foundation.presentationBinder.lastContact.minSeparation,
+        supportPointCount: foundation.presentationBinder.lastContact.supportPointCount,
+      }
+      : null,
   };
 });
 await page.screenshot({
