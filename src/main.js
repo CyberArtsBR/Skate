@@ -17,6 +17,7 @@ import { RiderController } from './character/RiderController.js';
 import { HalfpipeCamera } from './camera/HalfpipeCamera.js';
 import { HalfpipeHUD } from './ui/HalfpipeHUD.js';
 import { HalfpipePumpInput } from './input/HalfpipePumpInput.js';
+import { HalfpipeSession, formatSessionTime } from './game/HalfpipeSession.js';
 
 const stage = document.querySelector('#game-stage');
 const canvas = document.querySelector('#game-canvas');
@@ -32,6 +33,9 @@ const lighting = createLighting(scene);
 const ground = createGround(scene);
 const hud = new HalfpipeHUD(stage);
 const profile = new HalfpipeProfile();
+const session = new HalfpipeSession({
+  durationSeconds: GAME_CONFIG.session.durationSeconds,
+});
 const profileDebug = new HalfpipeDebug(profile);
 scene.add(profileDebug.root);
 
@@ -56,7 +60,7 @@ function resize() {
 }
 
 function formatTelemetry(state) {
-  const runState = simulationRunning ? 'RUN' : 'PAUSE';
+  const runState = session.phase.toUpperCase();
   return [
     `P · ${runState}`,
     'R · RESET',
@@ -83,17 +87,54 @@ function applySimulationState(state, { rotateWheels = true } = {}) {
   lastWheelDistance = state.signedDistanceTravelled;
 }
 
+function updateSessionHUD() {
+  const state = session.snapshot();
+  hud.setScore(state.score);
+  hud.setTime(formatSessionTime(state.remaining));
+
+  if (state.phase === 'ready') {
+    hud.setStatus('READY · PRESS ↑/↓ OR ENTER TO START', 'ready');
+  } else if (state.phase === 'paused') {
+    hud.setStatus('PAUSED · PRESS P TO RESUME', 'paused');
+  } else if (state.phase === 'finished') {
+    hud.setStatus('TIME · RUN COMPLETE · PRESS R TO RESET', 'finished');
+  } else {
+    hud.setStatus('', 'running');
+  }
+}
+
 function resetSimulation() {
   if (!simulation) return;
   const state = simulation.reset();
+  session.reset();
+  simulationRunning = false;
   lastWheelDistance = state.signedDistanceTravelled;
   applySimulationState(state, { rotateWheels: false });
+  updateSessionHUD();
   hud.setDebugText(formatTelemetry(state));
 }
 
-function setSimulationRunning(nextRunning) {
-  simulationRunning = Boolean(nextRunning);
+function startSession() {
+  if (!simulation || session.phase === 'finished') return false;
+  if (session.phase === 'ready' || session.phase === 'paused') session.start();
+  simulationRunning = session.phase === 'running';
   lastFrameTime = null;
+  updateSessionHUD();
+  hud.setDebugText(formatTelemetry(simulation.snapshot()));
+  return simulationRunning;
+}
+
+function setSimulationRunning(nextRunning) {
+  if (nextRunning) {
+    if (session.phase === 'ready') session.start();
+    else if (session.phase === 'paused') session.resume();
+  } else if (session.phase === 'running') {
+    session.pause();
+  }
+
+  simulationRunning = session.phase === 'running';
+  lastFrameTime = null;
+  updateSessionHUD();
   if (simulation) hud.setDebugText(formatTelemetry(simulation.snapshot()));
   return simulationRunning;
 }
@@ -102,15 +143,30 @@ function render(timestamp = 0) {
   const frameDelta = lastFrameTime === null ? 0 : (timestamp - lastFrameTime) / 1000;
   lastFrameTime = timestamp;
 
-  if (simulationRunning && simulation) {
-    const pumpIntent = pumpInput?.pollGamepad() ?? 0;
-    simulation.setPumpIntent(pumpInput?.keyboardIntent || pumpIntent);
-    const result = simulation.advance(frameDelta);
-    if (result.steps > 0) {
-      applySimulationState(result.state);
-      if (timestamp - lastTelemetryTime >= 100) {
-        hud.setDebugText(formatTelemetry(result.state));
-        lastTelemetryTime = timestamp;
+  if (simulation) {
+    const gamepadIntent = pumpInput?.pollGamepad() ?? 0;
+    const pumpIntent = pumpInput?.keyboardIntent || gamepadIntent || 0;
+
+    if (session.phase === 'ready' && pumpIntent !== 0) startSession();
+
+    simulation.setPumpIntent(session.phase === 'running' ? pumpIntent : 0);
+
+    if (simulationRunning && session.phase === 'running') {
+      const result = simulation.advance(frameDelta);
+      if (result.steps > 0) {
+        session.step(result.steps * simulation.fixedDt);
+        applySimulationState(result.state);
+        updateSessionHUD();
+
+        if (session.phase === 'finished') {
+          simulationRunning = false;
+          simulation.setPumpIntent(0);
+        }
+
+        if (timestamp - lastTelemetryTime >= 100) {
+          hud.setDebugText(formatTelemetry(result.state));
+          lastTelemetryTime = timestamp;
+        }
       }
     }
   }
@@ -124,12 +180,19 @@ function onKeyDown(event) {
 
   if (event.code === 'KeyD') profileDebug.toggle();
 
+  if (
+    session.phase === 'ready'
+    && ['Enter', 'Space', 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS'].includes(event.code)
+  ) {
+    startSession();
+  }
+
   if (event.code === 'KeyP') {
-    setSimulationRunning(!simulationRunning);
+    if (session.phase === 'running') setSimulationRunning(false);
+    else if (session.phase === 'paused') setSimulationRunning(true);
   }
 
   if (event.code === 'KeyR') {
-    setSimulationRunning(false);
     resetSimulation();
   }
 
@@ -175,7 +238,6 @@ async function bootstrap() {
   simulation = new HalfpipeSimulation(profile);
   pumpInput = new HalfpipePumpInput(window);
   resetSimulation();
-  setSimulationRunning(true);
 
   loadingState.classList.add('is-hidden');
   stage.classList.add('is-ready');
@@ -191,6 +253,7 @@ async function bootstrap() {
     presentationBinder,
     presentationDebug,
     simulation,
+    session,
     pumpInput,
     physics: {
       get running() {
