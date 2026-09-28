@@ -28,7 +28,8 @@ export class HalfpipePresentationBinder {
     if (tangent.x < 0) tangent.multiplyScalar(-1);
     if (normal.y < 0) normal.multiplyScalar(-1);
 
-    const clearance = GAME_CONFIG.skateboard.surfaceClearance;
+    const clearance = GAME_CONFIG.skateboard.surfaceClearance
+      + GAME_CONFIG.skateboard.wallClearance * Math.abs(tangent.y);
     const angle = Math.atan2(tangent.y, tangent.x) + state.rotation;
     this.rider.root.position.set(
       sample.x + normal.x * clearance,

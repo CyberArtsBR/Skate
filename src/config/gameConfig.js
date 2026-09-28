@@ -14,6 +14,7 @@ export const GAME_CONFIG = Object.freeze({
     scale: 0.095,
     wheelRadius: 0.036,
     surfaceClearance: 0.18,
+    wallClearance: 0.08,
   }),
   rider: Object.freeze({
     targetHeight: 2.15,
