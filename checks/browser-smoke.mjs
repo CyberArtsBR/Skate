@@ -157,11 +157,67 @@ await page.screenshot({
 });
 await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.presentationDebug.select(0));
 
-await page.keyboard.press('d');
+const airTransition = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  const simulation = foundation.simulation;
+  const profile = foundation.profile;
+  foundation.physics.setRunning(false);
+
+  const takeoffX = profile.rightLip - 0.2;
+  simulation.reset({
+    pipeX: takeoffX - 0.025,
+    tangentVelocity: 20,
+  });
+  simulation.setPumpIntent(0);
+  simulation.setTurnIntent(0);
+  simulation.setHandPlantHeld(false);
+  foundation.physics.applyCurrentState();
+
+  let launch = null;
+  let landing = null;
+  let previousMode = simulation.snapshot().mode;
+  let previousRoot = foundation.rider.root.position.clone();
+  let previousState = simulation.snapshot();
+
+  for (let index = 0; index < 480; index += 1) {
+    const next = simulation.stepFixed();
+    foundation.physics.applyCurrentState();
+    const nextRoot = foundation.rider.root.position.clone();
+
+    if (previousMode === 'contact' && next.mode === 'airborne' && !launch) {
+      launch = {
+        previousPipeX: previousState.pipeX,
+        pipeX: next.pipeX,
+        previousRoot: previousRoot.toArray(),
+        root: nextRoot.toArray(),
+        rootDelta: nextRoot.distanceTo(previousRoot),
+        lipDistance: Math.abs(profile.rightLip - next.pipeX),
+      };
+    }
+
+    if (previousMode === 'airborne' && next.mode === 'contact' && !landing) {
+      landing = {
+        previousRoot: previousRoot.toArray(),
+        root: nextRoot.toArray(),
+        rootDelta: nextRoot.distanceTo(previousRoot),
+        pipeX: next.pipeX,
+      };
+      break;
+    }
+
+    previousMode = next.mode;
+    previousRoot = nextRoot;
+    previousState = next;
+  }
+
+  return { launch, landing };
+});
+
+await page.keyboard.press('F3');
 const profileDebugVisible = await page.evaluate(
   () => window.__HALFPIPE_FOUNDATION__.profileDebug.root.visible,
 );
-await page.keyboard.press('d');
+await page.keyboard.press('F3');
 
 await browser.close();
 
@@ -243,6 +299,20 @@ for (const station of stationStates) {
 assert.ok(stationStates[2].boardAngle < 0, 'left transition must slope down toward center');
 assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away from center');
 assert.equal(profileDebugVisible, true);
+assert.ok(airTransition.launch, 'air transition probe must reach airborne mode');
+assert.ok(
+  airTransition.launch.lipDistance > 0.15,
+  `takeoff anchor must remain inside the visual coping instead of snapping to the mathematical lip: ${airTransition.launch.lipDistance}`,
+);
+assert.ok(
+  airTransition.launch.rootDelta < 0.4,
+  `ramp-to-air presentation jump is too large: ${airTransition.launch.rootDelta}`,
+);
+assert.ok(airTransition.landing, 'air transition probe must return to contact mode');
+assert.ok(
+  airTransition.landing.rootDelta < 0.4,
+  `air-to-ramp presentation jump is too large: ${airTransition.landing.rootDelta}`,
+);
 assert.ok(state.hiddenGroundNodes.includes('halfpipe-ground_Baked_1'));
 assert.deepEqual(consoleErrors, []);
 assert.deepEqual(pageErrors, []);
@@ -255,4 +325,5 @@ console.log(JSON.stringify({
   consoleErrors,
   pageErrors,
   failedRequests,
+  airTransition,
 }, null, 2));
