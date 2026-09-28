@@ -347,6 +347,17 @@ export class HalfpipeSimulation {
       if (this.state.airTurnHold > this.aerialOverturnSeconds) {
         this.state.airTurnOverturned = true;
       }
+    } else if (
+      this.state.airTurnCompleted
+      && this.state.trickType === 'aerial-turn'
+      && this.state.trickProgress < 1
+    ) {
+      // Once a valid aerial turn has been committed, finish the visible 180°
+      // rotation even if the player releases the direction before landing.
+      this.state.trickProgress = Math.min(
+        1,
+        this.state.trickProgress + dt / 0.12,
+      );
     }
 
     this.state.time += dt;
