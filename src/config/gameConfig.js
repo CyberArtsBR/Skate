@@ -42,6 +42,9 @@ export const GAME_CONFIG = Object.freeze({
     presentationSpeedReference: 11,
     presentationVerticalEpsilon: 0.02,
   }),
+  session: Object.freeze({
+    durationSeconds: 75,
+  }),
   pumping: Object.freeze({
     specificEnergyPerSecond: 42,
     windowHalfWidth: 4.4,
