@@ -6,7 +6,7 @@ class FakeTarget {
   removeEventListener() {}
 }
 
-function makePad({ buttons = {}, stickY = 0 } = {}) {
+function makePad({ buttons = {}, stickX = 0, stickY = 0 } = {}) {
   const list = Array.from({ length: 16 }, () => ({ pressed: false }));
   for (const [index, pressed] of Object.entries(buttons)) {
     list[Number(index)] = { pressed: Boolean(pressed) };
@@ -15,7 +15,7 @@ function makePad({ buttons = {}, stickY = 0 } = {}) {
     connected: true,
     id: 'Test Controller',
     buttons: list,
-    axes: [0, stickY, 0, 0],
+    axes: [stickX, stickY, 0, 0],
   };
 }
 
@@ -29,6 +29,22 @@ assert.equal(input.pollGamepad([makePad({ buttons: { 13: true } })]), -1);
 assert.equal(input.pollGamepad([makePad({ stickY: -0.8 })]), 1);
 assert.equal(input.pollGamepad([makePad({ stickY: 0.8 })]), -1);
 assert.equal(input.pollGamepad([makePad({ stickY: 0.1 })]), 0);
+
+input.pollGamepad([makePad({ buttons: { 14: true } })]);
+assert.equal(input.snapshot().gamepadTurnIntent, -1);
+input.pollGamepad([makePad({ buttons: { 15: true } })]);
+assert.equal(input.snapshot().gamepadTurnIntent, 1);
+input.pollGamepad([makePad({ stickX: -0.8 })]);
+assert.equal(input.snapshot().gamepadTurnIntent, -1);
+input.pollGamepad([makePad({ stickX: 0.8 })]);
+assert.equal(input.snapshot().gamepadTurnIntent, 1);
+input.pollGamepad([makePad({ stickX: 0.1 })]);
+assert.equal(input.snapshot().gamepadTurnIntent, 0);
+
+input.pollGamepad([makePad({ buttons: { 1: true } })]);
+assert.equal(input.snapshot().handPlantHeld, true);
+input.pollGamepad([makePad()]);
+assert.equal(input.snapshot().handPlantHeld, false);
 
 input.pollGamepad([makePad({ buttons: { 0: true } })]);
 assert.deepEqual(input.consumeActions(), {
@@ -66,6 +82,8 @@ assert.deepEqual(input.consumeActions(), {
 input.pollGamepad([]);
 assert.equal(input.snapshot().gamepadConnected, false);
 assert.equal(input.snapshot().gamepadIntent, 0);
+assert.equal(input.snapshot().gamepadTurnIntent, 0);
+assert.equal(input.snapshot().handPlantHeld, false);
 
 input.dispose();
 
