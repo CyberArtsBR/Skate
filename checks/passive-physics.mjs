@@ -214,6 +214,8 @@ const kickTurnState = kickTurnSim.stepFixed();
 assert.equal(kickTurnState.lastTrick, 'kick-turn');
 assert.ok(kickTurnState.tangentVelocity < 0, 'right-wall kick turn should reverse back toward center');
 assert.equal(kickTurnState.trickCount, 1);
+assert.ok(kickTurnState.lastTrickPoints >= 100 && kickTurnState.lastTrickPoints <= 300);
+assert.equal(kickTurnState.score, kickTurnState.lastTrickPoints);
 
 const handPlantSim = new HalfpipeSimulation(trickProfile);
 handPlantSim.reset({
@@ -224,6 +226,7 @@ handPlantSim.setHandPlantHeld(true);
 const handPlantState = handPlantSim.stepFixed();
 assert.equal(handPlantState.lastTrick, 'hand-plant');
 assert.ok(handPlantState.tangentVelocity < 0, 'hand plant should reverse the rider back into the pipe');
+assert.ok(handPlantState.lastTrickPoints >= 400 && handPlantState.lastTrickPoints <= 700);
 
 const aerialTurnSim = new HalfpipeSimulation(trickProfile);
 aerialTurnSim.reset({
@@ -244,6 +247,7 @@ const aerialTurnState = aerialTurnSim.snapshot();
 assert.equal(aerialTurnState.mode, 'contact');
 assert.equal(aerialTurnState.lastTrick, 'aerial-turn');
 assert.ok(aerialTurnState.trickCount >= 1);
+assert.ok(aerialTurnState.lastTrickPoints >= 400 && aerialTurnState.lastTrickPoints <= 999);
 
 console.log(JSON.stringify({
   trickRegression: {
