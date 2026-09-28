@@ -27,10 +27,10 @@ export const GAME_CONFIG = Object.freeze({
     debugVisible: false,
   }),
   camera: Object.freeze({
-    fov: 33,
+    fov: 30,
     near: 0.1,
     far: 180,
-    position: Object.freeze([0, 7.2, 30.5]),
-    target: Object.freeze([0, 4.4, 0]),
+    position: Object.freeze([0, 6.0, 24.5]),
+    target: Object.freeze([0, 3.9, 0]),
   }),
 });
