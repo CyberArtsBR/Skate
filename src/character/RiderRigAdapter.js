@@ -1,0 +1,115 @@
+import * as THREE from 'three';
+
+const REQUIRED_SLOTS = Object.freeze([
+  'hips',
+  'leftThigh',
+  'rightThigh',
+  'leftShin',
+  'rightShin',
+  'leftFoot',
+  'rightFoot',
+]);
+
+const SLOT_ALIASES = Object.freeze({
+  hips: ['ccbasehip', 'hips', 'pelvis'],
+  spine: ['ccbasespine01', 'spine01', 'spine1', 'spine'],
+  chest: ['ccbasespine02', 'spine02', 'spine2', 'chest', 'upperchest'],
+  neck: ['ccbasenecktwist01', 'necktwist01', 'neck'],
+  head: ['ccbasehead', 'head'],
+  leftShoulder: ['ccbaselclavicle', 'leftclavicle', 'leftshoulder'],
+  leftUpperArm: ['ccbaselupperarm', 'leftupperarm', 'leftarm'],
+  leftForearm: ['ccbaselforearm', 'leftforearm', 'leftlowerarm'],
+  leftHand: ['ccbaselhand', 'lefthand'],
+  rightShoulder: ['ccbaserclavicle', 'rightclavicle', 'rightshoulder'],
+  rightUpperArm: ['ccbaserupperarm', 'rightupperarm', 'rightarm'],
+  rightForearm: ['ccbaserforearm', 'rightforearm', 'rightlowerarm'],
+  rightHand: ['ccbaserhand', 'righthand'],
+  leftThigh: ['ccbaselthigh', 'leftthigh', 'leftupleg'],
+  leftShin: ['ccbaselcalf', 'leftcalf', 'leftshin', 'leftleg'],
+  leftFoot: ['ccbaselfoot', 'leftfoot'],
+  rightThigh: ['ccbaserthigh', 'rightthigh', 'rightupleg'],
+  rightShin: ['ccbasercalf', 'rightcalf', 'rightshin', 'rightleg'],
+  rightFoot: ['ccbaserfoot', 'rightfoot'],
+});
+
+function normalizeName(name = '') {
+  return name.toLowerCase().replace(/mixamorig\d*/g, '').replace(/[^a-z0-9]/g, '');
+}
+function findBone(bones, aliases) {
+  const exact = bones.find((bone) => aliases.includes(normalizeName(bone.name)));
+  if (exact) return exact;
+  return bones.find((bone) => {
+    const name = normalizeName(bone.name);
+    return !/twist|share|toe|finger|eye|breast/.test(name)
+      && aliases.some((alias) => name.endsWith(alias));
+  }) || null;
+}
+
+export class RiderRigAdapter {
+  constructor(model) {
+    this.model = model;
+    this.bones = [];
+    model.traverse((object) => {
+      if (object.isBone) this.bones.push(object);
+    });
+
+    this.rig = {};
+    for (const [slot, aliases] of Object.entries(SLOT_ALIASES)) {
+      this.rig[slot] = findBone(this.bones, aliases);
+    }
+    this.missingRequired = REQUIRED_SLOTS.filter((slot) => !this.rig[slot]);
+    this.restPose = new Map(
+      this.bones.map((bone) => [bone, bone.quaternion.clone()]),
+    );
+  }
+
+  get valid() {
+    return this.missingRequired.length === 0;
+  }
+
+  get capabilities() {
+    const has = (slot) => Boolean(this.rig[slot]);
+    return {
+      gameplayFoundation: this.valid,
+      torso: ['hips', 'spine', 'chest'].every(has),
+      gaze: ['neck', 'head'].every(has),
+      leftArm: ['leftUpperArm', 'leftForearm', 'leftHand'].every(has),
+      rightArm: ['rightUpperArm', 'rightForearm', 'rightHand'].every(has),
+      leftLeg: ['leftThigh', 'leftShin', 'leftFoot'].every(has),
+      rightLeg: ['rightThigh', 'rightShin', 'rightFoot'].every(has),
+    };
+  }
+
+  resetPose() {
+    for (const [bone, quaternion] of this.restPose) bone.quaternion.copy(quaternion);
+  }
+
+  applyFoundationPose({ crouch = 0.55, torsoTurn = 0.08 } = {}) {
+    this.resetPose();
+    const rotation = new THREE.Quaternion();
+    const euler = new THREE.Euler();
+    const apply = (slot, x = 0, y = 0, z = 0) => {
+      const bone = this.rig[slot];
+      if (!bone) return;
+      rotation.setFromEuler(euler.set(x, y, z, 'XYZ'));
+      bone.quaternion.multiply(rotation);
+    };
+
+    apply('hips', -0.08 * crouch, 0, 0);
+    apply('spine', -0.055 * crouch, torsoTurn * 0.45, 0);
+    apply('chest', -0.025 * crouch, torsoTurn, 0);
+    apply('neck', 0, -torsoTurn * 0.65, 0);
+    apply('head', 0, -torsoTurn * 0.35, 0);
+
+    for (const side of ['left', 'right']) {
+      const sign = side === 'left' ? -1 : 1;
+      apply(`${side}Thigh`, -0.34 * crouch, sign * 0.045, sign * 0.055);
+      apply(`${side}Shin`, 0.61 * crouch, 0, 0);
+      apply(`${side}Foot`, -0.12 * crouch, sign * 0.025, 0);
+      apply(`${side}UpperArm`, -0.1, 0, sign * 0.58);
+      apply(`${side}Forearm`, -0.12, 0, sign * 0.08);
+    }
+
+    this.model.updateWorldMatrix(true, true);
+  }
+}
