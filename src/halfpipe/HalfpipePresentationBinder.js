@@ -31,6 +31,23 @@ export class HalfpipePresentationBinder {
     if (normal.y < 0) normal.multiplyScalar(-1);
 
     const angle = Math.atan2(tangent.y, tangent.x) + state.rotation;
+
+    if (state.airborne && state.worldY !== null) {
+      this.rider.root.position.set(state.pipeX, state.worldY, 0);
+      this.rider.root.rotation.set(0, 0, angle);
+      this.rider.root.updateWorldMatrix(true, true);
+
+      this.lastSample = {
+        ...sample,
+        tangent: tangent.clone(),
+        normal: normal.clone(),
+      };
+      this.lastAngle = angle;
+      this.lastContact = null;
+      this.rider.setPresentationState({ ...state, pipeX: state.pipeX });
+      return this.lastSample;
+    }
+
     const baseClearance = GAME_CONFIG.skateboard.surfaceClearance;
     const measuredWheelDiameter = Math.max(
       1e-4,
