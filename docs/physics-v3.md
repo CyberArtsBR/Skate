@@ -121,3 +121,21 @@ Corrections:
 - the upper torso and head now receive partial counter-rotation from the sampled surface angle, improving balance while keeping feet/IK anchored to the deck.
 
 These are presentation-only corrections. They do not change the fixed-step simulation, gravity, drag, crossing cadence, or contact path.
+
+
+## Contact-aware skateboard support pass
+
+The previous slope-only wall offset could keep the rider body visible while still giving poor confidence that the actual skateboard geometry stayed outside the mathematical riding surface.
+
+The presentation binder now solves clearance from measured skateboard support geometry:
+
+- four wheel-bottom support points are derived from the actual imported wheel meshes;
+- the lower nose and tail of the deck are included as additional support points;
+- the wheel diameter is measured from the loaded skateboard asset;
+- the flat keeps the existing calibrated base clearance;
+- transition margin scales from the measured wheel diameter and ramp slope;
+- an iterative solver finds the smallest additional displacement along the sampled surface normal that keeps every support point at or above the requested separation.
+
+The old fixed `wallClearance` heuristic has been removed. Runtime diagnostics are exposed through `HalfpipePresentationBinder.lastContact`, including resolved clearance, extra clearance, target/minimum support separation and support-point count.
+
+This is still presentation-only. It does not alter the 120 Hz authoritative passive simulation or its crossing cadence.
