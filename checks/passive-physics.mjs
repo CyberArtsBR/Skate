@@ -42,7 +42,10 @@ assert.ok(
 assert.equal(first.final.lipContacts, 0, 'default passive calibration should remain below coping');
 assert.equal(first.final.mode, 'contact');
 assert.ok(first.final.lastBottomCrossingTime !== null);
-assert.ok(first.final.bottomCrossingInterval > 0);
+assert.ok(
+  first.final.bottomCrossingInterval >= 1.7 && first.final.bottomCrossingInterval <= 2.2,
+  `passive crossing cadence drifted outside the current reference band: ${first.final.bottomCrossingInterval}`,
+);
 assert.ok(first.final.lastCrossingSpeed > 0);
 assert.ok(first.final.lastTurningPointX !== null);
 assert.ok(first.final.distanceTravelled > 0);
