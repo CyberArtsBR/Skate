@@ -29,6 +29,17 @@ export const GAME_CONFIG = Object.freeze({
     debugDepth: 8.3,
     debugVisible: false,
   }),
+  passivePhysics: Object.freeze({
+    fixedHz: 120,
+    gravity: 9.81,
+    linearDrag: 0.035,
+    maxFrameDelta: 0.1,
+    maxSubSteps: 20,
+    lipInset: 0.002,
+    velocityEpsilon: 0.0001,
+    startTransitionFraction: 0.72,
+    initialVelocity: 0,
+  }),
   camera: Object.freeze({
     fov: 30,
     near: 0.1,
