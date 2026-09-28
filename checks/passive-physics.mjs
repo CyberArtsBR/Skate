@@ -194,3 +194,61 @@ console.log(JSON.stringify({
     launches: airborne.final.airLaunches,
   },
 }, null, 2));
+
+
+function wallX(profile, side, fraction) {
+  return side * (
+    profile.flatHalfWidth + profile.transitionWidth * fraction
+  );
+}
+
+const trickProfile = new HalfpipeProfile();
+
+const kickTurnSim = new HalfpipeSimulation(trickProfile);
+kickTurnSim.reset({
+  pipeX: wallX(trickProfile, 1, 0.82),
+  tangentVelocity: 8,
+});
+kickTurnSim.setTurnIntent(-1);
+const kickTurnState = kickTurnSim.stepFixed();
+assert.equal(kickTurnState.lastTrick, 'kick-turn');
+assert.ok(kickTurnState.tangentVelocity < 0, 'right-wall kick turn should reverse back toward center');
+assert.equal(kickTurnState.trickCount, 1);
+
+const handPlantSim = new HalfpipeSimulation(trickProfile);
+handPlantSim.reset({
+  pipeX: wallX(trickProfile, 1, 0.95),
+  tangentVelocity: 7,
+});
+handPlantSim.setHandPlantHeld(true);
+const handPlantState = handPlantSim.stepFixed();
+assert.equal(handPlantState.lastTrick, 'hand-plant');
+assert.ok(handPlantState.tangentVelocity < 0, 'hand plant should reverse the rider back into the pipe');
+
+const aerialTurnSim = new HalfpipeSimulation(trickProfile);
+aerialTurnSim.reset({
+  pipeX: trickProfile.rightLip - 0.006,
+  tangentVelocity: 20,
+});
+for (let index = 0; index < 60 && aerialTurnSim.snapshot().mode !== 'airborne'; index += 1) {
+  aerialTurnSim.stepFixed();
+}
+assert.equal(aerialTurnSim.snapshot().mode, 'airborne', 'aerial-turn probe must launch');
+aerialTurnSim.setTurnIntent(-1);
+for (let index = 0; index < 22; index += 1) aerialTurnSim.stepFixed();
+aerialTurnSim.setTurnIntent(0);
+for (let index = 0; index < 600 && aerialTurnSim.snapshot().mode === 'airborne'; index += 1) {
+  aerialTurnSim.stepFixed();
+}
+const aerialTurnState = aerialTurnSim.snapshot();
+assert.equal(aerialTurnState.mode, 'contact');
+assert.equal(aerialTurnState.lastTrick, 'aerial-turn');
+assert.ok(aerialTurnState.trickCount >= 1);
+
+console.log(JSON.stringify({
+  trickRegression: {
+    kickTurn: kickTurnState.lastTrick,
+    handPlant: handPlantState.lastTrick,
+    aerialTurn: aerialTurnState.lastTrick,
+  },
+}, null, 2));
