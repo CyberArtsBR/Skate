@@ -39,6 +39,8 @@ export const GAME_CONFIG = Object.freeze({
     velocityEpsilon: 0.0001,
     startTransitionFraction: 0.72,
     initialVelocity: 0,
+    presentationSpeedReference: 7,
+    presentationVerticalEpsilon: 0.02,
   }),
   camera: Object.freeze({
     fov: 30,
