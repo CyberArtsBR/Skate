@@ -46,9 +46,9 @@ export const GAME_CONFIG = Object.freeze({
     durationSeconds: 75,
   }),
   pumping: Object.freeze({
-    specificEnergyPerSecond: 42,
-    windowHalfWidth: 4.4,
-    minimumSpeed: 0.8,
+    specificEnergyPerSecond: 78,
+    windowHalfWidth: 4.8,
+    minimumSpeed: 0.65,
   }),
   camera: Object.freeze({
     fov: 30,
