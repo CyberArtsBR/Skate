@@ -73,7 +73,9 @@ function formatTelemetry(state) {
     `PUMP ${state.pumpIntent > 0 ? 'UP' : state.pumpIntent < 0 ? 'DOWN' : '-'}`,
     `Q ${state.pumpTimingQuality.toFixed(2)}`,
     `TURN ${state.turnIntent < 0 ? 'LEFT' : state.turnIntent > 0 ? 'RIGHT' : '-'}`,
-    state.lastTrick ? `TRICK ${state.lastTrick}` : 'TRICK -',
+    state.lastTrick
+      ? `TRICK ${state.lastTrick} +${state.lastTrickPoints || 0}`
+      : 'TRICK -',
     state.mode === 'airborne'
       ? `AIR ${state.airVerticalVelocity.toFixed(1)} · H ${(state.airY ?? 0).toFixed(1)}`
       : 'CONTACT',
@@ -190,6 +192,7 @@ function render(timestamp = 0) {
       const result = simulation.advance(frameDelta);
       if (result.steps > 0) {
         session.step(result.steps * simulation.fixedDt);
+        session.score = result.state.score || 0;
         applySimulationState(result.state);
         updateSessionHUD();
 
