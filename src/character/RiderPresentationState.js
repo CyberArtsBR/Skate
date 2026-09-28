@@ -11,6 +11,11 @@ export const DEFAULT_RIDER_PRESENTATION_STATE = Object.freeze({
   worldY: null,
   surfaceAngle: 0,
   rotation: 0,
+  facingYaw: 0,
+  trickRoll: 0,
+  trickOffsetX: 0,
+  trickOffsetY: 0,
+  trickVisualActive: false,
   landing: 0,
   landingQuality: 'none',
   trickType: null,
@@ -26,6 +31,11 @@ export function createRiderPresentationState(overrides = {}) {
   state.worldY = Number.isFinite(Number(state.worldY)) ? Number(state.worldY) : null;
   state.surfaceAngle = Number(state.surfaceAngle) || 0;
   state.rotation = Number(state.rotation) || 0;
+  state.facingYaw = Number(state.facingYaw) || 0;
+  state.trickRoll = Number(state.trickRoll) || 0;
+  state.trickOffsetX = Number(state.trickOffsetX) || 0;
+  state.trickOffsetY = Number(state.trickOffsetY) || 0;
+  state.trickVisualActive = Boolean(state.trickVisualActive);
   state.ascending = Boolean(state.ascending);
   state.descending = Boolean(state.descending);
   state.airborne = Boolean(state.airborne);
