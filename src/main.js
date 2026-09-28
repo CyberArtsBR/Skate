@@ -72,6 +72,9 @@ function formatTelemetry(state) {
     `T ${state.turningPoints}`,
     `PUMP ${state.pumpIntent > 0 ? 'UP' : state.pumpIntent < 0 ? 'DOWN' : '-'}`,
     `Q ${state.pumpTimingQuality.toFixed(2)}`,
+    state.mode === 'airborne'
+      ? `AIR ${state.airVerticalVelocity.toFixed(1)} · H ${(state.airY ?? 0).toFixed(1)}`
+      : 'CONTACT',
   ].join('   ');
 }
 
