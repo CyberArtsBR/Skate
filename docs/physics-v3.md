@@ -105,3 +105,19 @@ The first live preview recording showed a stable deterministic oscillation, but 
 For the next isolated calibration pass, only the gameplay gravity scale is changed from 9.81 to 30 while preserving the existing profile and passive drag. This is a **gameplay-scale acceleration**, not a claim that the game world uses SI-scale real-world gravity.
 
 The 120 Hz reference simulation with the current starting amplitude produces early passive crossing intervals around 1.81 s and gradually lengthens as passive energy decays. Pumping and airtime are still absent, so this remains a contact-model calibration rather than final California Games tuning.
+
+
+## Visual contact correction — preview screenshot review
+
+The next preview screenshots exposed two presentation problems that are independent of the authoritative passive physics:
+
+1. rotating the imported wheel/axle hierarchy could visibly orbit a wheel/truck piece away from the deck because the source GLB does not guarantee centered wheel pivots;
+2. rotating the entire rider root by the ramp tangent made the Chimpion read like a rigid object lying sideways on steep transitions.
+
+Corrections:
+
+- wheel travel is still accumulated, but unsafe GLB wheel transforms are no longer mutated; visual wheel spin stays disabled until safe centered pivots are authored/rebuilt;
+- the skateboard and lower body remain aligned to the ramp;
+- the upper torso and head now receive partial counter-rotation from the sampled surface angle, improving balance while keeping feet/IK anchored to the deck.
+
+These are presentation-only corrections. They do not change the fixed-step simulation, gravity, drag, crossing cadence, or contact path.
