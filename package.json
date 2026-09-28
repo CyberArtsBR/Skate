@@ -7,10 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "node --check src/main.js && node checks/foundation-invariants.mjs && node checks/passive-physics.mjs",
+    "check": "node --check src/main.js && node checks/foundation-invariants.mjs && node checks/passive-physics.mjs && node checks/contact-clearance.mjs",
     "check:browser": "node checks/browser-smoke.mjs",
     "audit:assets": "node tools/inspect-glb.mjs",
-    "check:physics": "node checks/passive-physics.mjs"
+    "check:physics": "node checks/passive-physics.mjs",
+    "check:contact": "node checks/contact-clearance.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
