@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { HalfpipeProfile } from '../src/halfpipe/HalfpipeProfile.js';
 import { HalfpipeSimulation } from '../src/halfpipe/HalfpipeSimulation.js';
+import { simulationToPresentationState } from '../src/halfpipe/HalfpipeSimulationPresentation.js';
 
 function runPassive(seconds = 20) {
   const profile = new HalfpipeProfile();
@@ -40,6 +41,24 @@ assert.ok(
 );
 assert.equal(first.final.lipContacts, 0, 'default passive calibration should remain below coping');
 assert.equal(first.final.mode, 'contact');
+assert.ok(first.final.distanceTravelled > 0);
+assert.ok(
+  first.final.distanceTravelled >= Math.abs(first.final.signedDistanceTravelled),
+  'absolute ramp travel must bound signed travel',
+);
+
+const presentationProbe = new HalfpipeSimulation(new HalfpipeProfile());
+for (let index = 0; index < 90; index += 1) presentationProbe.stepFixed();
+const presentationState = simulationToPresentationState(
+  presentationProbe.profile,
+  presentationProbe.snapshot(),
+);
+assert.equal(presentationState.airborne, false);
+assert.equal(presentationState.descending, true);
+assert.equal(presentationState.ascending, false);
+assert.ok(presentationState.verticalVelocity < 0);
+assert.ok(presentationState.speedNormalized > 0);
+assert.equal(presentationState.pumpCompression, 0);
 
 console.log(JSON.stringify({
   initial: first.initial,
