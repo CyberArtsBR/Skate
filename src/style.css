@@ -155,6 +155,28 @@ body {
   font-size: clamp(12px, 1.2vw, 21px);
 }
 
+.hud-status {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(46px, 5vw, 78px);
+  transform: translateX(-50%);
+  max-width: 70%;
+  padding: 0.55em 0.9em;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 999px;
+  color: rgb(255 255 255 / 82%);
+  background: rgb(4 19 32 / 62%);
+  font: 800 clamp(9px, 0.72vw, 13px) / 1.1 monospace;
+  letter-spacing: 0.08em;
+  text-align: center;
+  backdrop-filter: blur(3px);
+}
+
+.hud-status[data-phase="finished"] {
+  color: #ffde80;
+  border-color: rgb(255 222 128 / 42%);
+}
+
 .hud-debug {
   position: absolute;
   right: clamp(20px, 3vw, 52px);
