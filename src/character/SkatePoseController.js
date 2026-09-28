@@ -15,6 +15,7 @@ export class SkatePoseController {
     const air = state.airborne ? 1 : 0;
     const ascending = state.ascending ? 1 : 0;
     const descending = state.descending ? 1 : 0;
+    const surfaceAngle = THREE.MathUtils.clamp(Number(state.surfaceAngle) || 0, -1.25, 1.25);
     const landingScale = state.landingQuality === 'hard'
       ? 1.2
       : state.landingQuality === 'rough' ? 1.08 : 1;
@@ -35,6 +36,8 @@ export class SkatePoseController {
       kneeFlex: 0.38 + compression * 0.42,
       ankleFlex: -0.08 - compression * 0.07,
       torsoCounter: 0.12 + speed * 0.05 - landing * 0.04,
+      torsoBalanceZ: -surfaceAngle * 0.56,
+      headBalanceZ: -surfaceAngle * 0.12,
       headLook: 0.42 + speed * 0.08,
       armBalance: 0.58 + air * 0.08 + landing * 0.06,
       airborne: Boolean(state.airborne),

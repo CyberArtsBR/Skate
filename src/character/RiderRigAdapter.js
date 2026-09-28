@@ -91,6 +91,8 @@ export class RiderRigAdapter {
     kneeFlex = 0.56,
     ankleFlex = -0.12,
     torsoCounter = 0.12,
+    torsoBalanceZ = 0,
+    headBalanceZ = 0,
     headLook = 0.42,
     armBalance = 0.62,
   } = {}) {
@@ -106,10 +108,20 @@ export class RiderRigAdapter {
 
     const stanceDirection = stance === 'goofy' ? -1 : 1;
     apply('hips', -hipFlex, 0, 0);
-    apply('spine', -0.055 * compression, -torsoCounter * 0.35 * stanceDirection, 0);
-    apply('chest', -0.025 * compression, -torsoCounter * 0.65 * stanceDirection, 0);
-    apply('neck', 0, headLook * 0.42 * stanceDirection, 0);
-    apply('head', 0, headLook * 0.58 * stanceDirection, 0);
+    apply(
+      'spine',
+      -0.055 * compression,
+      -torsoCounter * 0.35 * stanceDirection,
+      torsoBalanceZ * 0.36,
+    );
+    apply(
+      'chest',
+      -0.025 * compression,
+      -torsoCounter * 0.65 * stanceDirection,
+      torsoBalanceZ * 0.64,
+    );
+    apply('neck', 0, headLook * 0.42 * stanceDirection, headBalanceZ * 0.35);
+    apply('head', 0, headLook * 0.58 * stanceDirection, headBalanceZ * 0.65);
 
     for (const side of ['left', 'right']) {
       const sign = side === 'left' ? -1 : 1;

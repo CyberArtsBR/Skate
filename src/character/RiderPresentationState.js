@@ -8,6 +8,7 @@ export const DEFAULT_RIDER_PRESENTATION_STATE = Object.freeze({
   pumpCompression: 0,
   airborne: false,
   verticalVelocity: 0,
+  surfaceAngle: 0,
   rotation: 0,
   landing: 0,
   landingQuality: 'none',
@@ -21,6 +22,7 @@ export function createRiderPresentationState(overrides = {}) {
   state.pipeX = Number(state.pipeX) || 0;
   state.tangentVelocity = Number(state.tangentVelocity) || 0;
   state.verticalVelocity = Number(state.verticalVelocity) || 0;
+  state.surfaceAngle = Number(state.surfaceAngle) || 0;
   state.rotation = Number(state.rotation) || 0;
   state.ascending = Boolean(state.ascending);
   state.descending = Boolean(state.descending);

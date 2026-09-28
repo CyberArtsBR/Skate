@@ -36,6 +36,10 @@ export class SkateboardVisual {
     this.coordinateSystem = SKATEBOARD_COORDINATE_SYSTEM;
     this.stanceHalfLength = GAME_CONFIG.rider.stanceHalfLength;
     this.footLateralOffset = GAME_CONFIG.rider.footLateralOffset;
+    this.wheelSpinDistance = 0;
+    this.wheelSpinSafe = false;
+    this.measuredWheelDiameter = GAME_CONFIG.skateboard.wheelRadius * 2;
+    this.surfaceSupportPoints = [];
   }
 
   async load() {
@@ -46,12 +50,16 @@ export class SkateboardVisual {
     this.root.add(this.model);
 
     const wheelCandidates = [];
+    const wheelMeshes = [];
     this.model.traverse((object) => {
       if (!object.isMesh) return;
       object.castShadow = true;
       object.receiveShadow = true;
       if (/Board1/i.test(object.name)) this.deck = object;
-      if (WHEEL_PATTERN.test(object.name)) wheelCandidates.push(object.parent || object);
+      if (WHEEL_PATTERN.test(object.name)) {
+        wheelCandidates.push(object.parent || object);
+        wheelMeshes.push(object);
+      }
     });
 
     this.root.updateWorldMatrix(true, true);
@@ -64,8 +72,9 @@ export class SkateboardVisual {
     box = new THREE.Box3().setFromObject(this.root);
     box.getSize(this.dimensions);
 
+    let deckBox = null;
     if (this.deck) {
-      const deckBox = new THREE.Box3().setFromObject(this.deck);
+      deckBox = new THREE.Box3().setFromObject(this.deck);
       this.deckSurfaceY = deckBox.max.y;
     } else {
       this.deckSurfaceY = box.max.y;
@@ -79,12 +88,23 @@ export class SkateboardVisual {
     });
     this.wheels = uniqueWheels;
 
-    for (const wheel of this.wheels) {
-      const wheelBox = new THREE.Box3().setFromObject(wheel);
+    const wheelDiameters = [];
+    const uniqueWheelMeshes = [...new Set(wheelMeshes)];
+    for (const wheelMesh of uniqueWheelMeshes) {
+      const wheelBox = new THREE.Box3().setFromObject(wheelMesh);
       const point = wheelBox.getCenter(new THREE.Vector3());
       point.y = wheelBox.min.y;
       this.root.worldToLocal(point);
       this.contactPoints.push(point);
+
+      const wheelSize = wheelBox.getSize(new THREE.Vector3());
+      const diameter = Math.max(Math.abs(wheelSize.x), Math.abs(wheelSize.y));
+      if (Number.isFinite(diameter) && diameter > 1e-4) wheelDiameters.push(diameter);
+    }
+
+    if (wheelDiameters.length) {
+      wheelDiameters.sort((a, b) => a - b);
+      this.measuredWheelDiameter = wheelDiameters[Math.floor(wheelDiameters.length / 2)];
     }
 
     this.wheelContactY = this.contactPoints.length
@@ -102,6 +122,23 @@ export class SkateboardVisual {
     this.rearContact.position.copy(averageContact(negativeX, -this.dimensions.x * 0.3));
     this.root.add(this.frontContact, this.rearContact);
 
+    this.surfaceSupportPoints = this.contactPoints.map((point, index) => ({
+      name: `wheel-bottom-${index + 1}`,
+      position: point.clone(),
+    }));
+
+    if (deckBox) {
+      const deckCenterZ = (deckBox.min.z + deckBox.max.z) * 0.5;
+      for (const [name, x] of [
+        ['deck-tail-underside', deckBox.min.x],
+        ['deck-nose-underside', deckBox.max.x],
+      ]) {
+        const point = new THREE.Vector3(x, deckBox.min.y, deckCenterZ);
+        this.root.worldToLocal(point);
+        this.surfaceSupportPoints.push({ name, position: point });
+      }
+    }
+
     // The source hierarchy nests one axle under the other's parent. Exposing
     // that parent as a mutable truck transform would move both axles, so the
     // safe foundation contract keeps truck transforms null and exposes wheels.
@@ -110,13 +147,20 @@ export class SkateboardVisual {
     this.root.userData.coordinateSystem = this.coordinateSystem;
     this.root.userData.deckTopHeight = this.deckSurfaceY;
     this.root.userData.wheelContactHeight = this.wheelContactY;
+    this.root.userData.wheelSpinSafe = this.wheelSpinSafe;
+    this.root.userData.measuredWheelDiameter = this.measuredWheelDiameter;
+    this.root.userData.surfaceSupportPointCount = this.surfaceSupportPoints.length;
     return this;
   }
 
   rotateWheels(distance) {
-    const angle = distance / GAME_CONFIG.skateboard.wheelRadius;
-    const axle = new THREE.Vector3(0, 0, 1);
-    for (const wheel of this.wheels) wheel.rotateOnWorldAxis(axle, -angle);
+    // The source GLB uses wheel/axle nodes whose local pivots are not guaranteed
+    // to sit at the visual wheel centers. Rotating those parents made wheel/truck
+    // pieces orbit away from the board on the live Phase 3A preview.
+    //
+    // Keep the authoritative travelled-distance hook, but do not mutate the
+    // unsafe hierarchy until centered wheel pivots are authored or rebuilt.
+    this.wheelSpinDistance += Number(distance) || 0;
   }
 
   dispose() {
