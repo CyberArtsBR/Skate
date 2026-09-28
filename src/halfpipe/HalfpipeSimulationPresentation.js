@@ -10,6 +10,7 @@ export function simulationToPresentationState(profile, simulationState) {
   const sample = profile.sample(simulationState.pipeX);
   const tangent = orientedTangent(sample);
   const verticalVelocity = simulationState.tangentVelocity * tangent.y;
+  const surfaceAngle = Math.atan2(tangent.y, tangent.x);
   const threshold = GAME_CONFIG.passivePhysics.presentationVerticalEpsilon;
   const speedReference = GAME_CONFIG.passivePhysics.presentationSpeedReference;
 
@@ -21,6 +22,7 @@ export function simulationToPresentationState(profile, simulationState) {
     pumpCompression: 0,
     airborne: false,
     verticalVelocity,
+    surfaceAngle,
     rotation: 0,
     landing: 0,
     landingQuality: 'none',
