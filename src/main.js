@@ -93,11 +93,11 @@ function updateSessionHUD() {
   hud.setTime(formatSessionTime(state.remaining));
 
   if (state.phase === 'ready') {
-    hud.setStatus('READY · PRESS ↑/↓ OR ENTER TO START', 'ready');
+    hud.setStatus('READY · ↑/↓ OR A / ENTER TO START', 'ready');
   } else if (state.phase === 'paused') {
-    hud.setStatus('PAUSED · PRESS P TO RESUME', 'paused');
+    hud.setStatus('PAUSED · START / A / P TO RESUME', 'paused');
   } else if (state.phase === 'finished') {
-    hud.setStatus('TIME · RUN COMPLETE · PRESS R TO RESET', 'finished');
+    hud.setStatus('TIME · RUN COMPLETE · A TO RESTART · VIEW / R TO RESET', 'finished');
   } else {
     hud.setStatus('', 'running');
   }
@@ -145,7 +145,25 @@ function render(timestamp = 0) {
 
   if (simulation) {
     const gamepadIntent = pumpInput?.pollGamepad() ?? 0;
+    const controllerActions = pumpInput?.consumeActions() || {};
     const pumpIntent = pumpInput?.keyboardIntent || gamepadIntent || 0;
+
+    if (controllerActions.reset) {
+      resetSimulation();
+    } else if (controllerActions.pause) {
+      if (session.phase === 'running') setSimulationRunning(false);
+      else if (session.phase === 'paused') setSimulationRunning(true);
+      else if (session.phase === 'ready') startSession();
+    } else if (controllerActions.confirm) {
+      if (session.phase === 'finished') {
+        resetSimulation();
+        startSession();
+      } else if (session.phase === 'paused') {
+        setSimulationRunning(true);
+      } else if (session.phase === 'ready') {
+        startSession();
+      }
+    }
 
     if (session.phase === 'ready' && pumpIntent !== 0) startSession();
 
