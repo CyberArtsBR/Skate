@@ -63,6 +63,11 @@ export const GAME_CONFIG = Object.freeze({
     aerialCompleteSeconds: 0.14,
     aerialOverturnSeconds: 0.5,
   }),
+  scoring: Object.freeze({
+    kickTurn: Object.freeze({ min: 100, max: 300 }),
+    handPlant: Object.freeze({ min: 400, max: 700 }),
+    aerialTurn: Object.freeze({ min: 400, max: 999 }),
+  }),
   air: Object.freeze({
     takeoffInset: 0.005,
     launchMinimumSpeed: 1.2,
