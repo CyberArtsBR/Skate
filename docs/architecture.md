@@ -20,7 +20,7 @@ DOM stage
 
 The render loop only renders the current scene. There is no gameplay simulation, timer update, score update, collision step or camera tracking in Phase 1.
 
-The stage is CSS-constrained to 16:9 and letterboxes naturally. `HalfpipeCamera` owns a fixed perspective camera whose composition keeps the whole pipe and vertical air space visible. Resize only updates renderer size, pixel ratio and camera aspect.
+The stage is CSS-constrained to 16:9 and letterboxes naturally. `HalfpipeCamera` owns a fixed perspective camera whose composition keeps the whole pipe and vertical air space visible. The camera stays on the halfpipe center axis (`x = 0`) with zero roll, producing the symmetric, near-front elevation used by the visual reference instead of an oblique three-quarter view. Resize only updates renderer size, pixel ratio and camera aspect.
 
 ## 2. Visual halfpipe versus future authoritative physics
 

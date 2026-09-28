@@ -45,6 +45,8 @@ const state = await page.evaluate(() => {
     groundMaterial: foundation.ground.ground.material.type,
     groundDepthWrite: foundation.ground.ground.material.depthWrite,
     groundGridVisible: foundation.ground.grid.visible,
+    cameraPosition: foundation.camera.position.toArray(),
+    cameraRoll: foundation.camera.rotation.z,
     renderer: canvas.getContext('webgl2') ? 'webgl2' : 'webgl',
   };
 });
@@ -78,6 +80,8 @@ assert.equal(state.rigCapabilities.gameplayFoundation, true);
 assert.equal(state.groundMaterial, 'ShadowMaterial');
 assert.equal(state.groundDepthWrite, false);
 assert.equal(state.groundGridVisible, false);
+assert.equal(state.cameraPosition[0], 0);
+assert.ok(Math.abs(state.cameraRoll) < 1e-8);
 assert.equal(profileDebugVisible, true);
 assert.ok(state.hiddenGroundNodes.includes('halfpipe-ground_Baked_1'));
 assert.deepEqual(consoleErrors, []);
