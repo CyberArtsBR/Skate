@@ -213,6 +213,50 @@ const airTransition = await page.evaluate(() => {
   return { launch, landing };
 });
 
+const trickPresentationProbe = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  const simulation = foundation.simulation;
+  const profile = foundation.profile;
+  const wallX = (side, fraction) => side * (
+    profile.flatHalfWidth + profile.transitionWidth * fraction
+  );
+
+  simulation.reset({
+    pipeX: wallX(1, 0.84),
+    tangentVelocity: 7,
+  });
+  simulation.setTurnIntent(-1);
+  simulation.stepFixed();
+  simulation.setTurnIntent(0);
+  for (let index = 0; index < 20; index += 1) simulation.stepFixed();
+  foundation.physics.applyCurrentState();
+  const kick = {
+    trick: simulation.snapshot().lastTrick,
+    yaw: foundation.rider.trickCarrier.rotation.y,
+    roll: foundation.rider.trickCarrier.rotation.z,
+    visualActive: foundation.rider.presentationState.trickVisualActive,
+  };
+
+  simulation.reset({
+    pipeX: wallX(1, 0.95),
+    tangentVelocity: 7,
+  });
+  simulation.setHandPlantHeld(true);
+  simulation.stepFixed();
+  simulation.setHandPlantHeld(false);
+  for (let index = 0; index < 30; index += 1) simulation.stepFixed();
+  foundation.physics.applyCurrentState();
+  const handPlant = {
+    trick: simulation.snapshot().lastTrick,
+    yaw: foundation.rider.trickCarrier.rotation.y,
+    roll: foundation.rider.trickCarrier.rotation.z,
+    offsetY: foundation.rider.trickCarrier.position.y,
+    visualActive: foundation.rider.presentationState.trickVisualActive,
+  };
+
+  return { kick, handPlant };
+});
+
 await page.keyboard.press('F3');
 const profileDebugVisible = await page.evaluate(
   () => window.__HALFPIPE_FOUNDATION__.profileDebug.root.visible,
@@ -299,6 +343,22 @@ for (const station of stationStates) {
 assert.ok(stationStates[2].boardAngle < 0, 'left transition must slope down toward center');
 assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away from center');
 assert.equal(profileDebugVisible, true);
+assert.equal(trickPresentationProbe.kick.trick, 'kick-turn');
+assert.equal(trickPresentationProbe.kick.visualActive, true);
+assert.ok(
+  Math.abs(trickPresentationProbe.kick.yaw) > 0.45,
+  `kick turn carrier yaw is not visible: ${trickPresentationProbe.kick.yaw}`,
+);
+assert.equal(trickPresentationProbe.handPlant.trick, 'hand-plant');
+assert.equal(trickPresentationProbe.handPlant.visualActive, true);
+assert.ok(
+  Math.abs(trickPresentationProbe.handPlant.roll) > 0.6,
+  `hand plant carrier roll is not visible: ${trickPresentationProbe.handPlant.roll}`,
+);
+assert.ok(
+  trickPresentationProbe.handPlant.offsetY > 0.12,
+  `hand plant carrier lift is not visible: ${trickPresentationProbe.handPlant.offsetY}`,
+);
 assert.ok(airTransition.launch, 'air transition probe must reach airborne mode');
 assert.ok(
   airTransition.launch.lipDistance >= 0.004,
@@ -326,4 +386,5 @@ console.log(JSON.stringify({
   pageErrors,
   failedRequests,
   airTransition,
+  trickPresentationProbe,
 }, null, 2));
