@@ -4,9 +4,9 @@ export class HalfpipeHUD {
     this.root.className = 'halfpipe-hud';
     this.root.innerHTML = `
       <div class="hud-block hud-score"><span>SCORE</span><strong data-score>0</strong></div>
-      <div class="hud-title"><small>RIDER INTEGRATION // PHASE 2</small><strong>HALF-PIPE</strong></div>
+      <div class="hud-title"><small>PASSIVE PHYSICS // PHASE 3A</small><strong>HALF-PIPE</strong></div>
       <div class="hud-block hud-time"><span>TIME</span><strong data-time>1:15</strong></div>
-      <div class="hud-debug" data-debug>D · PROFILE&nbsp;&nbsp; [ ] · STATIONS</div>
+      <div class="hud-debug" data-debug>P · PAUSE&nbsp;&nbsp; R · RESET&nbsp;&nbsp; D · PROFILE</div>
     `;
     stage.append(this.root);
   }
