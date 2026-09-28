@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: chimpions-halfpipe
+    runtime: static
+    branch: feat/halfpipe-foundation-v1
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    autoDeployTrigger: commit
