@@ -153,6 +153,10 @@ assert.ok(
   airborne.peakY !== null && airborne.peakY > lipY + 0.7,
   `airborne peak should visibly clear the lip, got peak ${airborne.peakY} vs lip ${lipY}`,
 );
+assert.ok(
+  airborne.peakY <= lipY + 3.5,
+  `airborne peak should stay camera-readable, got peak ${airborne.peakY} vs lip ${lipY}`,
+);
 assert.ok(airborne.final.airLaunches >= 1, 'air launch telemetry must be recorded');
 
 console.log(JSON.stringify({
