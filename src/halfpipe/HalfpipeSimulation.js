@@ -55,6 +55,8 @@ export class HalfpipeSimulation {
     this.aerialOverturnSeconds =
       options.aerialOverturnSeconds ?? turningDefaults.aerialOverturnSeconds;
 
+    this.scoring = GAME_CONFIG.scoring;
+
     const airDefaults = GAME_CONFIG.air;
     this.airTakeoffInset = options.airTakeoffInset ?? airDefaults.takeoffInset;
     this.airLaunchMinimumSpeed =
@@ -116,8 +118,10 @@ export class HalfpipeSimulation {
       trickType: null,
       trickProgress: 0,
       trickCount: 0,
+      score: 0,
       lastTrick: null,
       lastTrickTime: null,
+      lastTrickPoints: 0,
 
       airSide: 0,
       airAnchorX: null,
@@ -206,12 +210,24 @@ export class HalfpipeSimulation {
     return this.state.pumpDesiredIntent || 0;
   }
 
-  _recordTrick(type, progress = 1) {
+  _recordTrick(type, quality = 1) {
+    const clampedQuality = Math.max(0, Math.min(1, quality));
+    const range = type === 'kick-turn'
+      ? this.scoring.kickTurn
+      : type === 'hand-plant'
+        ? this.scoring.handPlant
+        : this.scoring.aerialTurn;
+    const points = Math.round(
+      range.min + (range.max - range.min) * clampedQuality,
+    );
+
     this.state.trickType = type;
-    this.state.trickProgress = Math.max(0, Math.min(1, progress));
+    this.state.trickProgress = clampedQuality;
     this.state.trickCount += 1;
+    this.state.score += points;
     this.state.lastTrick = type;
     this.state.lastTrickTime = this.state.time;
+    this.state.lastTrickPoints = points;
   }
 
   _trySurfaceTurn(previousX, velocity, desiredIntent) {
@@ -226,7 +242,9 @@ export class HalfpipeSimulation {
       this.handPlantHeld
       && wallFraction >= this.handPlantMinFraction
     ) {
-      this._recordTrick('hand-plant', wallFraction);
+      const quality = (wallFraction - this.handPlantMinFraction)
+        / Math.max(1e-4, 1 - this.handPlantMinFraction);
+      this._recordTrick('hand-plant', quality);
       return {
         velocity: -velocity * this.handPlantRetention,
         turned: true,
@@ -238,7 +256,9 @@ export class HalfpipeSimulation {
       && expectedTurn !== 0
       && wallFraction >= this.kickTurnMinFraction
     ) {
-      this._recordTrick('kick-turn', wallFraction);
+      const quality = (wallFraction - this.kickTurnMinFraction)
+        / Math.max(1e-4, 1 - this.kickTurnMinFraction);
+      this._recordTrick('kick-turn', quality);
       return {
         velocity: -velocity * this.kickTurnRetention,
         turned: true,
@@ -337,9 +357,24 @@ export class HalfpipeSimulation {
       const landingSpeed = Math.abs(verticalVelocity) * this.airLandingVelocityRetention;
 
       if (this.state.airTurnCompleted && !this.state.airTurnOverturned) {
+        const airHeight = Math.max(
+          0,
+          (this.state.maxAirY ?? baseY) - baseY,
+        );
+        const heightQuality = Math.max(
+          0,
+          Math.min(1, (airHeight - 0.5) / 3.5),
+        );
+        const holdQuality = Math.max(
+          0,
+          Math.min(
+            1,
+            this.state.airTurnHold / Math.max(this.aerialIdealHoldSeconds, 1e-4),
+          ),
+        );
         this._recordTrick(
           'aerial-turn',
-          Math.min(1, this.state.airTurnHold / Math.max(this.aerialIdealHoldSeconds, 1e-4)),
+          heightQuality * 0.6 + holdQuality * 0.4,
         );
       } else if (this.state.airTurnOverturned) {
         this.state.lastTrick = 'aerial-turn-overrotated';
