@@ -1,0 +1,27 @@
+name: Verify Halfpipe Pumping
+
+on:
+  push:
+    branches:
+      - feat/halfpipe-pumping-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Static and physics checks
+        run: npm run check
+      - name: Pumping regression
+        run: npm run check:pumping
+      - name: Build
+        run: npm run build
