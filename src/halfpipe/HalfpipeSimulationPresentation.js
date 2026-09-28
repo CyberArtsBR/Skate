@@ -9,7 +9,10 @@ function orientedTangent(sample) {
 export function simulationToPresentationState(profile, simulationState) {
   const sample = profile.sample(simulationState.pipeX);
   const tangent = orientedTangent(sample);
-  const verticalVelocity = simulationState.tangentVelocity * tangent.y;
+  const airborne = simulationState.mode === 'airborne';
+  const verticalVelocity = airborne
+    ? simulationState.airVerticalVelocity
+    : simulationState.tangentVelocity * tangent.y;
   const surfaceAngle = Math.atan2(tangent.y, tangent.x);
   const threshold = GAME_CONFIG.passivePhysics.presentationVerticalEpsilon;
   const speedReference = GAME_CONFIG.passivePhysics.presentationSpeedReference;
@@ -22,8 +25,9 @@ export function simulationToPresentationState(profile, simulationState) {
     pumpCompression: simulationState.pumpIntent < 0
       ? simulationState.pumpWindowInfluence
       : 0,
-    airborne: false,
+    airborne,
     verticalVelocity,
+    worldY: airborne ? simulationState.airY : null,
     surfaceAngle,
     rotation: 0,
     landing: 0,
@@ -32,7 +36,8 @@ export function simulationToPresentationState(profile, simulationState) {
     trickProgress: 0,
     speedNormalized: Math.min(
       1,
-      Math.abs(simulationState.tangentVelocity) / Math.max(0.001, speedReference),
+      Math.abs(airborne ? simulationState.airVerticalVelocity : simulationState.tangentVelocity)
+        / Math.max(0.001, speedReference),
     ),
   };
 }
