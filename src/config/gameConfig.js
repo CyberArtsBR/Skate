@@ -1,11 +1,9 @@
-import { HOLLYWOOD_BACKGROUND } from '../assets/hollywoodBackground.js';
-
 export const GAME_CONFIG = Object.freeze({
   assets: Object.freeze({
     halfpipe: '/models/halfpipe/halfpipe.glb',
     skateboard: '/models/skateboard/skateboard.glb',
     chimpion: '/models/characters/The%20Heretic.glb',
-    background: HOLLYWOOD_BACKGROUND,
+    background: '/images/backgrounds/halfpipe-hollywood-original.jpg',
   }),
   renderer: Object.freeze({
     maxPixelRatio: 2,
