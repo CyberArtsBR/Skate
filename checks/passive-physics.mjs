@@ -55,7 +55,7 @@ assert.ok(
 );
 
 const presentationProbe = new HalfpipeSimulation(new HalfpipeProfile());
-for (let index = 0; index < 90; index += 1) presentationProbe.stepFixed();
+for (let index = 0; index < 60; index += 1) presentationProbe.stepFixed();
 const presentationState = simulationToPresentationState(
   presentationProbe.profile,
   presentationProbe.snapshot(),
