@@ -121,6 +121,7 @@ export class HalfpipeVisual {
 
     const fullBoxBeforeAlignment = visibleBounds(this.root);
     const fullCenter = fullBoxBeforeAlignment.getCenter(new THREE.Vector3());
+    const authoredPositionX = this.model.position.x;
 
     this.ridingSurface = findRidingSurface(this.model);
     if (!this.ridingSurface) {
@@ -128,14 +129,21 @@ export class HalfpipeVisual {
     }
 
     const ridingBoxBeforeAlignment = worldBounds(this.ridingSurface);
-    const ridingCenter = ridingBoxBeforeAlignment.getCenter(new THREE.Vector3());
+    const ridingBoundsCenterBefore = ridingBoxBeforeAlignment.getCenter(new THREE.Vector3());
 
     // IMPORTANT VISUAL CONTRACT:
-    // HalfpipeProfile uses world X=0 as the center of the riding channel.
-    // Do not center X from the complete GLB bounds: decorative/support meshes
-    // are asymmetric and previously shifted the visible channel ~1 world unit
-    // left, while gameplay remained centered at X=0.
-    this.model.position.x -= ridingCenter.x;
+    // HalfpipeProfile uses world X=0 as the gameplay center. The source GLB was
+    // authored with its riding channel aligned to that origin. Astra's direct
+    // mesh/raycast audit proved that changing model.position.x from the authored
+    // value to a full-model-bounds center introduced the right-wall penetration:
+    // UPPER RIGHT ~= -0.354 and RIGHT LIP ~= -0.715. Restoring the authored X
+    // transform made left/right support distances nearly identical and positive.
+    //
+    // Therefore X is an authored riding-origin contract, NOT a bounds-centering
+    // problem. Decorative/support geometry may be asymmetric, and even the
+    // riding-surface subtree can have asymmetric bounds that are not a safe
+    // centerline proxy. Never recenter X from geometry bounds here.
+    this.model.position.x = authoredPositionX;
 
     // Preserve the established presentation framing on the other axes.
     this.model.position.z -= fullCenter.z;
@@ -146,12 +154,13 @@ export class HalfpipeVisual {
     this.bounds.copy(box);
     this.ridingSurfaceBounds.copy(worldBounds(this.ridingSurface));
 
-    const alignedRidingCenter = this.ridingSurfaceBounds.getCenter(new THREE.Vector3());
+    const alignedRidingBoundsCenter = this.ridingSurfaceBounds.getCenter(new THREE.Vector3());
     this.alignment = Object.freeze({
-      source: 'riding-surface',
+      source: 'authored-riding-origin',
       ridingSurfaceName: this.ridingSurface.name,
-      originalRidingCenterX: ridingCenter.x,
-      alignedRidingCenterX: alignedRidingCenter.x,
+      authoredPositionX,
+      ridingBoundsCenterBeforeX: ridingBoundsCenterBefore.x,
+      ridingBoundsCenterAfterX: alignedRidingBoundsCenter.x,
       fullModelCenterX: fullCenter.x,
       appliedX: this.model.position.x,
     });
@@ -159,7 +168,7 @@ export class HalfpipeVisual {
     this.root.userData.visualOnly = true;
     this.root.userData.hiddenSourceGround = [...this.hiddenGroundNodes];
     this.root.userData.ridingSurfaceName = this.ridingSurface.name;
-    this.root.userData.ridingSurfaceCenterX = alignedRidingCenter.x;
+    this.root.userData.ridingSurfaceCenterX = alignedRidingBoundsCenter.x;
     this.root.userData.alignmentSource = this.alignment.source;
     return this;
   }
