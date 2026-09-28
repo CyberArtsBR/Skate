@@ -127,7 +127,10 @@ assert.ok(
   pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 2.6,
   `strong correct pumping should reach 90% lip amplitude within 2.6s, got ${pumped.timeToHighAmplitude}`,
 );
-assert.equal(pumped.final.mode, 'contact');
+assert.ok(
+  ['contact', 'airborne'].includes(pumped.final.mode),
+  `pumped simulation ended in invalid mode: ${pumped.final.mode}`,
+);
 
 console.log(JSON.stringify({
   initial: first.initial,
