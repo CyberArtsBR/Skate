@@ -73,6 +73,8 @@ function runPumped(seconds = 8) {
   const simulation = new HalfpipeSimulation(profile);
   const totalSteps = Math.round(seconds / simulation.fixedDt);
   let maxAbsX = Math.abs(simulation.snapshot().pipeX);
+  let timeToHighAmplitude = null;
+  const highAmplitudeTarget = profile.rightLip * 0.9;
 
   for (let index = 0; index < totalSteps; index += 1) {
     const state = simulation.snapshot();
@@ -80,18 +82,37 @@ function runPumped(seconds = 8) {
     simulation.setPumpIntent(desiredIntent);
     const next = simulation.stepFixed();
     maxAbsX = Math.max(maxAbsX, Math.abs(next.pipeX));
+    if (timeToHighAmplitude === null && Math.abs(next.pipeX) >= highAmplitudeTarget) {
+      timeToHighAmplitude = next.time;
+    }
   }
 
-  return { simulation, final: simulation.snapshot(), maxAbsX };
+  return {
+    simulation,
+    final: simulation.snapshot(),
+    maxAbsX,
+    timeToHighAmplitude,
+    highAmplitudeTarget,
+  };
 }
 
 const pumped = runPumped();
 assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
 assert.ok(pumped.maxAbsX > Math.abs(first.initial.pipeX), 'correct pumping should increase amplitude');
+assert.ok(
+  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 4.5,
+  `strong correct pumping should reach 90% lip amplitude within 4.5s, got ${pumped.timeToHighAmplitude}`,
+);
 assert.equal(pumped.final.mode, 'contact');
 
 console.log(JSON.stringify({
   initial: first.initial,
   final: first.final,
   fixedDt: first.simulation.fixedDt,
+  pumped: {
+    maxAbsX: pumped.maxAbsX,
+    timeToHighAmplitude: pumped.timeToHighAmplitude,
+    highAmplitudeTarget: pumped.highAmplitudeTarget,
+    pumpWorkTotal: pumped.final.pumpWorkTotal,
+  },
 }, null, 2));
