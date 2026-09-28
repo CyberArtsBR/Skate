@@ -51,7 +51,7 @@ export const GAME_CONFIG = Object.freeze({
   }),
   pumping: Object.freeze({
     acceleration: 8.5,
-    upperWallRetention: 0.62,
+    upperWallRetention: 0.75,
     minimumSpeed: 0.65,
   }),
   turning: Object.freeze({
@@ -79,7 +79,7 @@ export const GAME_CONFIG = Object.freeze({
     aerialRoll: 0.2,
   }),
   air: Object.freeze({
-    takeoffInset: 0.005,
+    takeoffInset: 0.08,
     launchMinimumSpeed: 1.2,
     minimumVerticalVelocity: 10,
     maximumVerticalVelocity: 20,
