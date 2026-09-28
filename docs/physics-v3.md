@@ -96,3 +96,12 @@ Developer-only controls during this passive phase:
 - `D`: toggle the mathematical profile debug line.
 
 The HUD debug strip shows passive telemetry (pipe X, tangent speed, specific mechanical energy, bottom crossings, and turning points). SCORE and TIME remain placeholders; no game timer or scoring logic has been added.
+
+
+## Passive calibration pass 1 — video review
+
+The first live preview recording showed a stable deterministic oscillation, but the observed HUD cadence was approximately 3.18–3.20 s between bottom crossings. The current reverse-engineering target for lower-amplitude classic play is approximately 1.69–1.90 s, with higher-amplitude play extending beyond 2 s.
+
+For the next isolated calibration pass, only the gameplay gravity scale is changed from 9.81 to 30 while preserving the existing profile and passive drag. This is a **gameplay-scale acceleration**, not a claim that the game world uses SI-scale real-world gravity.
+
+The 120 Hz reference simulation with the current starting amplitude produces early passive crossing intervals around 1.81 s and gradually lengthens as passive energy decays. Pumping and airtime are still absent, so this remains a contact-model calibration rather than final California Games tuning.
