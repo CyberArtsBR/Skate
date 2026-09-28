@@ -36,6 +36,8 @@ export class SkateboardVisual {
     this.coordinateSystem = SKATEBOARD_COORDINATE_SYSTEM;
     this.stanceHalfLength = GAME_CONFIG.rider.stanceHalfLength;
     this.footLateralOffset = GAME_CONFIG.rider.footLateralOffset;
+    this.wheelSpinDistance = 0;
+    this.wheelSpinSafe = false;
   }
 
   async load() {
@@ -110,13 +112,18 @@ export class SkateboardVisual {
     this.root.userData.coordinateSystem = this.coordinateSystem;
     this.root.userData.deckTopHeight = this.deckSurfaceY;
     this.root.userData.wheelContactHeight = this.wheelContactY;
+    this.root.userData.wheelSpinSafe = this.wheelSpinSafe;
     return this;
   }
 
   rotateWheels(distance) {
-    const angle = distance / GAME_CONFIG.skateboard.wheelRadius;
-    const axle = new THREE.Vector3(0, 0, 1);
-    for (const wheel of this.wheels) wheel.rotateOnWorldAxis(axle, -angle);
+    // The source GLB uses wheel/axle nodes whose local pivots are not guaranteed
+    // to sit at the visual wheel centers. Rotating those parents made wheel/truck
+    // pieces orbit away from the board on the live Phase 3A preview.
+    //
+    // Keep the authoritative travelled-distance hook, but do not mutate the
+    // unsafe hierarchy until centered wheel pivots are authored or rebuilt.
+    this.wheelSpinDistance += Number(distance) || 0;
   }
 
   dispose() {
