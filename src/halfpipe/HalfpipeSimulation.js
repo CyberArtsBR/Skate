@@ -6,6 +6,11 @@ function signWithEpsilon(value, epsilon) {
   return 0;
 }
 
+function smoothstep01(value) {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+}
+
 export class HalfpipeSimulation {
   constructor(profile, options = {}) {
     if (!profile?.sample) throw new TypeError('HalfpipeSimulation requires a HalfpipeProfile-like object');
@@ -21,11 +26,35 @@ export class HalfpipeSimulation {
     this.velocityEpsilon = options.velocityEpsilon ?? defaults.velocityEpsilon;
     this.startTransitionFraction = options.startTransitionFraction ?? defaults.startTransitionFraction;
     this.initialVelocity = options.initialVelocity ?? defaults.initialVelocity;
+
+    const arcadeDefaults = GAME_CONFIG.arcadeMotion;
+    this.downhillGravityScale =
+      options.downhillGravityScale ?? arcadeDefaults.downhillGravityScale;
+    this.uphillGravityScale =
+      options.uphillGravityScale ?? arcadeDefaults.uphillGravityScale;
+
     const pumpDefaults = GAME_CONFIG.pumping;
-    this.pumpSpecificEnergyPerSecond =
-      options.pumpSpecificEnergyPerSecond ?? pumpDefaults.specificEnergyPerSecond;
-    this.pumpWindowHalfWidth = options.pumpWindowHalfWidth ?? pumpDefaults.windowHalfWidth;
+    this.pumpAcceleration = options.pumpAcceleration ?? pumpDefaults.acceleration;
+    this.pumpUpperWallRetention =
+      options.pumpUpperWallRetention ?? pumpDefaults.upperWallRetention;
     this.pumpMinimumSpeed = options.pumpMinimumSpeed ?? pumpDefaults.minimumSpeed;
+
+    const turningDefaults = GAME_CONFIG.turning;
+    this.kickTurnMinFraction =
+      options.kickTurnMinFraction ?? turningDefaults.kickTurnMinFraction;
+    this.kickTurnRetention =
+      options.kickTurnRetention ?? turningDefaults.kickTurnRetention;
+    this.handPlantMinFraction =
+      options.handPlantMinFraction ?? turningDefaults.handPlantMinFraction;
+    this.handPlantRetention =
+      options.handPlantRetention ?? turningDefaults.handPlantRetention;
+    this.aerialIdealHoldSeconds =
+      options.aerialIdealHoldSeconds ?? turningDefaults.aerialIdealHoldSeconds;
+    this.aerialCompleteSeconds =
+      options.aerialCompleteSeconds ?? turningDefaults.aerialCompleteSeconds;
+    this.aerialOverturnSeconds =
+      options.aerialOverturnSeconds ?? turningDefaults.aerialOverturnSeconds;
+
     const airDefaults = GAME_CONFIG.air;
     this.airTakeoffInset = options.airTakeoffInset ?? airDefaults.takeoffInset;
     this.airLaunchMinimumSpeed =
@@ -39,7 +68,10 @@ export class HalfpipeSimulation {
       options.airLaunchVelocityScale ?? airDefaults.launchVelocityScale;
     this.airLandingVelocityRetention =
       options.airLandingVelocityRetention ?? airDefaults.landingVelocityRetention;
+
     this.pumpIntent = 0;
+    this.turnIntent = 0;
+    this.handPlantHeld = false;
 
     this.accumulator = 0;
     this._lastDirection = 0;
@@ -70,6 +102,7 @@ export class HalfpipeSimulation {
       distanceTravelled: 0,
       signedDistanceTravelled: 0,
       specificEnergy: 0,
+
       pumpIntent: 0,
       pumpDesiredIntent: 0,
       pumpWindowInfluence: 0,
@@ -77,12 +110,26 @@ export class HalfpipeSimulation {
       pumpActive: false,
       lastPumpWork: 0,
       pumpWorkTotal: 0,
+
+      turnIntent: 0,
+      handPlantHeld: false,
+      trickType: null,
+      trickProgress: 0,
+      trickCount: 0,
+      lastTrick: null,
+      lastTrickTime: null,
+
       airSide: 0,
+      airAnchorX: null,
+      airBaseY: null,
       airY: null,
       airVerticalVelocity: 0,
       airLaunches: 0,
       maxAirY: null,
       lastAirPeakY: null,
+      airTurnHold: 0,
+      airTurnCompleted: false,
+      airTurnOverturned: false,
     };
 
     this.accumulator = 0;
@@ -96,13 +143,19 @@ export class HalfpipeSimulation {
     const tangent = sample.tangent.clone();
     const normal = sample.normal.clone();
 
-    // Physics uses one signed surface coordinate: +tangentVelocity always means
-    // travel toward increasing world X. HalfpipeProfile's left-side tangent is
-    // authored outward, so normalize it to the +X parameter direction here.
     if (tangent.x < 0) tangent.multiplyScalar(-1);
     if (normal.y < 0) normal.multiplyScalar(-1);
 
     return { ...sample, tangent, normal };
+  }
+
+  _wallFraction(x) {
+    const absoluteX = Math.abs(x);
+    if (absoluteX <= this.profile.flatHalfWidth) return 0;
+    return Math.max(0, Math.min(
+      1,
+      (absoluteX - this.profile.flatHalfWidth) / this.profile.transitionWidth,
+    ));
   }
 
   _refreshDerivedState() {
@@ -136,6 +189,16 @@ export class HalfpipeSimulation {
     return this.pumpIntent;
   }
 
+  setTurnIntent(intent) {
+    this.turnIntent = intent > 0 ? 1 : intent < 0 ? -1 : 0;
+    return this.turnIntent;
+  }
+
+  setHandPlantHeld(held) {
+    this.handPlantHeld = Boolean(held);
+    return this.handPlantHeld;
+  }
+
   _pumpPhase(previousX, previousVelocity) {
     const phaseSignal = previousX * previousVelocity;
     if (phaseSignal > this.velocityEpsilon) return 1;
@@ -143,15 +206,54 @@ export class HalfpipeSimulation {
     return this.state.pumpDesiredIntent || 0;
   }
 
-  _pumpInfluence(previousX) {
-    const normalized = Math.min(1, Math.abs(previousX) / Math.max(0.001, this.pumpWindowHalfWidth));
-    const smooth = normalized * normalized * (3 - 2 * normalized);
-    return 1 - smooth;
+  _recordTrick(type, progress = 1) {
+    this.state.trickType = type;
+    this.state.trickProgress = Math.max(0, Math.min(1, progress));
+    this.state.trickCount += 1;
+    this.state.lastTrick = type;
+    this.state.lastTrickTime = this.state.time;
   }
 
-  _enterAir(side, launchSpeed) {
-    const lipX = side < 0 ? this.profile.leftLip : this.profile.rightLip;
-    const lip = this._sampleIncreasingX(lipX);
+  _trySurfaceTurn(previousX, velocity, desiredIntent) {
+    if (desiredIntent !== 1 || Math.abs(velocity) < this.velocityEpsilon) {
+      return { velocity, turned: false };
+    }
+
+    const wallFraction = this._wallFraction(previousX);
+    const expectedTurn = previousX < 0 ? 1 : previousX > 0 ? -1 : 0;
+
+    if (
+      this.handPlantHeld
+      && wallFraction >= this.handPlantMinFraction
+    ) {
+      this._recordTrick('hand-plant', wallFraction);
+      return {
+        velocity: -velocity * this.handPlantRetention,
+        turned: true,
+      };
+    }
+
+    if (
+      this.turnIntent === expectedTurn
+      && expectedTurn !== 0
+      && wallFraction >= this.kickTurnMinFraction
+    ) {
+      this._recordTrick('kick-turn', wallFraction);
+      return {
+        velocity: -velocity * this.kickTurnRetention,
+        turned: true,
+      };
+    }
+
+    return { velocity, turned: false };
+  }
+
+  _enterAir(side, launchSpeed, takeoffX) {
+    const anchorX = Math.max(
+      this.profile.leftLip + this.lipInset,
+      Math.min(this.profile.rightLip - this.lipInset, takeoffX),
+    );
+    const takeoff = this._sampleIncreasingX(anchorX);
     const verticalVelocity = Math.min(
       this.airMaximumVerticalVelocity,
       Math.max(
@@ -161,33 +263,56 @@ export class HalfpipeSimulation {
     );
 
     this.state.mode = 'airborne';
-    this.state.pipeX = lipX;
+    this.state.pipeX = anchorX;
     this.state.tangentVelocity = 0;
     this.state.tangentialAcceleration = -this.airGravity;
     this.state.airSide = side;
-    this.state.airY = lip.y;
+    this.state.airAnchorX = anchorX;
+    this.state.airBaseY = takeoff.y;
+    this.state.airY = takeoff.y;
     this.state.airVerticalVelocity = verticalVelocity;
     this.state.airLaunches += 1;
     this.state.maxAirY = this.state.maxAirY === null
-      ? lip.y
-      : Math.max(this.state.maxAirY, lip.y);
-    this.state.lastAirPeakY = lip.y;
+      ? takeoff.y
+      : Math.max(this.state.maxAirY, takeoff.y);
+    this.state.lastAirPeakY = takeoff.y;
+    this.state.airTurnHold = 0;
+    this.state.airTurnCompleted = false;
+    this.state.airTurnOverturned = false;
+    this.state.trickType = null;
+    this.state.trickProgress = 0;
     this.state.pumpActive = false;
     this.state.lastPumpWork = 0;
-    return lip;
+    return takeoff;
   }
 
   _stepAirborne() {
     const dt = this.fixedDt;
     const side = this.state.airSide || (this.state.pipeX < 0 ? -1 : 1);
-    const lipX = side < 0 ? this.profile.leftLip : this.profile.rightLip;
-    const lip = this._sampleIncreasingX(lipX);
+    const anchorX = this.state.airAnchorX ?? this.state.pipeX;
+    const baseY = this.state.airBaseY ?? this._sampleIncreasingX(anchorX).y;
     const previousVerticalVelocity = this.state.airVerticalVelocity;
     const verticalVelocity = previousVerticalVelocity - this.airGravity * dt;
-    let nextY = (this.state.airY ?? lip.y) + verticalVelocity * dt;
+    let nextY = (this.state.airY ?? baseY) + verticalVelocity * dt;
+
+    const expectedTurn = side < 0 ? 1 : -1;
+    if (this.turnIntent === expectedTurn) {
+      this.state.airTurnHold += dt;
+      this.state.trickType = 'aerial-turn';
+      this.state.trickProgress = Math.min(
+        1,
+        this.state.airTurnHold / Math.max(this.aerialIdealHoldSeconds, 1e-4),
+      );
+      if (this.state.airTurnHold >= this.aerialCompleteSeconds) {
+        this.state.airTurnCompleted = true;
+      }
+      if (this.state.airTurnHold > this.aerialOverturnSeconds) {
+        this.state.airTurnOverturned = true;
+      }
+    }
 
     this.state.time += dt;
-    this.state.pipeX = lipX;
+    this.state.pipeX = anchorX;
     this.state.airVerticalVelocity = verticalVelocity;
     this.state.tangentialAcceleration = -this.airGravity;
     this.state.pumpIntent = 0;
@@ -196,6 +321,8 @@ export class HalfpipeSimulation {
     this.state.pumpTimingQuality = 0;
     this.state.pumpActive = false;
     this.state.lastPumpWork = 0;
+    this.state.turnIntent = this.turnIntent;
+    this.state.handPlantHeld = this.handPlantHeld;
 
     if (previousVerticalVelocity > 0 && verticalVelocity <= 0) {
       this.state.lastAirPeakY = nextY;
@@ -205,17 +332,31 @@ export class HalfpipeSimulation {
       ? nextY
       : Math.max(this.state.maxAirY, nextY);
 
-    if (nextY <= lip.y && verticalVelocity < 0) {
-      nextY = lip.y;
+    if (nextY <= baseY && verticalVelocity < 0) {
+      nextY = baseY;
       const landingSpeed = Math.abs(verticalVelocity) * this.airLandingVelocityRetention;
+
+      if (this.state.airTurnCompleted && !this.state.airTurnOverturned) {
+        this._recordTrick(
+          'aerial-turn',
+          Math.min(1, this.state.airTurnHold / Math.max(this.aerialIdealHoldSeconds, 1e-4)),
+        );
+      } else if (this.state.airTurnOverturned) {
+        this.state.lastTrick = 'aerial-turn-overrotated';
+        this.state.lastTrickTime = this.state.time;
+      }
+
       this.state.mode = 'contact';
-      this.state.pipeX = side < 0
-        ? this.profile.leftLip + this.lipInset
-        : this.profile.rightLip - this.lipInset;
+      this.state.pipeX = anchorX;
       this.state.tangentVelocity = side < 0 ? landingSpeed : -landingSpeed;
       this.state.airSide = 0;
+      this.state.airAnchorX = null;
+      this.state.airBaseY = null;
       this.state.airY = null;
       this.state.airVerticalVelocity = 0;
+      this.state.airTurnHold = 0;
+      this.state.airTurnCompleted = false;
+      this.state.airTurnOverturned = false;
       this._lastDirection = signWithEpsilon(
         this.state.tangentVelocity,
         this.velocityEpsilon,
@@ -235,39 +376,63 @@ export class HalfpipeSimulation {
     const previousX = this.state.pipeX;
     const previousVelocity = this.state.tangentVelocity;
     const sample = this._sampleIncreasingX(previousX);
-
-    // Gravity projected onto the surface tangent. Because the tangent is always
-    // oriented toward increasing X, this naturally accelerates down the left
-    // wall (+) and down the right wall (-).
-    const gravityAlongTangent = -this.gravity * sample.tangent.y;
-    const dragAcceleration = -this.linearDrag * previousVelocity;
-    const acceleration = gravityAlongTangent + dragAcceleration;
-
-    let velocity = previousVelocity + acceleration * dt;
-
     const desiredIntent = this._pumpPhase(previousX, previousVelocity);
-    const pumpWindowInfluence = this._pumpInfluence(previousX);
+
+    const gravityAlongTangent = -this.gravity * sample.tangent.y;
+    const verticalVelocity = previousVelocity * sample.tangent.y;
+    const gravityScale = verticalVelocity < -this.velocityEpsilon
+      ? this.downhillGravityScale
+      : verticalVelocity > this.velocityEpsilon
+        ? this.uphillGravityScale
+        : 1;
+    const scaledGravity = gravityAlongTangent * gravityScale;
+    const dragAcceleration = -this.linearDrag * previousVelocity;
+
+    const wallFraction = this._wallFraction(previousX);
+    const upperFactor = smoothstep01((wallFraction - 0.62) / 0.38);
+    const pumpInfluence = desiredIntent === 1
+      ? 1 - upperFactor * (1 - this.pumpUpperWallRetention)
+      : 1;
     const speedEligible = Math.abs(previousVelocity) >= this.pumpMinimumSpeed;
-    const timingQuality = (
+    const pumpMatched = (
       speedEligible
       && this.pumpIntent !== 0
       && this.pumpIntent === desiredIntent
-    ) ? pumpWindowInfluence : 0;
+    );
+    const pumpAcceleration = pumpMatched
+      ? this.pumpAcceleration
+        * pumpInfluence
+        * (signWithEpsilon(previousVelocity, this.velocityEpsilon) || 1)
+      : 0;
 
-    const pumpWork = this.pumpSpecificEnergyPerSecond * timingQuality * dt;
-    if (pumpWork > 0) {
-      const direction = signWithEpsilon(velocity || previousVelocity, this.velocityEpsilon) || 1;
-      const speedSquared = velocity * velocity + 2 * pumpWork;
-      velocity = direction * Math.sqrt(Math.max(0, speedSquared));
-      this.state.pumpWorkTotal += pumpWork;
-    }
+    const acceleration = scaledGravity + dragAcceleration + pumpAcceleration;
+    let velocity = previousVelocity + acceleration * dt;
+
+    const pumpWork = pumpMatched
+      ? Math.max(0, Math.abs(pumpAcceleration * previousVelocity) * dt)
+      : 0;
+    if (pumpWork > 0) this.state.pumpWorkTotal += pumpWork;
 
     this.state.pumpIntent = this.pumpIntent;
     this.state.pumpDesiredIntent = desiredIntent;
-    this.state.pumpWindowInfluence = pumpWindowInfluence;
-    this.state.pumpTimingQuality = timingQuality;
-    this.state.pumpActive = pumpWork > 0;
+    this.state.pumpWindowInfluence = pumpInfluence;
+    this.state.pumpTimingQuality = pumpMatched ? pumpInfluence : 0;
+    this.state.pumpActive = pumpMatched;
     this.state.lastPumpWork = pumpWork;
+    this.state.turnIntent = this.turnIntent;
+    this.state.handPlantHeld = this.handPlantHeld;
+    this.state.trickType = null;
+    this.state.trickProgress = 0;
+
+    const surfaceTurn = this._trySurfaceTurn(previousX, velocity, desiredIntent);
+    velocity = surfaceTurn.velocity;
+
+    if (surfaceTurn.turned) {
+      this.state.turningPoints += 1;
+      this.state.lastTurningPointX = previousX;
+      this._lastDirection = signWithEpsilon(velocity, this.velocityEpsilon);
+    }
+
     let nextX = previousX + velocity * sample.tangent.x * dt;
 
     const minX = this.profile.leftLip + this.lipInset;
@@ -276,51 +441,43 @@ export class HalfpipeSimulation {
     const takeoffMaxX = this.profile.rightLip - this.airTakeoffInset;
     let launched = false;
 
-    // Coping takeoff is intentionally allowed a few centimeters before the
-    // mathematical lip. The board has finite wheel/deck support geometry, so
-    // requiring its center to reach the exact profile endpoint created a long
-    // artificial wait after the rider was already visually at coping height.
-    if (
-      nextX <= takeoffMinX
-      && velocity < 0
-      && Math.abs(velocity) >= this.airLaunchMinimumSpeed
-    ) {
-      this.state.lipContacts += 1;
-      this._enterAir(-1, velocity);
-      launched = true;
-    } else if (
-      nextX >= takeoffMaxX
-      && velocity > 0
-      && Math.abs(velocity) >= this.airLaunchMinimumSpeed
-    ) {
-      this.state.lipContacts += 1;
-      this._enterAir(1, velocity);
-      launched = true;
-    } else if (nextX <= minX && velocity < 0) {
-      this.state.lipContacts += 1;
-      nextX = minX;
-      velocity = 0;
-    } else if (nextX >= maxX && velocity > 0) {
-      this.state.lipContacts += 1;
-      nextX = maxX;
-      velocity = 0;
+    if (!surfaceTurn.turned) {
+      if (
+        nextX <= takeoffMinX
+        && velocity < 0
+        && Math.abs(velocity) >= this.airLaunchMinimumSpeed
+      ) {
+        this.state.lipContacts += 1;
+        this._enterAir(-1, velocity, takeoffMinX);
+        launched = true;
+      } else if (
+        nextX >= takeoffMaxX
+        && velocity > 0
+        && Math.abs(velocity) >= this.airLaunchMinimumSpeed
+      ) {
+        this.state.lipContacts += 1;
+        this._enterAir(1, velocity, takeoffMaxX);
+        launched = true;
+      } else if (nextX <= minX && velocity < 0) {
+        this.state.lipContacts += 1;
+        nextX = minX;
+        velocity = 0;
+      } else if (nextX >= maxX && velocity > 0) {
+        this.state.lipContacts += 1;
+        nextX = maxX;
+        velocity = 0;
+      }
     }
 
+    const surfaceDelta = velocity * dt;
+    this.state.distanceTravelled += Math.abs(surfaceDelta);
+    this.state.signedDistanceTravelled += surfaceDelta;
+
     if (launched) {
-      const surfaceDelta = velocity * dt;
-      this.state.distanceTravelled += Math.abs(surfaceDelta);
-      this.state.signedDistanceTravelled += surfaceDelta;
       this.state.time += dt;
       this._refreshDerivedState();
       return this.snapshot();
     }
-
-    // tangentVelocity is speed along the ramp surface (ds/dt), so travelled
-    // distance is arc distance, not horizontal delta-X. This is the quantity
-    // later used for visual wheel rotation and telemetry.
-    const surfaceDelta = velocity * dt;
-    this.state.distanceTravelled += Math.abs(surfaceDelta);
-    this.state.signedDistanceTravelled += surfaceDelta;
 
     if (
       previousX !== 0
@@ -338,7 +495,8 @@ export class HalfpipeSimulation {
 
     const nextDirection = signWithEpsilon(velocity, this.velocityEpsilon);
     if (
-      nextDirection !== 0
+      !surfaceTurn.turned
+      && nextDirection !== 0
       && this._lastDirection !== 0
       && nextDirection !== this._lastDirection
     ) {
@@ -369,7 +527,6 @@ export class HalfpipeSimulation {
       steps += 1;
     }
 
-    // Avoid a runaway catch-up spiral after a long background-tab pause.
     if (steps === this.maxSubSteps && this.accumulator >= this.fixedDt) {
       this.accumulator %= this.fixedDt;
     }
