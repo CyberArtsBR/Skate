@@ -31,7 +31,7 @@ export const GAME_CONFIG = Object.freeze({
   }),
   passivePhysics: Object.freeze({
     fixedHz: 120,
-    gravity: 9.81,
+    gravity: 30,
     linearDrag: 0.035,
     maxFrameDelta: 0.1,
     maxSubSteps: 20,
@@ -39,7 +39,7 @@ export const GAME_CONFIG = Object.freeze({
     velocityEpsilon: 0.0001,
     startTransitionFraction: 0.72,
     initialVelocity: 0,
-    presentationSpeedReference: 7,
+    presentationSpeedReference: 11,
     presentationVerticalEpsilon: 0.02,
   }),
   camera: Object.freeze({
