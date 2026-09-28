@@ -68,6 +68,28 @@ assert.ok(presentationState.surfaceAngle < 0);
 assert.ok(presentationState.speedNormalized > 0);
 assert.equal(presentationState.pumpCompression, 0);
 
+function runPumped(seconds = 8) {
+  const profile = new HalfpipeProfile();
+  const simulation = new HalfpipeSimulation(profile);
+  const totalSteps = Math.round(seconds / simulation.fixedDt);
+  let maxAbsX = Math.abs(simulation.snapshot().pipeX);
+
+  for (let index = 0; index < totalSteps; index += 1) {
+    const state = simulation.snapshot();
+    const desiredIntent = state.pipeX * state.tangentVelocity >= 0 ? 1 : -1;
+    simulation.setPumpIntent(desiredIntent);
+    const next = simulation.stepFixed();
+    maxAbsX = Math.max(maxAbsX, Math.abs(next.pipeX));
+  }
+
+  return { simulation, final: simulation.snapshot(), maxAbsX };
+}
+
+const pumped = runPumped();
+assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
+assert.ok(pumped.maxAbsX > Math.abs(first.initial.pipeX), 'correct pumping should increase amplitude');
+assert.equal(pumped.final.mode, 'contact');
+
 console.log(JSON.stringify({
   initial: first.initial,
   final: first.final,
