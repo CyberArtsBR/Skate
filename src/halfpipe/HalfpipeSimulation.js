@@ -29,6 +29,8 @@ export class HalfpipeSimulation {
     const airDefaults = GAME_CONFIG.air;
     this.airLaunchMinimumSpeed =
       options.airLaunchMinimumSpeed ?? airDefaults.launchMinimumSpeed;
+    this.airMinimumVerticalVelocity =
+      options.airMinimumVerticalVelocity ?? airDefaults.minimumVerticalVelocity;
     this.airGravity = options.airGravity ?? airDefaults.gravity;
     this.airLaunchVelocityScale =
       options.airLaunchVelocityScale ?? airDefaults.launchVelocityScale;
@@ -148,7 +150,7 @@ export class HalfpipeSimulation {
     const lipX = side < 0 ? this.profile.leftLip : this.profile.rightLip;
     const lip = this._sampleIncreasingX(lipX);
     const verticalVelocity = Math.max(
-      this.airLaunchMinimumSpeed,
+      this.airMinimumVerticalVelocity,
       Math.abs(launchSpeed) * this.airLaunchVelocityScale,
     );
 
