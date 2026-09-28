@@ -100,8 +100,8 @@ const pumped = runPumped();
 assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
 assert.ok(pumped.maxAbsX > Math.abs(first.initial.pipeX), 'correct pumping should increase amplitude');
 assert.ok(
-  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 3.5,
-  `strong correct pumping should reach 90% lip amplitude within 3.5s, got ${pumped.timeToHighAmplitude}`,
+  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 3.2,
+  `strong correct pumping should reach 90% lip amplitude within 3.2s, got ${pumped.timeToHighAmplitude}`,
 );
 assert.equal(pumped.final.mode, 'contact');
 
@@ -114,5 +114,52 @@ console.log(JSON.stringify({
     timeToHighAmplitude: pumped.timeToHighAmplitude,
     highAmplitudeTarget: pumped.highAmplitudeTarget,
     pumpWorkTotal: pumped.final.pumpWorkTotal,
+  },
+}, null, 2));
+
+
+function runUntilAirborne(seconds = 10) {
+  const profile = new HalfpipeProfile();
+  const simulation = new HalfpipeSimulation(profile);
+  const totalSteps = Math.round(seconds / simulation.fixedDt);
+  let firstAirTime = null;
+  let peakY = null;
+
+  for (let index = 0; index < totalSteps; index += 1) {
+    const state = simulation.snapshot();
+    if (state.mode === 'contact') {
+      const desiredIntent = state.pipeX * state.tangentVelocity >= 0 ? 1 : -1;
+      simulation.setPumpIntent(desiredIntent);
+    } else {
+      simulation.setPumpIntent(0);
+    }
+
+    const next = simulation.stepFixed();
+    if (next.mode === 'airborne' && firstAirTime === null) firstAirTime = next.time;
+    if (next.maxAirY !== null) peakY = next.maxAirY;
+  }
+
+  return { profile, simulation, final: simulation.snapshot(), firstAirTime, peakY };
+}
+
+const airborne = runUntilAirborne();
+const lipY = airborne.profile.sample(airborne.profile.rightLip).y;
+assert.ok(airborne.firstAirTime !== null, 'strong pumping should launch vertically above a lip');
+assert.ok(
+  airborne.firstAirTime <= 7,
+  `vertical air launch should be reachable within 7s, got ${airborne.firstAirTime}`,
+);
+assert.ok(
+  airborne.peakY !== null && airborne.peakY > lipY + 0.35,
+  `airborne peak should visibly clear the lip, got peak ${airborne.peakY} vs lip ${lipY}`,
+);
+assert.ok(airborne.final.airLaunches >= 1, 'air launch telemetry must be recorded');
+
+console.log(JSON.stringify({
+  airPrototype: {
+    firstAirTime: airborne.firstAirTime,
+    peakY: airborne.peakY,
+    lipY,
+    launches: airborne.final.airLaunches,
   },
 }, null, 2));
