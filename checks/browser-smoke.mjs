@@ -33,17 +33,32 @@ const state = await page.evaluate(() => {
     score: hud.querySelector('[data-score]').textContent,
     time: hud.querySelector('[data-time]').textContent,
     hudText: hud.innerText.replace(/\s+/g, ' ').trim(),
+    backgroundAsset: foundation.background.element.dataset.assetUrl,
+    backgroundImage: getComputedStyle(document.querySelector('.background-plate')).backgroundImage,
+    backgroundDimensions: [
+      foundation.background.state.naturalWidth,
+      foundation.background.state.naturalHeight,
+    ],
     hiddenGroundNodes: foundation.halfpipe.hiddenGroundNodes,
     wheelCount: foundation.rider.skateboard.wheels.length,
     rigCapabilities: foundation.rider.chimpion.rigAdapter.capabilities,
+    groundMaterial: foundation.ground.ground.material.type,
+    groundDepthWrite: foundation.ground.ground.material.depthWrite,
+    groundGridVisible: foundation.ground.grid.visible,
     renderer: canvas.getContext('webgl2') ? 'webgl2' : 'webgl',
   };
 });
 
 await page.screenshot({
-  path: path.resolve('docs/foundation-preview.png'),
+  path: path.resolve('docs/background-integration-preview.png'),
   fullPage: true,
 });
+
+await page.keyboard.press('d');
+const profileDebugVisible = await page.evaluate(
+  () => window.__HALFPIPE_FOUNDATION__.profileDebug.root.visible,
+);
+await page.keyboard.press('d');
 
 await browser.close();
 
@@ -52,8 +67,18 @@ assert.equal(state.canvasOpacity, '1');
 assert.equal(state.loadingDisplay, 'none');
 assert.equal(state.score, '0');
 assert.equal(state.time, '1:15');
+assert.equal(state.backgroundAsset, '/images/backgrounds/urban-sports-beach.jpg');
+assert.ok(state.backgroundImage.includes('urban-sports-beach.jpg'));
+assert.ok(state.backgroundDimensions[0] >= 1600);
+assert.ok(state.backgroundDimensions[1] >= 900);
+assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] > 1.76);
+assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] < 1.8);
 assert.equal(state.wheelCount, 4);
 assert.equal(state.rigCapabilities.gameplayFoundation, true);
+assert.equal(state.groundMaterial, 'ShadowMaterial');
+assert.equal(state.groundDepthWrite, false);
+assert.equal(state.groundGridVisible, false);
+assert.equal(profileDebugVisible, true);
 assert.ok(state.hiddenGroundNodes.includes('halfpipe-ground_Baked_1'));
 assert.deepEqual(consoleErrors, []);
 assert.deepEqual(pageErrors, []);

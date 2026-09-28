@@ -117,3 +117,17 @@ Prepared boundaries for Phase 2 and later:
 - `HalfpipeHUD.setScore()` and `setTime()` are presentation-only; current values remain static placeholders.
 
 The future simulation should have its own fixed-step state, input sampling and deterministic update loop. That work is intentionally outside this checkpoint.
+
+## 8. Replaceable event background
+
+The beach/palm Urban Sports plate is stored at `public/images/backgrounds/urban-sports-beach.jpg` and configured through `GAME_CONFIG.assets.background`. It is not part of the Three.js scene and is not baked into the halfpipe geometry.
+
+`createBackground()` owns a DOM layer below the transparent WebGL canvas. It preloads the configured image, preserves its aspect ratio with CSS `background-size: cover`, and exposes `setImage(url, position)` for future swaps. The stage is fixed to 16:9 and the source plate is also approximately 16:9, so the current composition needs only negligible cover cropping and no stretching. A restrained grade overlay darkens the upper HUD region and lower foreground without permanently modifying the source image.
+
+To replace the backdrop later:
+
+1. add the new image under `public/images/backgrounds/`;
+2. change `GAME_CONFIG.assets.background`;
+3. adjust the optional position passed to `createBackground()` only if the new plate has a different visual center.
+
+The independent 3D ground remains in the scene as a transparent `ShadowMaterial` receiver. This preserves real-time grounding shadows while allowing the photographed venue floor to remain visible through the WebGL canvas. The retained grid helper is disabled for presentation and can still be enabled later for diagnostics.

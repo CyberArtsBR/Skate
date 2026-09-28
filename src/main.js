@@ -19,7 +19,10 @@ const loadingState = document.querySelector('#loading-state');
 
 const { scene, renderer } = createScene(canvas);
 const cameraController = new HalfpipeCamera();
-const background = createBackground(stage);
+const background = createBackground(stage, {
+  imageUrl: GAME_CONFIG.assets.background,
+  position: 'center center',
+});
 const lighting = createLighting(scene);
 const ground = createGround(scene);
 const hud = new HalfpipeHUD(stage);
@@ -60,6 +63,7 @@ async function bootstrap() {
     halfpipeAsset.load(),
     skateboardAsset.load(),
     chimpionAsset.load(),
+    background.ready,
   ]);
 
   rider = new RiderController({
@@ -80,6 +84,9 @@ async function bootstrap() {
     profile,
     profileDebug,
     camera: cameraController.camera,
+    background,
+    ground,
+    lighting,
   };
 }
 

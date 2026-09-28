@@ -57,55 +57,40 @@ body {
 }
 
 .california-background {
-  --background-image: none;
   z-index: 0;
   overflow: hidden;
-  background-image:
-    var(--background-image),
-    linear-gradient(180deg, #68b8d3 0%, #b9d8da 46%, #dfc7a6 74%, #756a5d 100%);
-  background-position: center;
+  background: linear-gradient(180deg, #168ce3 0%, #91d8ef 54%, #bd8a69 100%);
+}
+
+.background-plate,
+.background-grade {
+  position: absolute;
+  inset: 0;
+}
+
+.background-plate {
+  --background-image: none;
+  --background-position: center center;
+  background-image: var(--background-image);
+  background-position: var(--background-position);
+  background-repeat: no-repeat;
   background-size: cover;
+  filter: saturate(0.94) contrast(0.95) brightness(0.88);
+  transform: scale(1.004);
 }
 
-.background-sun {
-  position: absolute;
-  top: 15%;
-  right: 15%;
-  width: 8%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #fff1b7;
-  box-shadow: 0 0 80px 32px rgb(255 226 159 / 44%);
-}
-
-.background-haze {
-  position: absolute;
-  left: -5%;
-  width: 110%;
-  clip-path: polygon(0 76%, 8% 62%, 17% 72%, 28% 48%, 40% 68%, 53% 42%, 65% 64%, 78% 46%, 90% 69%, 100% 56%, 100% 100%, 0 100%);
-}
-
-.background-haze-far {
-  bottom: 12%;
-  height: 37%;
-  background: rgb(95 116 122 / 34%);
-  filter: blur(4px);
-}
-
-.background-haze-near {
-  bottom: -4%;
-  height: 31%;
-  background: rgb(58 69 67 / 42%);
-  filter: blur(2px);
-  transform: scaleX(-1);
+.background-grade {
+  background:
+    linear-gradient(180deg, rgb(4 20 35 / 20%) 0%, transparent 22%, transparent 58%, rgb(31 22 18 / 22%) 100%),
+    radial-gradient(ellipse at 50% 45%, transparent 45%, rgb(3 14 24 / 15%) 100%);
 }
 
 #scene-overlay {
   z-index: 3;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgb(5 12 17 / 22%), transparent 18%, transparent 76%, rgb(4 8 11 / 30%)),
-    radial-gradient(ellipse at center, transparent 52%, rgb(3 9 13 / 29%) 100%);
+    linear-gradient(180deg, rgb(3 13 24 / 18%), transparent 19%, transparent 74%, rgb(14 9 7 / 28%)),
+    radial-gradient(ellipse at center, transparent 54%, rgb(2 10 17 / 24%) 100%);
 }
 
 .halfpipe-hud {
@@ -115,7 +100,7 @@ body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: start;
-  text-shadow: 0 3px 10px rgb(0 0 0 / 55%);
+  text-shadow: 0 3px 12px rgb(0 0 0 / 78%);
 }
 
 .hud-block {
@@ -124,6 +109,13 @@ body {
   gap: 0.08em;
   font-style: italic;
   letter-spacing: 0.08em;
+  width: max-content;
+  padding: clamp(7px, 0.7vw, 11px) clamp(11px, 1vw, 17px);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgb(4 20 34 / 66%), rgb(8 25 36 / 30%));
+  box-shadow: 0 8px 28px rgb(0 0 0 / 15%);
+  backdrop-filter: blur(3px);
 }
 
 .hud-block span {
@@ -138,6 +130,7 @@ body {
 }
 
 .hud-time {
+  justify-self: end;
   align-items: flex-end;
 }
 
@@ -148,6 +141,10 @@ body {
   gap: 0.18em;
   opacity: 0.78;
   letter-spacing: 0.18em;
+  padding: 0.55em 1em;
+  border-radius: 999px;
+  background: rgb(4 19 32 / 42%);
+  box-shadow: 0 5px 24px rgb(0 0 0 / 18%);
 }
 
 .hud-title small {

@@ -3,6 +3,7 @@ export const GAME_CONFIG = Object.freeze({
     halfpipe: '/models/halfpipe/halfpipe.glb',
     skateboard: '/models/skateboard/skateboard.glb',
     chimpion: '/models/characters/The%20Heretic.glb',
+    background: '/images/backgrounds/urban-sports-beach.jpg',
   }),
   renderer: Object.freeze({
     maxPixelRatio: 2,
@@ -26,10 +27,10 @@ export const GAME_CONFIG = Object.freeze({
     debugVisible: false,
   }),
   camera: Object.freeze({
-    fov: 36,
+    fov: 35,
     near: 0.1,
     far: 180,
-    position: Object.freeze([8.8, 12.4, 31]),
-    target: Object.freeze([0, 5.1, 0]),
+    position: Object.freeze([8.2, 11.4, 32.5]),
+    target: Object.freeze([0, 4.65, 0]),
   }),
 });
