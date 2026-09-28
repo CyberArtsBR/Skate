@@ -62,6 +62,7 @@ function formatTelemetry(state) {
     `V ${state.tangentVelocity.toFixed(2)}`,
     `E ${state.specificEnergy.toFixed(1)}`,
     `C ${state.bottomCrossings}`,
+    `Δ ${state.bottomCrossingInterval ? state.bottomCrossingInterval.toFixed(2) : '--'}`,
     `T ${state.turningPoints}`,
   ].join('   ');
 }
