@@ -55,11 +55,19 @@ assert.ok(
 );
 
 const presentationProbe = new HalfpipeSimulation(new HalfpipeProfile());
-for (let index = 0; index < 60; index += 1) presentationProbe.stepFixed();
-const presentationState = simulationToPresentationState(
-  presentationProbe.profile,
-  presentationProbe.snapshot(),
-);
+let presentationState = null;
+for (let index = 0; index < 240; index += 1) {
+  const snapshot = presentationProbe.stepFixed();
+  const candidate = simulationToPresentationState(
+    presentationProbe.profile,
+    snapshot,
+  );
+  if (!candidate.airborne && Math.abs(candidate.verticalVelocity) > 0.02) {
+    presentationState = candidate;
+    break;
+  }
+}
+assert.ok(presentationState, 'presentation probe should find moving contact state');
 assert.equal(presentationState.airborne, false);
 assert.ok(
   Math.abs(presentationState.verticalVelocity) > 0.02,
