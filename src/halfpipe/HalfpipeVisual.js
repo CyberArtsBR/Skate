@@ -35,10 +35,22 @@ function visibleBounds(root) {
   return worldBounds(root);
 }
 
+function hasVisibleMesh(object) {
+  let found = false;
+  object.traverse((child) => {
+    if (found) return;
+    if (child.isMesh && child.geometry && isVisibleInHierarchy(child)) found = true;
+  });
+  return found;
+}
+
 function findRidingSurface(root) {
   for (const name of RIDING_SURFACE_NAMES) {
     const exact = root.getObjectByName(name);
-    if (exact?.isMesh && exact.geometry && isVisibleInHierarchy(exact)) return exact;
+    // Some exported GLBs wrap the riding geometry in a named Object3D/Group.
+    // Astra's mesh audit identified Object_4 as the riding-surface subtree,
+    // so preserve that anchor even when the named node itself is not a Mesh.
+    if (exact && hasVisibleMesh(exact)) return exact;
   }
 
   const namedCandidates = [];
