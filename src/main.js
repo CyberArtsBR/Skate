@@ -72,6 +72,8 @@ function formatTelemetry(state) {
     `T ${state.turningPoints}`,
     `PUMP ${state.pumpIntent > 0 ? 'UP' : state.pumpIntent < 0 ? 'DOWN' : '-'}`,
     `Q ${state.pumpTimingQuality.toFixed(2)}`,
+    `TURN ${state.turnIntent < 0 ? 'LEFT' : state.turnIntent > 0 ? 'RIGHT' : '-'}`,
+    state.lastTrick ? `TRICK ${state.lastTrick}` : 'TRICK -',
     state.mode === 'airborne'
       ? `AIR ${state.airVerticalVelocity.toFixed(1)} · H ${(state.airY ?? 0).toFixed(1)}`
       : 'CONTACT',
@@ -156,6 +158,10 @@ function render(timestamp = 0) {
     const gamepadIntent = pumpInput?.pollGamepad() ?? 0;
     const controllerActions = pumpInput?.consumeActions() || {};
     const pumpIntent = pumpInput?.keyboardIntent || gamepadIntent || 0;
+    const turnIntent = pumpInput?.keyboardTurnIntent
+      || pumpInput?.gamepadTurnIntent
+      || 0;
+    const handPlantHeld = Boolean(pumpInput?.handPlantHeld);
 
     if (controllerActions.reset) {
       resetSimulation();
@@ -177,6 +183,8 @@ function render(timestamp = 0) {
     if (session.phase === 'ready' && pumpIntent !== 0) startSession();
 
     simulation.setPumpIntent(session.phase === 'running' ? pumpIntent : 0);
+    simulation.setTurnIntent(session.phase === 'running' ? turnIntent : 0);
+    simulation.setHandPlantHeld(session.phase === 'running' && handPlantHeld);
 
     if (simulationRunning && session.phase === 'running') {
       const result = simulation.advance(frameDelta);
@@ -188,6 +196,8 @@ function render(timestamp = 0) {
         if (session.phase === 'finished') {
           simulationRunning = false;
           simulation.setPumpIntent(0);
+          simulation.setTurnIntent(0);
+          simulation.setHandPlantHeld(false);
         }
 
         if (timestamp - lastTelemetryTime >= 100) {
@@ -205,11 +215,15 @@ function render(timestamp = 0) {
 function onKeyDown(event) {
   if (event.repeat) return;
 
-  if (event.code === 'KeyD') profileDebug.toggle();
+  if (event.code === 'F3') profileDebug.toggle();
 
   if (
     session.phase === 'ready'
-    && ['Enter', 'Space', 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS'].includes(event.code)
+    && [
+      'Enter', 'Space',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyK',
+    ].includes(event.code)
   ) {
     startSession();
   }
