@@ -163,7 +163,7 @@ const airTransition = await page.evaluate(() => {
   const profile = foundation.profile;
   foundation.physics.setRunning(false);
 
-  const takeoffX = profile.rightLip - 0.2;
+  const takeoffX = profile.rightLip - simulation.airTakeoffInset;
   simulation.reset({
     pipeX: takeoffX - 0.025,
     tangentVelocity: 20,
@@ -301,8 +301,8 @@ assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away 
 assert.equal(profileDebugVisible, true);
 assert.ok(airTransition.launch, 'air transition probe must reach airborne mode');
 assert.ok(
-  airTransition.launch.lipDistance > 0.15,
-  `takeoff anchor must remain inside the visual coping instead of snapping to the mathematical lip: ${airTransition.launch.lipDistance}`,
+  airTransition.launch.lipDistance >= 0.004,
+  `takeoff anchor must preserve the configured near-coping position instead of snapping to the mathematical lip: ${airTransition.launch.lipDistance}`,
 );
 assert.ok(
   airTransition.launch.rootDelta < 0.4,
