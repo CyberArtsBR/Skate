@@ -74,6 +74,20 @@ assert.equal(input.snapshot().gamepadTurnIntent, 1);
 input.pollGamepad([makePad({ stickX: 0.1 })]);
 assert.equal(input.snapshot().gamepadTurnIntent, 0);
 
+// The start prompt needs a true edge from any physical gamepad button.
+input.pollGamepad([makePad()]);
+input.consumeUIActions();
+input.pollGamepad([makePad({ buttons: { 3: true } })]);
+assert.equal(input.consumeUIActions().anyButton, true);
+input.pollGamepad([makePad({ buttons: { 3: true } })]);
+assert.equal(input.consumeUIActions().anyButton, false, 'held button must not retrigger start');
+input.pollGamepad([makePad()]);
+input.consumeUIActions();
+input.pollGamepad([makePad({ buttons: { 8: true } })]);
+assert.equal(input.consumeUIActions().anyButton, true, 'View/Share must count as any button');
+input.pollGamepad([makePad()]);
+input.consumeUIActions();
+
 for (const buttonIndex of [0, 1, 2]) {
   input.pollGamepad([makePad({ buttons: { [buttonIndex]: true } })]);
   assert.equal(
