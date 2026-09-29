@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { quality } from '../graphics/RenderQualityManager.js';
 
 export function createLighting(scene) {
-  const hemisphere = new THREE.HemisphereLight(0xdaf5ff, 0x735746, 1.55);
+  const hemisphere = new THREE.HemisphereLight(0xdaf5ff, 0x6b5140, 1.7);
   scene.add(hemisphere);
 
-  const key = new THREE.DirectionalLight(0xffe5bd, 3.45);
+  const key = new THREE.DirectionalLight(0xffe5bd, 3.7);
   key.name = 'california-key-light';
   key.position.set(-10, 20, 14);
   key.castShadow = true;
@@ -20,7 +20,7 @@ export function createLighting(scene) {
   scene.add(key);
   const unregisterShadow = quality.registerShadowLight(key);
 
-  const fill = new THREE.DirectionalLight(0x9acde8, 0.88);
+  const fill = new THREE.DirectionalLight(0x8ec8e8, 0.95);
   fill.position.set(12, 8, -12);
   scene.add(fill);
 
