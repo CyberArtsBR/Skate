@@ -9,6 +9,12 @@ export const GAME_CONFIG = Object.freeze({
     maxPixelRatio: 2,
     clearColor: 0x000000,
     shadowMapSize: 2048,
+    environmentIntensity: 1.35,
+    bloom: Object.freeze({
+      strength: 0.72,
+      radius: 0.38,
+      threshold: 0.72,
+    }),
   }),
   skateboard: Object.freeze({
     scale: 0.112,
