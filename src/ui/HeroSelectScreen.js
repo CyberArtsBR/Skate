@@ -157,6 +157,7 @@ export class HeroSelectScreen {
       button.dataset.heroId = hero.id;
       button.innerHTML = [
         '<span class="hero-card-image-wrap">',
+        '<img class="hero-card-image" alt="" loading="eager" decoding="async" draggable="false">',
         '<span class="hero-card-monogram" aria-hidden="true"></span>',
         '</span>',
         '<span class="hero-card-copy">',
@@ -164,6 +165,7 @@ export class HeroSelectScreen {
         '<small></small>',
         '</span>',
       ].join('');
+
       const initials = hero.name
         .replace(/^The\s+/i, '')
         .split(/\s+/)
@@ -171,7 +173,20 @@ export class HeroSelectScreen {
         .join('')
         .slice(0, 2)
         .toUpperCase();
-      button.querySelector('.hero-card-monogram').textContent = initials;
+
+      const image = button.querySelector('.hero-card-image');
+      const fallback = button.querySelector('.hero-card-monogram');
+      image.src = hero.portraitUrl;
+      image.alt = hero.name;
+      fallback.textContent = initials;
+      image.addEventListener('load', () => {
+        button.classList.add('has-thumb');
+        button.classList.remove('thumb-failed');
+      });
+      image.addEventListener('error', () => {
+        button.classList.remove('has-thumb');
+        button.classList.add('thumb-failed');
+      });
       button.querySelector('strong').textContent = hero.name;
       button.querySelector('small').textContent = hero.tribe;
       button.addEventListener('click', () => this.selectHero(index));
