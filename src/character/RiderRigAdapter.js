@@ -120,8 +120,8 @@ export class RiderRigAdapter {
       -torsoCounter * 0.65 * stanceDirection,
       torsoBalanceZ * 0.64,
     );
-    apply('neck', 0, headLook * 0.42 * stanceDirection, headBalanceZ * 0.35);
-    apply('head', 0, headLook * 0.58 * stanceDirection, headBalanceZ * 0.65);
+    apply('neck', 0, headLook * 0.24 * stanceDirection, headBalanceZ * 0.22);
+    apply('head', 0, headLook * 0.34 * stanceDirection, headBalanceZ * 0.42);
 
     for (const side of ['left', 'right']) {
       const sign = side === 'left' ? -1 : 1;
