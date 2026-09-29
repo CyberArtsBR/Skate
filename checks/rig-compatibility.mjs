@@ -16,7 +16,7 @@ const FILES = [
 ];
 
 const ALIASES = {
-  hips: ['hips','hip','pelvis','ccbasehip'],
+  hips: ['ccbasehip','hips','hip','pelvis'],
   spine: ['spine','spine0','spine1','spine01','ccbasespine01'],
   chest: ['chest','upperchest','spine2','spine02','spine3','ccbasespine02'],
   neck: ['neck','neck1','necktwist01','ccbasenecktwist01'],
@@ -53,13 +53,18 @@ function semanticName(name='') {
 
 function findNode(nodes, slot) {
   const aliases = ALIASES[slot] || [];
-  const exact = nodes.find((n) => aliases.includes(norm(n.getName())));
-  if (exact) return exact;
-  const sem = nodes.find((n) => {
-    const value = semanticName(n.getName());
-    return aliases.some((a) => value === a || value.endsWith(a));
-  });
-  return sem || null;
+  for (const alias of aliases) {
+    const exact = nodes.find((n) => norm(n.getName()) === alias);
+    if (exact) return exact;
+  }
+  for (const alias of aliases) {
+    const sem = nodes.find((n) => {
+      const value = semanticName(n.getName());
+      return value === alias || value.endsWith(alias);
+    });
+    if (sem) return sem;
+  }
+  return null;
 }
 
 function localMatrix(node) {
