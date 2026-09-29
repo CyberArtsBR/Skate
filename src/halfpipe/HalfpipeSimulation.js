@@ -355,15 +355,16 @@ export class HalfpipeSimulation {
     const expectedTurnIntent = this._expectedTurnIntentForAllowedSide();
 
     // Hand Plant is coping-only and is legal only on the facing-dependent side.
+    // Input may be buffered while entering the tiny activation band, but the
+    // animation itself is pinned to the actual lip/white coping bar.
     // Front-facing: LEFT wall. Back-facing: RIGHT wall.
     if (
       this.handPlantHeld
       && Math.max(wallFraction, predictedWallFraction) >= this.handPlantMinFraction
     ) {
-      const handPlantAnchor = side * (
-        this.profile.flatHalfWidth
-        + this.profile.transitionWidth * this.handPlantMinFraction
-      );
+      const handPlantAnchor = side < 0
+        ? this.profile.leftLip + this.lipInset
+        : this.profile.rightLip - this.lipInset;
       const quality = (
         Math.max(wallFraction, predictedWallFraction) - this.handPlantMinFraction
       ) / Math.max(1e-4, 1 - this.handPlantMinFraction);
