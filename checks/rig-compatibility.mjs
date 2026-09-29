@@ -139,3 +139,21 @@ for(const [id,d] of Object.entries(diagnostics)){
 }
 
 console.log(JSON.stringify(diagnostics,null,2));
+
+
+console.log('HERETIC_REFERENCE_EXACT=' + JSON.stringify(
+  Object.fromEntries(
+    Object.entries((await (async () => {
+      const doc = await io.read(path.resolve('public/models/characters/The Heretic.glb'));
+      const nodes = doc.getRoot().listNodes();
+      const rig = {};
+      for (const slot of Object.keys(ALIASES)) rig[slot] = findNode(nodes, slot);
+      return { bones: Object.fromEntries(
+        Object.entries(rig).map(([slot,node]) => [
+          slot,
+          node ? worldQuaternion(node).toArray() : null,
+        ]),
+      ) };
+    })()).bones),
+  ),
+));
