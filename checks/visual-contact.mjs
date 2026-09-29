@@ -4,7 +4,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const url = process.env.HALFPIPE_PREVIEW_URL || 'http://127.0.0.1:5173';
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 
 await page.goto(url, { waitUntil: 'networkidle' });
