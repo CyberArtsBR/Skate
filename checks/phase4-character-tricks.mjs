@@ -95,6 +95,36 @@ assert.ok([
   SKATE_ANIMATION_STATE.HEAVY_LAND,
 ].includes(landed.animationState));
 
+// A bail must immediately restore full deck contact even when airborne IK was
+// previously released. The impact expression belongs in the body pose, not in
+// a visually detached foot.
+const bailAnimation = new SkateAnimationController();
+const bailAir = bailAnimation.update(createRiderPresentationState({
+  time: 2,
+  airborne: true,
+  verticalVelocity: -18,
+  airHeight: 0.45,
+  footIKWeight: 0.3,
+  dropInProgress: 1,
+  animationState: SKATE_ANIMATION_STATE.AIR,
+}));
+assert.ok(bailAir.footIKWeight < 0.9);
+const bailContact = bailAnimation.update(createRiderPresentationState({
+  ...bailAir,
+  time: 2.016,
+  airborne: false,
+  verticalVelocity: 0,
+  landing: 1,
+  landingQuality: 'bail',
+  wallSide: -1,
+}));
+assert.equal(
+  bailContact.footIKWeight,
+  1,
+  'bail contact must snap both feet to full-strength deck IK',
+);
+assert.equal(bailContact.animationState, SKATE_ANIMATION_STATE.BAIL);
+
 const trickPose = new TrickPoseController({ stance: 'regular', stanceHalfLength: 0.24 });
 const kickMid = trickPose.evaluate({
   trickVisualActive: true,
@@ -112,7 +142,47 @@ const kickSettled = trickPose.evaluate({
 assert.ok(Math.abs(kickSettled.boardRoll) < 1e-8, 'kick-turn carrier must return to neutral');
 assert.ok(Math.abs(kickSettled.boardYaw) < 1e-8, 'kick-turn board yaw must return to neutral');
 
+const bailCarrier = trickPose.evaluate({
+  landing: 1,
+  landingQuality: 'bail',
+  wallSide: -1,
+  turnDirection: 1,
+});
+assert.ok(
+  Math.abs(bailCarrier.boardYaw) <= 0.04,
+  'bail deck yaw must stay small enough for both feet to remain reachable',
+);
+assert.ok(
+  Math.abs(bailCarrier.boardRoll) <= 0.05,
+  'bail deck wobble must remain restrained',
+);
+assert.ok(
+  Math.abs(bailCarrier.bodyX) <= 0.015,
+  'bail body carrier must not slide away from deck targets',
+);
+assert.ok(
+  Math.abs(bailCarrier.bodyRoll) >= 0.05,
+  'bail should still read visually through a restrained body reaction',
+);
+
 const poseController = new SkatePoseController();
+const bailPose = poseController.evaluate(createRiderPresentationState({
+  landing: 1,
+  landingQuality: 'bail',
+  wallSide: -1,
+  facingYaw: 0,
+  preloadCompression: 0.35,
+  dropInProgress: 1,
+}));
+assert.ok(bailPose.kneeFlex > 0.75, 'bail should absorb impact through the knees');
+assert.ok(
+  Math.abs(bailPose.torsoBalanceZ) > 0.1,
+  'bail should communicate instability through torso lean',
+);
+assert.ok(
+  bailPose.leftArmBalance > 0.8 && bailPose.rightArmBalance > 0.8,
+  'bail should use both arms for recovery instead of detaching a foot',
+);
 const fakiePose = poseController.evaluate(createRiderPresentationState({
   facingYaw: Math.PI,
   speedNormalized: 0.5,
@@ -218,6 +288,12 @@ console.log(JSON.stringify({
   kickTurnNeutral: {
     boardRoll: kickSettled.boardRoll,
     boardYaw: kickSettled.boardYaw,
+  },
+  bailRecovery: {
+    footIKWeight: bailContact.footIKWeight,
+    boardYaw: bailCarrier.boardYaw,
+    boardRoll: bailCarrier.boardRoll,
+    kneeFlex: bailPose.kneeFlex,
   },
   fakieFacingSign: fakiePose.facingSign,
   aerialDirection: {

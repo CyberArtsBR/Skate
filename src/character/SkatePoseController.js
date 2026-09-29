@@ -55,12 +55,14 @@ export class SkatePoseController {
       compression
       + pump * 0.12
       + landing * 0.38 * landingScale
+      + bail * 0.16
       + recovery * 0.06,
     );
     if (handPlant) compression = Math.max(0.36, compression * 0.72);
 
     const asymmetry = sketchy * 0.18 * wallSide * facingSign;
-    const landingRecoil = heavy * 0.18 + bail * 0.28;
+    const bailLean = bail * wallSide * facingSign;
+    const landingRecoil = heavy * 0.18 + bail * 0.34;
     const airCounter = air
       ? (Number(state.turnDirection) || 1) * (0.07 + airTuck * 0.09)
       : 0;
@@ -79,6 +81,12 @@ export class SkatePoseController {
     if (sketchy > 0) {
       leftArmBalance += asymmetry * 0.8;
       rightArmBalance -= asymmetry * 0.8;
+    }
+    if (bail > 0) {
+      // Arms catch balance asymmetrically while feet remain planted.
+      const bailArmReaction = 0.34 * bail;
+      leftArmBalance += bailArmReaction + bailLean * 0.12;
+      rightArmBalance += bailArmReaction - bailLean * 0.12;
     }
     if (handPlant) {
       leftArmBalance = handPlantFreeArm;
@@ -123,10 +131,12 @@ export class SkatePoseController {
       torsoBalanceZ:
         -surfaceAngle * 0.52 * facingSign
         + asymmetry
+        + bailLean * 0.16
         - wallSide * handPlant * 0.16,
       headBalanceZ:
         -surfaceAngle * 0.04 * facingSign
-        + asymmetry * 0.28,
+        + asymmetry * 0.28
+        - bailLean * 0.07,
       // Airborne gaze opens toward the expected landing wall; on touchdown it
       // returns toward travel instead of snapping with the torso.
       headLook: handPlant
@@ -141,7 +151,7 @@ export class SkatePoseController {
       leftForearmDrop: forearmDrop + Math.max(0, asymmetry) * 0.3,
       rightForearmDrop: forearmDrop + Math.max(0, -asymmetry) * 0.3,
       armLag: secondaryLag,
-      torsoSettle: recovery * 0.08 - heavy * 0.11,
+      torsoSettle: recovery * 0.08 - heavy * 0.11 - bail * 0.08,
       airborne: Boolean(state.airborne),
     });
     return this.pose;
