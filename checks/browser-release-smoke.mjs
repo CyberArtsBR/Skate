@@ -95,7 +95,29 @@ assert.equal(await page.locator('.board-swatch').count(), 9);
 await page.keyboard.press('ArrowRight');
 await page.keyboard.press('ArrowUp');
 await page.keyboard.press('Enter');
-await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls', null, { timeout: 15000 });
+try {
+  await page.waitForFunction(
+    () => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls',
+    null,
+    { timeout: 15000 },
+  );
+} catch (error) {
+  const diagnostic = await page.evaluate(() => ({
+    flow: window.__HALFPIPE_FOUNDATION__?.flow?.snapshot?.(),
+    customization: {
+      riderId: window.__HALFPIPE_FOUNDATION__?.customization?.riderId,
+      selectedRiderId: window.__HALFPIPE_FOUNDATION__?.customization?.selectedRiderId,
+      boardColorId: window.__HALFPIPE_FOUNDATION__?.customization?.boardColorId,
+    },
+    status: document.querySelector('[data-status]')?.textContent,
+    busy: document.querySelector('.hero-select-screen')?.classList.contains('is-busy'),
+  }));
+  console.error('Customization diagnostic:', JSON.stringify(diagnostic));
+  console.error('Customization console errors:', JSON.stringify(consoleErrors));
+  console.error('Customization page errors:', JSON.stringify(pageErrors));
+  console.error('Customization failed requests:', JSON.stringify(failedRequests));
+  throw error;
+}
 const customization = await page.evaluate(() => ({
   riderId: window.__HALFPIPE_FOUNDATION__.customization.riderId,
   selectedRiderId: window.__HALFPIPE_FOUNDATION__.customization.selectedRiderId,
