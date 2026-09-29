@@ -418,7 +418,11 @@ export class HalfpipeSimulation {
     this.state.pumpActive = false;
     this.state.lastPumpWork = 0;
 
-    if (!this.state.airTurnActive && this.turnIntent === expectedTurn) {
+    if (
+      !this.state.airTurnActive
+      && !this.state.airTurnCompleted
+      && this.turnIntent === expectedTurn
+    ) {
       this.state.airTurnActive = true;
       this.state.airTurnDirection = expectedTurn;
       this.state.airTurnElapsed = 0;
