@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
 
+const COPING_MATERIAL_NAME = 'Rail_Metal';
+const REFLECTIVE_SHELL_MATERIAL_NAME = 'Material';
+
 const RIDING_SURFACE_NAMES = Object.freeze([
   'Object_4',
   'halfpipe-riding-surface',
@@ -97,6 +100,10 @@ export class HalfpipeVisual {
     this.ridingSurface = null;
     this.ridingSurfaceBounds = new THREE.Box3();
     this.alignment = null;
+    this.materialDiagnostics = {
+      reflectiveShellCount: 0,
+      emissiveCopingCount: 0,
+    };
     this._surfaceRaycaster = new THREE.Raycaster();
   }
 
@@ -113,6 +120,50 @@ export class HalfpipeVisual {
       if (object.isMesh) {
         object.castShadow = true;
         object.receiveShadow = true;
+
+        const sourceMaterials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+
+        const preparedMaterials = sourceMaterials.map((material) => {
+          if (!material) return material;
+
+          if (material.name === COPING_MATERIAL_NAME) {
+            const coping = new THREE.MeshStandardMaterial({
+              name: 'Rail_Metal_Emissive',
+              color: 0xffffff,
+              metalness: 0.22,
+              roughness: 0.2,
+              emissive: 0xffffff,
+              emissiveIntensity: 4.8,
+              transparent: false,
+              depthWrite: true,
+              toneMapped: true,
+            });
+            this.materialDiagnostics.emissiveCopingCount += 1;
+            return coping;
+          }
+
+          if (
+            material.name === REFLECTIVE_SHELL_MATERIAL_NAME
+            && material.isMeshStandardMaterial
+          ) {
+            material.metalness = Math.max(0.88, Number(material.metalness) || 0);
+            material.roughness = Math.max(0.16, Math.min(0.26, Number(material.roughness) || 0.22));
+            material.envMapIntensity = Math.max(
+              1.45,
+              Number(material.envMapIntensity) || 0,
+            );
+            material.needsUpdate = true;
+            this.materialDiagnostics.reflectiveShellCount += 1;
+          }
+
+          return material;
+        });
+
+        object.material = Array.isArray(object.material)
+          ? preparedMaterials
+          : preparedMaterials[0];
       }
     });
 
@@ -170,6 +221,7 @@ export class HalfpipeVisual {
     this.root.userData.ridingSurfaceName = this.ridingSurface.name;
     this.root.userData.ridingSurfaceCenterX = alignedRidingBoundsCenter.x;
     this.root.userData.alignmentSource = this.alignment.source;
+    this.root.userData.materialDiagnostics = { ...this.materialDiagnostics };
     return this;
   }
 
