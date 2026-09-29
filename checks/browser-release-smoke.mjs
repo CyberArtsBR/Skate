@@ -86,8 +86,95 @@ assertFullscreenLayout(initial, '1600x900');
 
 await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'character-select');
+await page.waitForFunction(() => document.querySelectorAll('.hero-card').length === 10);
+assert.equal(await page.locator('.hero-card').count(), 10);
+assert.equal(await page.locator('.board-swatch').count(), 9);
+
+// Default selection is The Heretic. Move right to The Commodore and move the
+// board one swatch away from Original, then verify the actual runtime assets.
+await page.keyboard.press('ArrowRight');
+await page.keyboard.press('ArrowUp');
 await page.keyboard.press('Enter');
-await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls');
+try {
+  await page.waitForFunction(
+    () => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls',
+    null,
+    { timeout: 15000 },
+  );
+} catch (error) {
+  const diagnostic = await page.evaluate(() => ({
+    flow: window.__HALFPIPE_FOUNDATION__?.flow?.snapshot?.(),
+    customization: {
+      riderId: window.__HALFPIPE_FOUNDATION__?.customization?.riderId,
+      selectedRiderId: window.__HALFPIPE_FOUNDATION__?.customization?.selectedRiderId,
+      boardColorId: window.__HALFPIPE_FOUNDATION__?.customization?.boardColorId,
+    },
+    status: document.querySelector('[data-status]')?.textContent,
+    busy: document.querySelector('.hero-select-screen')?.classList.contains('is-busy'),
+  }));
+  console.error('Customization diagnostic:', JSON.stringify(diagnostic));
+  console.error('Customization console errors:', JSON.stringify(consoleErrors));
+  console.error('Customization page errors:', JSON.stringify(pageErrors));
+  console.error('Customization failed requests:', JSON.stringify(failedRequests));
+  throw error;
+}
+const customization = await page.evaluate(() => ({
+  riderId: window.__HALFPIPE_FOUNDATION__.customization.riderId,
+  selectedRiderId: window.__HALFPIPE_FOUNDATION__.customization.selectedRiderId,
+  boardColorId: window.__HALFPIPE_FOUNDATION__.customization.boardColorId,
+  sourceUrl: window.__HALFPIPE_FOUNDATION__.rider.chimpion.root.userData.sourceUrl,
+  deckColor: window.__HALFPIPE_FOUNDATION__.rider.skateboard.root.userData.deckColor,
+}));
+assert.equal(customization.riderId, 'commodore');
+assert.equal(customization.selectedRiderId, 'commodore');
+assert.equal(customization.boardColorId, 'red');
+assert.match(customization.sourceUrl, /Commodore/i);
+assert.equal(customization.deckColor, 0xc91f37);
+
+// Validate the complete shipped roster, not only the default and one alternate.
+// Every hero must load through the production GLTF + Halfpipe rig/IK path.
+const rosterIds = await page.evaluate(() => (
+  window.__HALFPIPE_FOUNDATION__.customization.roster.map((hero) => hero.id)
+));
+assert.equal(rosterIds.length, 10);
+
+for (const heroId of rosterIds) {
+  await page.evaluate(() => {
+    const foundation = window.__HALFPIPE_FOUNDATION__;
+    if (foundation.flow.state !== 'character-select') {
+      foundation.flow.transitionTo('character-select');
+    }
+  });
+
+  await page.locator('.hero-card[data-hero-id="' + heroId + '"]').click();
+  await page.locator('[data-confirm]').click();
+
+  try {
+    await page.waitForFunction(
+      (expectedId) => (
+        window.__HALFPIPE_FOUNDATION__.flow.state === 'controls'
+        && window.__HALFPIPE_FOUNDATION__.customization.riderId === expectedId
+        && window.__HALFPIPE_FOUNDATION__.rider.chimpion.rigAdapter.valid
+      ),
+      heroId,
+      { timeout: 20000 },
+    );
+  } catch (error) {
+    const diagnostic = await page.evaluate((expectedId) => ({
+      expectedId,
+      flow: window.__HALFPIPE_FOUNDATION__?.flow?.snapshot?.(),
+      actualId: window.__HALFPIPE_FOUNDATION__?.customization?.riderId,
+      selectedId: window.__HALFPIPE_FOUNDATION__?.customization?.selectedRiderId,
+      sourceUrl: window.__HALFPIPE_FOUNDATION__?.rider?.chimpion?.root?.userData?.sourceUrl,
+      missingRequired: window.__HALFPIPE_FOUNDATION__?.rider?.chimpion?.rigAdapter?.missingRequired,
+      status: document.querySelector('[data-status]')?.textContent,
+    }), heroId);
+    console.error('Roster diagnostic:', JSON.stringify(diagnostic));
+    console.error('Roster console errors:', JSON.stringify(consoleErrors));
+    throw error;
+  }
+}
+
 await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'countdown');
 const startPrompt = await page.locator('.countdown-label').textContent();
@@ -193,6 +280,7 @@ console.log(JSON.stringify({
   initial,
   runningStart,
   runningLater,
+  customization,
   reset,
   webglResilience,
   consoleErrors,

@@ -32,7 +32,7 @@ export class ChimpionLoader {
   async load() {
     const gltf = await new GLTFLoader().loadAsync(this.url);
     this.model = gltf.scene;
-    this.model.name = 'the-heretic-model';
+    this.model.name = 'chimpion-model';
 
     this.model.traverse((object) => {
       if (!object.isMesh) return;
@@ -57,6 +57,7 @@ export class ChimpionLoader {
     this.modelCarrier.rotation.y = 0;
     this.rigAdapter.applySkatePose({ stance: GAME_CONFIG.rider.stance });
     this.root.userData.rigCapabilities = this.rigAdapter.capabilities;
+    this.root.userData.sourceUrl = this.url;
     this.root.userData.poseMode = 'skateboard-side-stance';
     this.root.userData.modelForwardAxis = '+Z';
     this.root.userData.targetHeight = GAME_CONFIG.rider.targetHeight;

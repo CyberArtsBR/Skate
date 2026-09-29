@@ -45,17 +45,7 @@ export class RiderController {
     skateboard.root.position.x = -this.trickPoseController.rearPivotX;
 
     this.presentationState = createRiderPresentationState();
-    this.footIK = new RiderFootIK({
-      rigAdapter: chimpion.rigAdapter,
-      riderRoot: this.root,
-      skateboard,
-      chimpionRoot: chimpion.root,
-      stance: GAME_CONFIG.rider.stance,
-    });
-    this.handPlantIK = new HandPlantIK({
-      rigAdapter: chimpion.rigAdapter,
-      riderRoot: this.root,
-    });
+    this._rebuildCharacterIK();
     this.setPresentationState(this.presentationState);
 
     this.root.userData.presentationOnly = true;
@@ -63,6 +53,41 @@ export class RiderController {
     this.root.userData.hasTrickCarrier = true;
     this.root.userData.hasRearTruckPivot = true;
     this.root.userData.hasHandPlantIK = true;
+  }
+
+  _rebuildCharacterIK() {
+    this.footIK = new RiderFootIK({
+      rigAdapter: this.chimpion.rigAdapter,
+      riderRoot: this.root,
+      skateboard: this.skateboard,
+      chimpionRoot: this.chimpion.root,
+      stance: GAME_CONFIG.rider.stance,
+    });
+    this.handPlantIK = new HandPlantIK({
+      rigAdapter: this.chimpion.rigAdapter,
+      riderRoot: this.root,
+    });
+  }
+
+  replaceChimpion(chimpion) {
+    if (!chimpion?.root || !chimpion?.rigAdapter?.valid) {
+      throw new Error('Cannot replace rider with an invalid Chimpion rig');
+    }
+
+    const previous = this.chimpion;
+    previous?.root?.removeFromParent?.();
+
+    this.chimpion = chimpion;
+    this.bodyCarrier.add(chimpion.root);
+    chimpion.root.position.y = this.baseChimpionY;
+    chimpion.root.position.z = 0.015;
+    this._rebuildCharacterIK();
+
+    const pose = this.poseController.evaluate(this.presentationState);
+    chimpion.updatePose(pose);
+    this.setPresentationState(this.presentationState);
+    previous?.dispose?.();
+    return chimpion;
   }
 
   setPresentationState(nextState = {}) {
