@@ -38,12 +38,26 @@ export function simulationToPresentationState(profile, simulationState) {
   let trickOffsetY = 0;
   let trickVisualActive = false;
 
+  const dropTime = Math.max(0, Number(simulationState.time) || 0);
+  const dropDuration = Math.max(0.001, trickConfig.dropInDuration);
+  const dropInProgress = clamp01(dropTime / dropDuration);
+  const dropInRoll = (
+    !airborne
+    && !simulationState.surfaceTrickActive
+    && dropTime < dropDuration
+  )
+    ? trickConfig.dropInNoseLift * (1 - easeInOut(dropInProgress))
+    : 0;
+
   const currentSide = Number(simulationState.airSide)
     || Number(simulationState.lastTrickSide)
     || Math.sign(simulationState.pipeX)
     || 1;
 
-  if (airborne && trickType === 'aerial-turn') {
+  if (
+    airborne
+    && (simulationState.airTurnActive || trickType === 'aerial-turn')
+  ) {
     const direction = Number(simulationState.airTurnDirection)
       || (currentSide < 0 ? 1 : -1);
     const eased = easeInOut(trickProgress);
@@ -52,46 +66,34 @@ export function simulationToPresentationState(profile, simulationState) {
       * trickConfig.aerialRoll
       * Math.sin(Math.PI * trickProgress);
     trickVisualActive = trickProgress > 0;
+    trickType = 'aerial-turn';
   } else if (
     !airborne
-    && simulationState.lastTrickTime !== null
-    && (simulationState.lastTrick === 'kick-turn'
-      || simulationState.lastTrick === 'hand-plant')
+    && simulationState.surfaceTrickActive
+    && simulationState.surfaceTrickType
   ) {
-    const isHandPlant = simulationState.lastTrick === 'hand-plant';
-    const duration = isHandPlant
-      ? trickConfig.handPlantDuration
-      : trickConfig.kickTurnDuration;
-    const age = Math.max(
-      0,
-      (Number(simulationState.time) || 0)
-        - (Number(simulationState.lastTrickTime) || 0),
-    );
+    const isHandPlant = simulationState.surfaceTrickType === 'hand-plant';
+    const direction = Number(simulationState.lastTrickTurnDirection) || 0;
+    const side = Number(simulationState.lastTrickSide) || currentSide;
+    const eased = easeInOut(trickProgress);
+    const envelope = Math.sin(Math.PI * trickProgress);
 
-    if (age <= duration) {
-      trickType = simulationState.lastTrick;
-      trickProgress = clamp01(age / Math.max(duration, 1e-4));
-      const eased = easeInOut(trickProgress);
-      const envelope = Math.sin(Math.PI * trickProgress);
-      const direction = Number(simulationState.lastTrickTurnDirection) || 0;
-      const side = Number(simulationState.lastTrickSide) || currentSide;
+    trickType = simulationState.surfaceTrickType;
+    facingYaw = finalFacingYaw
+      - direction * Math.PI * (1 - eased);
 
-      facingYaw = finalFacingYaw
-        - direction * Math.PI * (1 - eased);
-
-      if (isHandPlant) {
-        trickRoll = -side * trickConfig.handPlantRoll * envelope;
-        trickOffsetX = -side * trickConfig.handPlantShift * envelope;
-        trickOffsetY = trickConfig.handPlantLift * envelope;
-      } else {
-        trickRoll = -side * trickConfig.kickTurnRoll * envelope;
-        trickOffsetY = trickConfig.kickTurnLift * envelope;
-      }
-      trickVisualActive = true;
+    if (isHandPlant) {
+      trickRoll = -side * trickConfig.handPlantRoll * envelope;
+      trickOffsetX = -side * trickConfig.handPlantShift * envelope;
+      trickOffsetY = trickConfig.handPlantLift * envelope;
     } else {
-      trickType = null;
-      trickProgress = 0;
+      trickRoll = -side * trickConfig.kickTurnRoll * envelope;
+      trickOffsetY = trickConfig.kickTurnLift * envelope;
     }
+    trickVisualActive = true;
+  } else {
+    trickType = null;
+    trickProgress = 0;
   }
 
   return {
@@ -112,6 +114,8 @@ export function simulationToPresentationState(profile, simulationState) {
     trickOffsetX,
     trickOffsetY,
     trickVisualActive,
+    dropInRoll,
+    dropInProgress,
     landing: 0,
     landingQuality: 'none',
     trickType,
