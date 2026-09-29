@@ -6,13 +6,13 @@ const placeholder = (kind, options = {}) => Object.freeze({
 });
 
 export const AUDIO_MANIFEST = Object.freeze({
-  version: 1,
+  version: 2,
   music: Object.freeze({
-    gameplay: placeholder('music-hook', { loop: true, gain: 0.72 }),
+    gameplay: placeholder('procedural-32bit-hard-rock', { loop: true, gain: 0.72 }),
     results: placeholder('music-hook', { loop: true, gain: 0.66 }),
   }),
   continuous: Object.freeze({
-    wheelRoll: placeholder('procedural-wheel-roll', { loop: true, gain: 1 }),
+    wheelRoll: placeholder('skate-wheel-roll-loop', { loop: true, gain: 1 }),
     rampTexture: placeholder('procedural-ramp-texture', { loop: true, gain: 1 }),
     wind: placeholder('procedural-wind', { loop: true, gain: 1 }),
   }),
@@ -35,6 +35,7 @@ export const AUDIO_MANIFEST = Object.freeze({
     landingHeavy: placeholder('landing-heavy', { gain: 0.86 }),
     bailBoard: placeholder('crash-board', { gain: 0.9 }),
     bailBody: placeholder('crash-body', { gain: 0.84 }),
+    crowdOh: placeholder('crowd-oooh', { gain: 0.86 }),
     bailRecovery: placeholder('recovery-accent', { gain: 0.4 }),
     scoreConfirm: placeholder('score-confirm', { gain: 0.42 }),
     comboTick: placeholder('combo-tick', { gain: 0.34 }),
@@ -46,12 +47,13 @@ export const AUDIO_MANIFEST = Object.freeze({
 });
 
 export const AUDIO_ASSET_REQUIREMENTS = Object.freeze([
-  'Optional music/gameplay loop (licensed/original, seamless)',
+  'Gameplay music may use the built-in 32-bit hard-rock loop or an original/licensed seamless replacement',
   'Optional results music loop or sting (licensed/original)',
   'Optional California outdoor ambience loop',
   'Optional distant-city ambience loop',
   'Optional restrained crowd ambience loop',
-  'Optional board/ramp wheel rolling texture loop',
+  'Preferred wheel-roll loop: 6-10 seconds, dry, seamless, no hard attack or baked fade, clean board-on-wood/concrete texture',
+  'Optional crowd OOOHH one-shot for bails',
   'Optional coping metal hit/scrape one-shots',
   'Optional landing impact family: perfect, clean, sketchy, heavy',
   'Optional bail layers: board, body/dust, recovery accent',
