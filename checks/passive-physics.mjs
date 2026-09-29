@@ -130,8 +130,8 @@ const pumped = runPumped();
 assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
 assert.ok(pumped.maxAbsX > pumped.initialAmplitude, 'correct pumping should increase amplitude from a lower transition start');
 assert.ok(
-  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 6,
-  `correct pumping should reach 90% lip amplitude within 6s from the calibration start, got ${pumped.timeToHighAmplitude}`,
+  pumped.timeToHighAmplitude === null || pumped.timeToHighAmplitude >= 6,
+  `V7 pumping should no longer rocket to 90% lip amplitude before 6s, got ${pumped.timeToHighAmplitude}`,
 );
 assert.ok(
   ['contact', 'airborne'].includes(pumped.final.mode),
@@ -152,7 +152,7 @@ console.log(JSON.stringify({
 }, null, 2));
 
 
-function runUntilAirborne(seconds = 10) {
+function runUntilAirborne(seconds = 14) {
   const profile = new HalfpipeProfile();
   const simulation = new HalfpipeSimulation(profile);
   const totalSteps = Math.round(seconds / simulation.fixedDt);
@@ -180,16 +180,16 @@ const airborne = runUntilAirborne();
 const lipY = airborne.profile.sample(airborne.profile.rightLip).y;
 assert.ok(airborne.firstAirTime !== null, 'strong pumping should launch vertically above a lip');
 assert.ok(
-  airborne.firstAirTime <= 7.5,
-  `slower-tuned vertical air launch should be reachable within 7.5s, got ${airborne.firstAirTime}`,
+  airborne.firstAirTime <= 13.5,
+  `stricter V7 pumping should still make aerial play reachable within 13.5s, got ${airborne.firstAirTime}`,
 );
 assert.ok(
   airborne.peakY !== null && airborne.peakY > lipY + 0.7,
   `airborne peak should visibly clear the lip, got peak ${airborne.peakY} vs lip ${lipY}`,
 );
 assert.ok(
-  airborne.peakY <= lipY + 15,
-  `high-speed airborne peak should stay within the expanded camera range, got peak ${airborne.peakY} vs lip ${lipY}`,
+  airborne.peakY <= lipY + 7.6,
+  `V7 airborne peak should respect the approximately half-height cap, got peak ${airborne.peakY} vs lip ${lipY}`,
 );
 assert.ok(airborne.final.airLaunches >= 1, 'air launch telemetry must be recorded');
 
