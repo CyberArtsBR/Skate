@@ -252,7 +252,7 @@ assert.ok(
 );
 
 // BACK-facing aerial: RIGHT side + LEFT input.
-const backAir = launchFromSide(profile, 1, -1);
+const backAir = launchFromSide(profile, 1, 1);
 backAir.setTurnIntent(-1);
 backAir.stepFixed();
 backAir.setTurnIntent(0);
