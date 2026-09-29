@@ -3,6 +3,7 @@ import { GAME_CONFIG } from '../src/config/gameConfig.js';
 import { HalfpipeProfile } from '../src/halfpipe/HalfpipeProfile.js';
 import { HalfpipeSimulation } from '../src/halfpipe/HalfpipeSimulation.js';
 import { simulationToPresentationState } from '../src/halfpipe/HalfpipeSimulationPresentation.js';
+import { SkatePoseController } from '../src/character/SkatePoseController.js';
 
 function wallX(profile, side, fraction) {
   return side * (
@@ -83,7 +84,7 @@ assert.ok(
 // Hand plant cannot fire on the lower/upper-middle wall anymore.
 const lowHand = new HalfpipeSimulation(profile);
 lowHand.reset({
-  pipeX: wallX(profile, 1, 0.94),
+  pipeX: wallX(profile, 1, 0.99),
   tangentVelocity: 7,
 });
 lowHand.setHandPlantHeld(true);
@@ -91,7 +92,7 @@ lowHand.stepFixed();
 assert.notEqual(
   lowHand.snapshot().lastTrick,
   'hand-plant',
-  'hand plant must not trigger below the coping zone',
+  'hand plant must not trigger even at 99% of the transition; it is coping-only',
 );
 
 // Hand plant triggers only at the coping and holds height for a slower animation.
@@ -169,10 +170,46 @@ for (
   aerial.stepFixed();
 }
 assert.equal(aerial.snapshot().airTurnActive, false);
-assert.notEqual(
-  aerial.snapshot().airVerticalVelocity,
-  0,
-  'aerial vertical motion should resume only after the full turn animation',
+assert.ok(
+  aerial.snapshot().airVerticalVelocity <= 0,
+  `aerial should descend after the held turn instead of regaining upward velocity: ${aerial.snapshot().airVerticalVelocity}`,
+);
+assert.ok(
+  aerial.snapshot().maxAirY <= frozenY + 1e-6,
+  `aerial turn started before apex must not gain height after the animation: max=${aerial.snapshot().maxAirY}, frozen=${frozenY}`,
+);
+
+const poseController = new SkatePoseController();
+const forwardPose = poseController.evaluate({
+  pumpCompression: 0,
+  landing: 0,
+  speedNormalized: 0.5,
+  airborne: false,
+  ascending: true,
+  descending: false,
+  surfaceAngle: 0.9,
+  facingYaw: 0,
+  trickVisualActive: false,
+  trickType: null,
+  landingQuality: 'none',
+});
+const forwardHeadBalance = forwardPose.headBalanceZ;
+const fakiePose = poseController.evaluate({
+  pumpCompression: 0,
+  landing: 0,
+  speedNormalized: 0.5,
+  airborne: false,
+  ascending: true,
+  descending: false,
+  surfaceAngle: 0.9,
+  facingYaw: Math.PI,
+  trickVisualActive: false,
+  trickType: null,
+  landingQuality: 'none',
+});
+assert.ok(
+  forwardHeadBalance * fakiePose.headBalanceZ < 0,
+  `head balance must reverse when rider faces backward: forward=${forwardHeadBalance}, fakie=${fakiePose.headBalanceZ}`,
 );
 
 console.log(JSON.stringify({
@@ -196,5 +233,10 @@ console.log(JSON.stringify({
     midpointY: aerialMid.airY,
     midpointYaw: aerialPresentation.facingYaw,
     resumedVerticalVelocity: aerial.snapshot().airVerticalVelocity,
+    maxAirY: aerial.snapshot().maxAirY,
+  },
+  headBalance: {
+    forward: forwardHeadBalance,
+    fakie: fakiePose.headBalanceZ,
   },
 }, null, 2));
