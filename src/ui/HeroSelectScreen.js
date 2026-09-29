@@ -157,16 +157,21 @@ export class HeroSelectScreen {
       button.dataset.heroId = hero.id;
       button.innerHTML = [
         '<span class="hero-card-image-wrap">',
-        '<img class="hero-card-image" alt="" loading="lazy">',
+        '<span class="hero-card-monogram" aria-hidden="true"></span>',
         '</span>',
         '<span class="hero-card-copy">',
         '<strong></strong>',
         '<small></small>',
         '</span>',
       ].join('');
-      const image = button.querySelector('img');
-      image.src = hero.portraitUrl;
-      image.alt = hero.name;
+      const initials = hero.name
+        .replace(/^The\s+/i, '')
+        .split(/\s+/)
+        .map((part) => part[0] || '')
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+      button.querySelector('.hero-card-monogram').textContent = initials;
       button.querySelector('strong').textContent = hero.name;
       button.querySelector('small').textContent = hero.tribe;
       button.addEventListener('click', () => this.selectHero(index));
