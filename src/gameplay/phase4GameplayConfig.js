@@ -49,10 +49,13 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   }),
   landing: Object.freeze({
     activeSeconds: 0.28,
-    impactPerfectMax: 14.5,
-    impactCleanMax: 18.5,
-    impactSketchyMax: 22,
-    impactHeavyMax: 26,
+    // High-air landings can carry ~38 units/s vertically. A correctly timed
+    // return should remain landable; rotation/flip timing is the primary bail
+    // criterion for the new 540/720/900 and backflip system.
+    impactPerfectMax: 24,
+    impactCleanMax: 40,
+    impactSketchyMax: 46,
+    impactHeavyMax: 52,
     rotationPerfectError: 14,
     rotationCleanError: 28,
     rotationSketchyError: 42,
