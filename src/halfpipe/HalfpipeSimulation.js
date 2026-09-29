@@ -672,7 +672,9 @@ export class HalfpipeSimulation {
 
     if (surfaceTurn.frozen) {
       this.state.time += dt;
-      this.state.pipeX = previousX;
+      // _startSurfaceTrick may deliberately move the presentation/contact
+      // anchor (Hand Plant pins to the coping). Preserve that resolved anchor
+      // instead of snapping back to the pre-trigger wall position.
       this.state.tangentVelocity = 0;
       this.state.tangentialAcceleration = 0;
       this._refreshDerivedState();
