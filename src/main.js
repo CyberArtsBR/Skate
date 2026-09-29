@@ -804,6 +804,13 @@ function onKeyDown(event) {
     return;
   }
 
+  // Menu navigation uses the same directional keys as gameplay. Handle the
+  // customization screen before the gameplay input layer's preventDefault.
+  if (gameFlow.state === HALFPIPE_FLOW_STATE.CHARACTER_SELECT) {
+    heroSelectScreen.handleKeyboardEvent(event);
+    return;
+  }
+
   if (event.defaultPrevented) return;
 
   if (event.code === 'F3') {
@@ -843,10 +850,6 @@ function onKeyDown(event) {
       controlsScreen.backButton.textContent = 'BACK';
       gameFlow.transitionTo(HALFPIPE_FLOW_STATE.CONTROLS);
     }
-    return;
-  }
-  if (gameFlow.state === HALFPIPE_FLOW_STATE.CHARACTER_SELECT) {
-    heroSelectScreen.handleKeyboardEvent(event);
     return;
   }
   if (gameFlow.state === HALFPIPE_FLOW_STATE.RUN && (event.code === 'KeyP' || event.code === 'Escape')) {
@@ -980,6 +983,14 @@ async function bootstrap() {
     hud,
     vfx,
     audio,
+    customization: {
+      roster: RIDER_ROSTER,
+      boardColors: SKATEBOARD_COLORS,
+      get riderId() { return currentHeroId; },
+      get selectedRiderId() { return selectedHeroId; },
+      get boardColorId() { return selectedBoardColorId; },
+      screen: heroSelectScreen,
+    },
     graphics: {
       quality,
       get preset() { return currentGraphicsPreset; },
