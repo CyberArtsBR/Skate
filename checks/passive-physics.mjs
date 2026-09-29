@@ -210,9 +210,16 @@ kickTurnSim.reset({
   tangentVelocity: 8,
 });
 kickTurnSim.setTurnIntent(-1);
-const kickTurnState = kickTurnSim.stepFixed();
-assert.equal(kickTurnState.lastTrick, 'kick-turn');
-assert.ok(kickTurnState.tangentVelocity < 0, 'right-wall kick turn should reverse back toward center');
+const kickTurnStart = kickTurnSim.stepFixed();
+assert.equal(kickTurnStart.lastTrick, 'kick-turn');
+assert.equal(kickTurnStart.surfaceTrickActive, true);
+assert.equal(kickTurnStart.tangentVelocity, 0);
+kickTurnSim.setTurnIntent(0);
+for (let index = 0; index < 120 && kickTurnSim.snapshot().surfaceTrickActive; index += 1) {
+  kickTurnSim.stepFixed();
+}
+const kickTurnState = kickTurnSim.snapshot();
+assert.ok(kickTurnState.tangentVelocity < 0, 'right-wall kick turn should reverse back toward center after the slow-motion hold');
 assert.equal(kickTurnState.trickCount, 1);
 assert.ok(kickTurnState.lastTrickPoints >= 100 && kickTurnState.lastTrickPoints <= 300);
 assert.equal(kickTurnState.score, kickTurnState.lastTrickPoints);
@@ -223,9 +230,16 @@ handPlantSim.reset({
   tangentVelocity: 7,
 });
 handPlantSim.setHandPlantHeld(true);
-const handPlantState = handPlantSim.stepFixed();
-assert.equal(handPlantState.lastTrick, 'hand-plant');
-assert.ok(handPlantState.tangentVelocity < 0, 'hand plant should reverse the rider back into the pipe');
+const handPlantStart = handPlantSim.stepFixed();
+assert.equal(handPlantStart.lastTrick, 'hand-plant');
+assert.equal(handPlantStart.surfaceTrickActive, true);
+assert.equal(handPlantStart.tangentVelocity, 0);
+handPlantSim.setHandPlantHeld(false);
+for (let index = 0; index < 180 && handPlantSim.snapshot().surfaceTrickActive; index += 1) {
+  handPlantSim.stepFixed();
+}
+const handPlantState = handPlantSim.snapshot();
+assert.ok(handPlantState.tangentVelocity < 0, 'hand plant should reverse the rider back into the pipe after the coping hold');
 assert.ok(handPlantState.lastTrickPoints >= 400 && handPlantState.lastTrickPoints <= 700);
 
 const aerialTurnSim = new HalfpipeSimulation(trickProfile);
