@@ -204,20 +204,51 @@ export class HalfpipeVisual {
         const sourceMaterials = Array.isArray(object.material)
           ? object.material
           : [object.material];
+        const frontMetal = GAME_CONFIG.renderer.frontMetal;
+        let preparedMaterials = sourceMaterials;
+
+        if (
+          frontMetal?.materialName
+          && sourceMaterials.some((material) => material?.name === frontMetal.materialName)
+        ) {
+          preparedMaterials = sourceMaterials.map((material) => {
+            if (material?.name !== frontMetal.materialName) return material;
+
+            // Maximize metallic/environment response while preserving the GLB's
+            // authored roughness exactly. This keeps the front U reflective
+            // without repeating the earlier regression that made it unnaturally
+            // matte by rewriting roughness.
+            const reflective = material.clone();
+            reflective.name = `${material.name}-max-reflective`;
+            if ('metalness' in reflective) reflective.metalness = frontMetal.metalness;
+            if ('envMapIntensity' in reflective) {
+              reflective.envMapIntensity = frontMetal.envMapIntensity;
+            }
+            reflective.needsUpdate = true;
+            return reflective;
+          });
+
+          object.material = Array.isArray(object.material)
+            ? preparedMaterials
+            : preparedMaterials[0];
+          object.userData.maxReflectiveFront = true;
+        }
+
         const hasCopingMaterial = sourceMaterials.some(
           (material) => material?.name === COPING_MATERIAL_NAME,
         );
 
         if (hasCopingMaterial) {
           object.userData.copingContactZone = true;
-          const preparedMaterials = sourceMaterials.map((material) => {
-            if (material?.name !== COPING_MATERIAL_NAME) return material;
+          preparedMaterials = preparedMaterials.map((material, index) => {
+            const sourceMaterial = sourceMaterials[index];
+            if (sourceMaterial?.name !== COPING_MATERIAL_NAME) return material;
 
             // Preserve the authored GLB material exactly except for a restrained
             // emissive lift on the white coping. In particular, do not touch
             // roughness, metalness, maps, or shell materials.
-            const coping = material.clone();
-            coping.name = `${material.name}-soft-emissive`;
+            const coping = sourceMaterial.clone();
+            coping.name = `${sourceMaterial.name}-soft-emissive`;
             if (coping.emissive?.set) {
               coping.emissive.set(0xffffff);
               coping.emissiveIntensity = GAME_CONFIG.renderer.copingGlow.emissiveIntensity;
