@@ -110,19 +110,19 @@ assert.ok(
   `successful front turn must leave rider back-facing, yaw=${kickSettled.facingYaw}`,
 );
 
-// BACK-facing: tricks only on RIGHT, with LEFT input.
-const illegalBackLeft = new HalfpipeSimulation(profile);
-illegalBackLeft.reset({
+// BACK-facing turns are symmetric too.
+const backLeft = new HalfpipeSimulation(profile);
+backLeft.reset({
   pipeX: wallX(profile, -1, 0.86),
   tangentVelocity: -7,
 });
-illegalBackLeft.state.facingTurns = 1;
-illegalBackLeft.setTurnIntent(1);
-illegalBackLeft.stepFixed();
+backLeft.state.facingTurns = 1;
+backLeft.setTurnIntent(1);
+backLeft.stepFixed();
 assert.equal(
-  illegalBackLeft.snapshot().lastTrick,
-  null,
-  'back-facing rider must not turn on LEFT wall',
+  backLeft.snapshot().lastTrick,
+  'kick-turn',
+  'back-facing rider must be allowed to turn on LEFT wall',
 );
 
 const backRight = new HalfpipeSimulation(profile);
@@ -148,7 +148,7 @@ assert.ok(
   `second counterclockwise 180 must return rider front-facing, yaw=${backKickSettled.facingYaw}`,
 );
 
-// Hand Plant: coping-only AND facing-side-only.
+// Hand Plant: coping-only, but valid on either wall.
 const lowHand = new HalfpipeSimulation(profile);
 lowHand.reset({
   pipeX: wallX(profile, -1, 0.975),
@@ -162,17 +162,17 @@ assert.notEqual(
   'hand plant must not trigger below the coping zone',
 );
 
-const wrongSideHand = new HalfpipeSimulation(profile);
-wrongSideHand.reset({
+const rightSideHand = new HalfpipeSimulation(profile);
+rightSideHand.reset({
   pipeX: wallX(profile, 1, 0.997),
   tangentVelocity: 7,
 });
-wrongSideHand.setHandPlantHeld(true);
-wrongSideHand.stepFixed();
+rightSideHand.setHandPlantHeld(true);
+rightSideHand.stepFixed();
 assert.equal(
-  wrongSideHand.snapshot().lastTrick,
-  null,
-  'front-facing hand plant must not trigger on RIGHT wall',
+  rightSideHand.snapshot().lastTrick,
+  'hand-plant',
+  'front-facing hand plant must be allowed on RIGHT wall',
 );
 
 const bufferedHand = new HalfpipeSimulation(profile);
@@ -243,21 +243,21 @@ assert.equal(
   'airborne hand-plant input must not create a surface trick',
 );
 
-// FRONT-facing aerial: LEFT side + RIGHT input only.
-const illegalFrontRightAir = launchFromSide(profile, 1, 0);
-illegalFrontRightAir.setTurnIntent(-1);
-for (let index = 0; index < 20; index += 1) illegalFrontRightAir.stepFixed();
+// FRONT-facing aerials can start on either side.
+const frontRightAir = launchFromSide(profile, 1, 0);
+frontRightAir.setTurnIntent(-1);
+for (let index = 0; index < 20; index += 1) frontRightAir.stepFixed();
 assert.equal(
-  illegalFrontRightAir.snapshot().airTurnActive,
-  false,
-  'front-facing aerial must be disabled on RIGHT side',
+  frontRightAir.snapshot().airTurnActive,
+  true,
+  'front-facing aerial must be allowed on RIGHT side',
 );
 
 const aerial = launchFromSide(profile, -1, 0);
 for (let index = 0; index < 10; index += 1) aerial.stepFixed();
 const turnStartY = aerial.snapshot().airY;
 aerial.setTurnIntent(1);
-const cleanTurnSteps = Math.round(0.5 / aerial.fixedDt);
+const cleanTurnSteps = Math.round(0.3 / aerial.fixedDt);
 const airHalfSteps = Math.round(cleanTurnSteps * 0.5);
 for (let index = 0; index < airHalfSteps; index += 1) aerial.stepFixed();
 const aerialMid = aerial.snapshot();
@@ -304,8 +304,8 @@ assert.ok(
   `back-facing half-held aerial should be near 90 degrees: ${backAir.snapshot().airRotationDegrees}`,
 );
 assert.ok(
-  backAirPresentation.facingYaw > Math.PI + 1.2,
-  `back-facing RIGHT aerial must also rotate counterclockwise on camera, yaw=${backAirPresentation.facingYaw}`,
+  backAirPresentation.facingYaw < Math.PI - 1.2,
+  `back-facing RIGHT aerial must follow LEFT input clockwise on camera, yaw=${backAirPresentation.facingYaw}`,
 );
 
 // Pose mirroring contract when riding with back to camera.
