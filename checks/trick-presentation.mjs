@@ -63,18 +63,18 @@ assert.ok(
   `drop-in board should start nose-up, roll=${dropPresentation.dropInRoll}`,
 );
 
-// FRONT-facing: tricks only on LEFT, with RIGHT input.
-const illegalFrontRight = new HalfpipeSimulation(profile);
-illegalFrontRight.reset({
+// Turns are symmetric: either wall works regardless of facing.
+const frontRight = new HalfpipeSimulation(profile);
+frontRight.reset({
   pipeX: wallX(profile, 1, 0.86),
   tangentVelocity: 7,
 });
-illegalFrontRight.setTurnIntent(-1);
-illegalFrontRight.stepFixed();
+frontRight.setTurnIntent(-1);
+frontRight.stepFixed();
 assert.equal(
-  illegalFrontRight.snapshot().lastTrick,
-  null,
-  'front-facing rider must not turn on RIGHT wall',
+  frontRight.snapshot().lastTrick,
+  'kick-turn',
+  'front-facing rider must be allowed to turn on RIGHT wall',
 );
 
 const frontLeft = new HalfpipeSimulation(profile);
