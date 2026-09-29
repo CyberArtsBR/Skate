@@ -86,6 +86,7 @@ export class RiderRigAdapter {
 
   applySkatePose({
     stance = 'regular',
+    facingSign = 1,
     compression = 0.45,
     hipFlex = 0.14,
     kneeFlex = 0.56,
@@ -107,30 +108,32 @@ export class RiderRigAdapter {
     };
 
     const stanceDirection = stance === 'goofy' ? -1 : 1;
+    const facingDirection = facingSign < 0 ? -1 : 1;
+    const motionDirection = stanceDirection * facingDirection;
     apply('hips', -hipFlex, 0, 0);
     apply(
       'spine',
       -0.055 * compression,
-      -torsoCounter * 0.35 * stanceDirection,
+      -torsoCounter * 0.35 * motionDirection,
       torsoBalanceZ * 0.36,
     );
     apply(
       'chest',
       -0.025 * compression,
-      -torsoCounter * 0.65 * stanceDirection,
+      -torsoCounter * 0.65 * motionDirection,
       torsoBalanceZ * 0.64,
     );
-    apply('neck', 0, headLook * 0.24 * stanceDirection, headBalanceZ * 0.22);
-    apply('head', 0, headLook * 0.34 * stanceDirection, headBalanceZ * 0.42);
+    apply('neck', 0, headLook * 0.24 * motionDirection, headBalanceZ * 0.22);
+    apply('head', 0, headLook * 0.34 * motionDirection, headBalanceZ * 0.42);
 
     for (const side of ['left', 'right']) {
       const sign = side === 'left' ? -1 : 1;
       const footRoleSign = side === 'left' ? stanceDirection : -stanceDirection;
       apply(`${side}Thigh`, -0.28 - compression * 0.12, sign * 0.035, footRoleSign * 0.09);
       apply(`${side}Shin`, kneeFlex, 0, 0);
-      apply(`${side}Foot`, ankleFlex, sign * 0.025, -footRoleSign * 0.025);
-      apply(`${side}UpperArm`, -0.12, -torsoCounter * 0.18, sign * armBalance);
-      apply(`${side}Forearm`, -0.16, 0, sign * 0.11);
+      apply(`${side}Foot`, ankleFlex, mirrorSign * 0.025, -footRoleSign * 0.025);
+      apply(`${side}UpperArm`, -0.12, -torsoCounter * 0.18 * facingDirection, mirrorSign * armBalance);
+      apply(`${side}Forearm`, -0.16, 0, mirrorSign * 0.11);
     }
 
     this.model.updateWorldMatrix(true, true);
