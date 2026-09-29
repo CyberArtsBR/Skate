@@ -92,6 +92,15 @@ const state = await page.evaluate(() => {
       foundation.background.state.naturalHeight,
     ],
     hiddenGroundNodes: foundation.halfpipe.hiddenGroundNodes,
+    halfpipeMaterialDiagnostics: { ...foundation.halfpipe.materialDiagnostics },
+    hasReflectionEnvironment: Boolean(foundation.halfpipe.root.parent?.environment)
+      || Boolean(foundation.lighting?.frontFill)
+      || Boolean(foundation.postProcessing),
+    sceneEnvironmentReady: Boolean(foundation.halfpipe.root.parent?.environment),
+    postProcessingEnabled: foundation.postProcessing.enabled,
+    bloomStrength: foundation.postProcessing.bloomPass.strength,
+    bloomRadius: foundation.postProcessing.bloomPass.radius,
+    bloomThreshold: foundation.postProcessing.bloomPass.threshold,
     wheelCount: foundation.rider.skateboard.wheels.length,
     wheelSpinSafe: foundation.rider.skateboard.wheelSpinSafe,
     measuredWheelDiameter: foundation.rider.skateboard.measuredWheelDiameter,
@@ -359,6 +368,19 @@ assert.ok(state.backgroundDimensions[0] >= 1600);
 assert.ok(state.backgroundDimensions[1] >= 900);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] > 1.76);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] < 1.8);
+assert.ok(
+  state.halfpipeMaterialDiagnostics.reflectiveShellCount >= 1,
+  `reflective front shell material was not prepared: ${JSON.stringify(state.halfpipeMaterialDiagnostics)}`,
+);
+assert.ok(
+  state.halfpipeMaterialDiagnostics.emissiveCopingCount >= 1,
+  `white coping was not converted to emissive material: ${JSON.stringify(state.halfpipeMaterialDiagnostics)}`,
+);
+assert.equal(state.sceneEnvironmentReady, true);
+assert.equal(state.postProcessingEnabled, true);
+assert.ok(state.bloomStrength >= 0.6);
+assert.ok(state.bloomRadius >= 0.3);
+assert.ok(state.bloomThreshold < 0.8);
 assert.equal(state.wheelCount, 4);
 assert.equal(state.wheelSpinSafe, false);
 assert.ok(state.measuredWheelDiameter > 0.075, `scaled skateboard wheel diameter is too small: ${state.measuredWheelDiameter}`);
