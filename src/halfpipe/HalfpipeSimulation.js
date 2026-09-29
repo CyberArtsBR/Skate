@@ -48,6 +48,8 @@ export class HalfpipeSimulation {
       options.handPlantMinFraction ?? turningDefaults.handPlantMinFraction;
     this.handPlantRetention =
       options.handPlantRetention ?? turningDefaults.handPlantRetention;
+    this.handPlantBufferSeconds =
+      options.handPlantBufferSeconds ?? turningDefaults.handPlantBufferSeconds;
     this.aerialIdealHoldSeconds =
       options.aerialIdealHoldSeconds ?? turningDefaults.aerialIdealHoldSeconds;
     this.aerialCompleteSeconds =
@@ -75,8 +77,10 @@ export class HalfpipeSimulation {
     this.pumpIntent = 0;
     this.turnIntent = 0;
     this.handPlantHeld = false;
+    this.handPlantBufferRemaining = 0;
 
     this.accumulator = 0;
+    this.handPlantBufferRemaining = 0;
     this._lastDirection = 0;
     this.reset(options.initialState);
   }
@@ -215,6 +219,12 @@ export class HalfpipeSimulation {
 
   setHandPlantHeld(held) {
     this.handPlantHeld = Boolean(held);
+    if (this.handPlantHeld && this.state?.mode !== 'airborne') {
+      this.handPlantBufferRemaining = Math.max(
+        this.handPlantBufferRemaining,
+        this.handPlantBufferSeconds,
+      );
+    }
     return this.handPlantHeld;
   }
 
@@ -358,8 +368,12 @@ export class HalfpipeSimulation {
     // Input may be buffered while entering the tiny activation band, but the
     // animation itself is pinned to the actual lip/white coping bar.
     // Front-facing: LEFT wall. Back-facing: RIGHT wall.
+    const handPlantRequested = (
+      this.handPlantHeld || this.handPlantBufferRemaining > 0
+    );
+
     if (
-      this.handPlantHeld
+      handPlantRequested
       && Math.max(wallFraction, predictedWallFraction) >= this.handPlantMinFraction
     ) {
       const handPlantAnchor = side < 0
@@ -368,6 +382,7 @@ export class HalfpipeSimulation {
       const quality = (
         Math.max(wallFraction, predictedWallFraction) - this.handPlantMinFraction
       ) / Math.max(1e-4, 1 - this.handPlantMinFraction);
+      this.handPlantBufferRemaining = 0;
       return this._startSurfaceTrick(
         'hand-plant',
         quality,
@@ -443,6 +458,7 @@ export class HalfpipeSimulation {
 
   _stepAirborne() {
     const dt = this.fixedDt;
+    this.handPlantBufferRemaining = 0;
     const side = this.state.airSide || (this.state.pipeX < 0 ? -1 : 1);
     const anchorX = this.state.airAnchorX ?? this.state.pipeX;
     const baseY = this.state.airBaseY ?? this._sampleIncreasingX(anchorX).y;
@@ -616,6 +632,12 @@ export class HalfpipeSimulation {
     if (this.state.mode === 'airborne') return this._stepAirborne();
 
     const dt = this.fixedDt;
+    if (!this.handPlantHeld && this.handPlantBufferRemaining > 0) {
+      this.handPlantBufferRemaining = Math.max(
+        0,
+        this.handPlantBufferRemaining - dt,
+      );
+    }
     const previousX = this.state.pipeX;
     const previousVelocity = this.state.tangentVelocity;
     const sample = this._sampleIncreasingX(previousX);
