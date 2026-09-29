@@ -33,6 +33,7 @@ export class SkatePoseController {
       0.3,
     );
     const wallSide = Math.sign(Number(state.wallSide) || 0) || 1;
+    const ascendingPrep = Boolean(state.rampAscending) && !air && !handPlant;
 
     const quality = String(state.landingQuality || LANDING_QUALITY.NONE);
     const landingScale = quality === LANDING_QUALITY.HEAVY
@@ -82,25 +83,39 @@ export class SkatePoseController {
     if (handPlant) {
       leftArmBalance = handPlantFreeArm;
       rightArmBalance = handPlantFreeArm;
+    } else if (ascendingPrep) {
+      // Keep the Phase 3B silhouette strength while Phase 4 makes the preload
+      // continuous: arms stay clearly down near the knees for the whole ascent.
+      const prepArm = 1.15 + preload * 0.15;
+      leftArmBalance = Math.max(leftArmBalance, prepArm);
+      rightArmBalance = Math.max(rightArmBalance, prepArm);
     }
 
     const forearmDrop = handPlant
       ? 0.04
       : air
         ? 0.05 + anticipation * 0.08
-        : 0.1 + landing * 0.12 + heavy * 0.08;
+        : ascendingPrep
+          ? Math.max(0.3 + preload * 0.12, 0.1 + landing * 0.12 + heavy * 0.08)
+          : 0.1 + landing * 0.12 + heavy * 0.08;
 
     Object.assign(this.pose, {
       stance: this.stance,
       facingSign,
-      ascendingPrep: Boolean(state.rampAscending),
+      ascendingPrep,
       compression,
       hipFlex: handPlant
         ? 0.08 + compression * 0.1
         : 0.07 + compression * 0.18 + landingRecoil * 0.22,
       kneeFlex: handPlant
         ? 0.44 + compression * 0.25
-        : 0.36 + compression * 0.5 + landingRecoil * 0.22,
+        : Math.min(
+          1.02,
+          0.36
+            + compression * 0.5
+            + landingRecoil * 0.22
+            + (ascendingPrep ? 0.36 : 0),
+        ),
       ankleFlex: handPlant
         ? -0.05
         : -0.08 - compression * 0.075 + anticipation * 0.035,

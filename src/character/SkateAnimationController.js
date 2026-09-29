@@ -118,7 +118,15 @@ export class SkateAnimationController {
     const targetFootIK = rawState.airborne
       ? 0.2 + landingAnticipation * 0.68
       : 1;
-    this.smoothedFootIK = damp(this.smoothedFootIK, targetFootIK, 10, dt);
+    // Release the board lock aggressively on the takeoff edge. A slow first
+    // airborne blend visually pins the feet for one frame and fights the air pose.
+    const footIKResponse = rawState.airborne && !this.wasAirborne ? 48 : 10;
+    this.smoothedFootIK = damp(
+      this.smoothedFootIK,
+      targetFootIK,
+      footIKResponse,
+      dt,
+    );
     this.smoothedPreload = damp(
       this.smoothedPreload,
       clamp01(rawState.preloadCompression),

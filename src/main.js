@@ -451,7 +451,7 @@ function applySimulationState(state, { rotateWheels = true, presentationDt = 0 }
 }
 
 function buildResultsStats() {
-  const stats = simulation?.getRunStats?.() || {};
+  const stats = simulation ? simulation.getRunStats() : {};
   return {
     finalScore: stats.score || 0,
     bestTrick: stats.bestTrick
