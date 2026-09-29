@@ -179,7 +179,7 @@ export class HalfpipeAudio {
       }
     }
 
-    return Promise.all(entries.map(async ([key, url]) => {
+    const results = await Promise.all(entries.map(async ([key, url]) => {
       try {
         await this._loadBuffer(key, url);
         return { key, loaded: true };
@@ -188,6 +188,14 @@ export class HalfpipeAudio {
         return { key, loaded: false, error };
       }
     }));
+
+    this.skate?.setContinuousBuffers({
+      wheelRoll: this.buffers.get('continuous.wheelRoll'),
+      rampTexture: this.buffers.get('continuous.rampTexture'),
+      wind: this.buffers.get('continuous.wind'),
+    });
+
+    return results;
   }
 
   async _loadBuffer(key, url) {
@@ -234,13 +242,14 @@ export class HalfpipeAudio {
 
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
+    const delay = Math.max(0, Number(options.delay) || 0);
     source.buffer = buffer;
     source.loop = Boolean(options.loop);
     source.playbackRate.value = Math.max(0.25, Math.min(4, Number(options.rate) || 1));
     gain.gain.value = Math.max(0, Number(options.gain ?? 1));
 
     source.connect(gain).connect(bus.gain);
-    source.start();
+    source.start(this.context.currentTime + delay);
     source.addEventListener('ended', () => {
       try { source.disconnect(); } catch {}
       try { gain.disconnect(); } catch {}
@@ -342,6 +351,7 @@ export class HalfpipeAudio {
       gain: (descriptor?.gain ?? 1) * (options.gain ?? 1),
       rate: options.rate ?? 1,
       loop: Boolean(options.loop),
+      delay: options.delay ?? 0,
     });
 
     return voice || fallback?.() || null;
@@ -561,18 +571,22 @@ export class HalfpipeAudio {
       eventValue(event, 'intensity', 'impact', 'impactIntensity') ?? 0.55,
     );
 
+    if (rating === 'BAIL') {
+      this._bailCue(event);
+      return;
+    }
+
     const keyByRating = {
       PERFECT: 'sfx.landingPerfect',
       CLEAN: 'sfx.landingClean',
       SKETCHY: 'sfx.landingSketchy',
       HEAVY: 'sfx.landingHeavy',
-      BAIL: 'sfx.landingHeavy',
     };
     const key = keyByRating[rating] || keyByRating.CLEAN;
 
     this._assetOr(key, () => {
       const bright = rating === 'PERFECT' || rating === 'CLEAN';
-      const heavy = rating === 'HEAVY' || rating === 'BAIL';
+      const heavy = rating === 'HEAVY';
 
       this._noiseBurst({
         duration: heavy ? 0.16 : 0.09,
@@ -601,7 +615,7 @@ export class HalfpipeAudio {
     });
 
     const strong = (
-      rating === 'HEAVY' || rating === 'BAIL'
+      rating === 'HEAVY'
         ? 0.48 + intensity * 0.4
         : 0.15 + intensity * 0.28
     );
@@ -654,7 +668,7 @@ export class HalfpipeAudio {
         type: 'triangle',
         delay: 0.045,
       });
-    });
+    }, { delay: 0.045 });
 
     this._assetOr('sfx.bailRecovery', () => {
       this._noiseBurst({
@@ -665,7 +679,7 @@ export class HalfpipeAudio {
         q: 0.5,
         delay: 0.26,
       });
-    });
+    }, { delay: 0.26 });
 
     this._haptic({
       weakMagnitude: 0.65,
