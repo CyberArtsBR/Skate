@@ -16,6 +16,8 @@ export const DEFAULT_RIDER_PRESENTATION_STATE = Object.freeze({
   trickOffsetX: 0,
   trickOffsetY: 0,
   trickVisualActive: false,
+  dropInRoll: 0,
+  dropInProgress: 1,
   landing: 0,
   landingQuality: 'none',
   trickType: null,
@@ -36,6 +38,8 @@ export function createRiderPresentationState(overrides = {}) {
   state.trickOffsetX = Number(state.trickOffsetX) || 0;
   state.trickOffsetY = Number(state.trickOffsetY) || 0;
   state.trickVisualActive = Boolean(state.trickVisualActive);
+  state.dropInRoll = Number(state.dropInRoll) || 0;
+  state.dropInProgress = clamp01(state.dropInProgress);
   state.ascending = Boolean(state.ascending);
   state.descending = Boolean(state.descending);
   state.airborne = Boolean(state.airborne);
