@@ -266,6 +266,13 @@ const backFacingPoseProbe = await page.evaluate(() => {
   return {
     facingYaw: foundation.rider.presentationState.facingYaw,
     ascending: foundation.rider.presentationState.ascending,
+    rampAscending: foundation.rider.presentationState.rampAscending,
+    bodyY: foundation.rider.chimpion.root.position.y,
+    baseBodyY: foundation.rider.baseChimpionY,
+    leftTargetY: foundation.rider.footIK.targets.left.position.y,
+    rightTargetY: foundation.rider.footIK.targets.right.position.y,
+    leftTargetBaseY: foundation.rider.footIK.targets.left.userData.baseY,
+    rightTargetBaseY: foundation.rider.footIK.targets.right.userData.baseY,
     footIK: { ...foundation.rider.footIK.result },
     leftHand: world(rig.leftHand),
     rightHand: world(rig.rightHand),
@@ -407,14 +414,27 @@ assert.ok(stationStates[2].boardAngle < 0, 'left transition must slope down towa
 assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away from center');
 assert.equal(profileDebugVisible, true);
 assert.equal(backFacingPoseProbe.ascending, true);
+assert.equal(backFacingPoseProbe.rampAscending, true);
 assert.ok(
   Math.cos(backFacingPoseProbe.facingYaw) < 0,
   `back-facing probe should really be fakie: ${JSON.stringify(backFacingPoseProbe)}`,
 );
 assert.ok(
   backFacingPoseProbe.footIK.enabled
-    && backFacingPoseProbe.footIK.maxError < 0.2,
+    && backFacingPoseProbe.footIK.maxError < 0.08,
   `back-facing feet must stay planted on skateboard: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
+  backFacingPoseProbe.bodyY
+    <= backFacingPoseProbe.baseBodyY - 0.03,
+  `fakie body should be seated lower toward the deck: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
+  backFacingPoseProbe.leftTargetY
+    <= backFacingPoseProbe.leftTargetBaseY - 0.04
+    && backFacingPoseProbe.rightTargetY
+      <= backFacingPoseProbe.rightTargetBaseY - 0.04,
+  `fakie foot targets should be pulled down onto the deck: ${JSON.stringify(backFacingPoseProbe)}`,
 );
 assert.ok(
   Math.abs(backFacingPoseProbe.leftHand[1] - backFacingPoseProbe.leftKnee[1]) < 0.35
