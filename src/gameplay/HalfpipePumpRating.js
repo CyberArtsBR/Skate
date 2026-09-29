@@ -25,9 +25,9 @@ export function evaluatePumpRating({
 
   // V8 keeps pumping skill-based, but widens the windows enough that a bail
   // does not leave the player trapped at low speed for too long.
-  if (absoluteError <= 0.12) return PUMP_RATINGS.PERFECT;
-  if (absoluteError <= 0.25) return PUMP_RATINGS.GOOD;
-  if (absoluteError <= 0.38) return PUMP_RATINGS.WEAK;
+  if (absoluteError <= 0.11) return PUMP_RATINGS.PERFECT;
+  if (absoluteError <= 0.24) return PUMP_RATINGS.GOOD;
+  if (absoluteError <= 0.37) return PUMP_RATINGS.WEAK;
 
   return error < 0 ? PUMP_RATINGS.EARLY : PUMP_RATINGS.LATE;
 }
@@ -35,10 +35,10 @@ export function evaluatePumpRating({
 export function pumpAccuracyWeight(rating) {
   switch (rating) {
     case PUMP_RATINGS.PERFECT: return 1;
-    case PUMP_RATINGS.GOOD: return 0.82;
-    case PUMP_RATINGS.WEAK: return 0.54;
+    case PUMP_RATINGS.GOOD: return 0.81;
+    case PUMP_RATINGS.WEAK: return 0.52;
     case PUMP_RATINGS.EARLY:
-    case PUMP_RATINGS.LATE: return 0.24;
+    case PUMP_RATINGS.LATE: return 0.22;
     default: return 0;
   }
 }
