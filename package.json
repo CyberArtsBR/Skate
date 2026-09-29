@@ -26,7 +26,7 @@
     "check:static": "node --check src/main.js && node checks/foundation-invariants.mjs && node checks/phase4-contracts.mjs && node checks/release-contracts.mjs && node checks/phase4-integration.mjs",
     "check:browser:release": "node checks/browser-release-smoke.mjs",
     "check:release:browser": "node checks/run-npm-suite.mjs check:browser:release check:browser check:visual-contact",
-    "check:release": "node checks/run-npm-suite.mjs check:static check:physics check:contact check:session check:controller check:camera check:tricks check:gameplay check:character check:ui build",
+    "check:release": "node checks/run-npm-suite.mjs check:static check:physics check:contact check:session check:controller check:camera check:tricks check:gameplay check:character check:ui check:integration build",
     "check:security": "npm audit --audit-level=high"
   },
   "dependencies": {

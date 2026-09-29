@@ -90,12 +90,26 @@ await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls');
 await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'countdown');
-await page.waitForFunction(
-  () => window.__HALFPIPE_FOUNDATION__.session.phase === 'running'
-    && window.__HALFPIPE_FOUNDATION__.flow.state === 'run',
-  null,
-  { timeout: 6000 },
-);
+try {
+  await page.waitForFunction(
+    () => window.__HALFPIPE_FOUNDATION__.session.phase === 'running'
+      && window.__HALFPIPE_FOUNDATION__.flow.state === 'run',
+    null,
+    { timeout: 6000 },
+  );
+} catch (error) {
+  const diagnostic = await page.evaluate(() => ({
+    flow: window.__HALFPIPE_FOUNDATION__?.flow?.snapshot?.(),
+    session: window.__HALFPIPE_FOUNDATION__?.session?.snapshot?.(),
+    countdown: {
+      hidden: document.querySelector('.countdown-overlay')?.hidden,
+      text: document.querySelector('.countdown-label')?.textContent,
+    },
+    simulationRunning: window.__HALFPIPE_FOUNDATION__?.physics?.running,
+  }));
+  console.error('Countdown diagnostic:', JSON.stringify(diagnostic));
+  throw error;
+}
 
 const runningStart = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot());
 await page.waitForTimeout(350);

@@ -360,7 +360,7 @@ assert.ok(state.backgroundDimensions[1] >= 900);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] > 1.76);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] < 1.8);
 assert.equal(state.wheelCount, 4);
-assert.equal(state.wheelSpinSafe, false);
+assert.equal(state.wheelSpinSafe, true, 'Phase 4 skateboard runtime must expose four safe semantic wheel pivots');
 assert.ok(state.measuredWheelDiameter > 0.075, `scaled skateboard wheel diameter is too small: ${state.measuredWheelDiameter}`);
 assert.ok(state.surfaceSupportPointCount >= 6);
 assert.ok(state.chimpionTargetHeight >= 2.3, `chimpion target height should be visibly larger: ${state.chimpionTargetHeight}`);

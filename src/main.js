@@ -801,7 +801,10 @@ async function bootstrap() {
   scene.add(halfpipe.root, rider.root);
   unregisterRiderQuality = quality.registerObject(rider.root);
 
-  presentationBinder = new HalfpipePresentationBinder(profile, rider);
+  presentationBinder = new HalfpipePresentationBinder(profile, rider, {
+    visualSurface: halfpipe,
+    visualSeparation: 0.02,
+  });
   presentationDebug = new HalfpipePresentationDebug(profile, presentationBinder, {
     onChange(station, index, count) {
       if (hud.debugMode) {
