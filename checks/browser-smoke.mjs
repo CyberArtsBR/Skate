@@ -376,7 +376,7 @@ assert.ok(
   `drop-in manual nose lift is not visible: ${JSON.stringify(dropInProbe)}`,
 );
 assert.ok(
-  Math.abs(dropInProbe.topWheelGap) < 0.16,
+  Math.abs(dropInProbe.topWheelGap) < 0.05,
   `drop-in upper wheel should begin at the coping/white bar, gap=${dropInProbe.topWheelGap}: ${JSON.stringify(dropInProbe)}`,
 );
 assert.equal(trickPresentationProbe.kick.trick, 'kick-turn');
