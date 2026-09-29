@@ -31,12 +31,15 @@ export class SkateAudio {
     this.destination = destination;
     this.speedReference = Math.max(1, Number(speedReference) || 18);
     this.disposed = false;
+    this.paused = false;
 
     this.noiseBuffer = createNoiseBuffer(context);
 
     this.rollFilter = context.createBiquadFilter();
-    this.rollFilter.type = 'bandpass';
-    this.rollFilter.Q.value = 0.75;
+    // The procedural fallback is intentionally soft and broadband. A real
+    // seamless wheel sample can replace it through setContinuousBuffers().
+    this.rollFilter.type = 'lowpass';
+    this.rollFilter.Q.value = 0.42;
     this.rollGain = context.createGain();
     this.rollGain.gain.value = 0;
     this.rollFilter.connect(this.rollGain).connect(destination);
@@ -84,10 +87,32 @@ export class SkateAudio {
     if (wind) this._replaceLoopSource('windSource', wind, this.windFilter);
   }
 
+  setPaused(paused) {
+    this.paused = Boolean(paused);
+    if (!this.context || this.disposed) return this.paused;
+    const now = this.context.currentTime;
+    const target = this.paused ? 0 : undefined;
+    if (target === 0) {
+      this.rollGain.gain.cancelScheduledValues(now);
+      this.rampGain.gain.cancelScheduledValues(now);
+      this.windGain.gain.cancelScheduledValues(now);
+      this.rollGain.gain.setTargetAtTime(0, now, 0.018);
+      this.rampGain.gain.setTargetAtTime(0, now, 0.018);
+      this.windGain.gain.setTargetAtTime(0, now, 0.018);
+    }
+    return this.paused;
+  }
+
   update(state = {}, dt = 1 / 60) {
     if (this.disposed) return;
 
     const now = this.context.currentTime;
+    if (this.paused) {
+      this.rollGain.gain.setTargetAtTime(0, now, 0.018);
+      this.rampGain.gain.setTargetAtTime(0, now, 0.018);
+      this.windGain.gain.setTargetAtTime(0, now, 0.018);
+      return;
+    }
     const smoothing = Math.max(0.025, Math.min(0.18, (Number(dt) || 0.016) * 5));
     const mode = state.mode || 'contact';
     const speed = Math.abs(Number(
@@ -100,12 +125,12 @@ export class SkateAudio {
 
     const transition = region.includes('transition') || region.includes('wall');
     const flat = !transition && !airborne;
-    const rollIntensity = airborne ? 0 : (0.035 + 0.34 * smoothstep(normalizedSpeed));
+    const rollIntensity = airborne ? 0 : (0.018 + 0.24 * smoothstep(normalizedSpeed));
     const transitionBoost = transition ? 1.16 : flat ? 0.9 : 1;
     const rollTarget = rollIntensity * transitionBoost;
 
-    const rollFrequency = 170 + normalizedSpeed * 520;
-    const rollQ = 0.58 + fastSpeed * 0.62;
+    const rollFrequency = 520 + normalizedSpeed * 1380;
+    const rollQ = 0.38 + fastSpeed * 0.32;
     this.rollGain.gain.setTargetAtTime(rollTarget, now, smoothing);
     this.rollFilter.frequency.setTargetAtTime(rollFrequency, now, smoothing);
     this.rollFilter.Q.setTargetAtTime(rollQ, now, smoothing);
