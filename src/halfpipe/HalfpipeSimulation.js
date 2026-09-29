@@ -223,6 +223,7 @@ export class HalfpipeSimulation {
       airTurnOverturned: false,
       airTurnFailedReason: null,
       airRotationDegrees: 0,
+      airRotationSignedDegrees: 0,
       airRotationTargetDegrees: 0,
       airLaunchVelocity: 0,
 
@@ -400,6 +401,16 @@ export class HalfpipeSimulation {
     return Math.abs(Math.trunc(this.state.facingTurns)) % 2 === 1;
   }
 
+  _visualTurnDirectionForInput(input) {
+    const rawDirection = Math.sign(Number(input) || 0);
+    if (!rawDirection) return 0;
+
+    // FRONT facing: LEFT => counter-clockwise (+), RIGHT => clockwise (-).
+    // BACK facing: invert that relationship, exactly as requested.
+    const facingSign = this._isFacingBack() ? -1 : 1;
+    return -rawDirection * facingSign;
+  }
+
   _allowedTrickSide() {
     // Front-facing rider may only trick on LEFT. After a completed 180° turn
     // the rider is back-facing and may only trick on RIGHT.
@@ -470,7 +481,13 @@ export class HalfpipeSimulation {
     }
   }
 
-  _awardValidatedTrick(type, quality, landingScoreMultiplier = 1, side = 0) {
+  _awardValidatedTrick(
+    type,
+    quality,
+    landingScoreMultiplier = 1,
+    side = 0,
+    turnDirection = 0,
+  ) {
     const clampedQuality = clamp01(quality);
     const range = scoreRangeForTrick(this.scoring, type);
     const basePoints = Math.round(
@@ -512,7 +529,8 @@ export class HalfpipeSimulation {
     this.state.lastTrick = type;
     this.state.lastTrickTime = this.state.time;
     this.state.lastTrickPoints = points;
-    this.state.lastTrickTurnDirection = Math.sign(this.turnIntent)
+    this.state.lastTrickTurnDirection = Math.sign(turnDirection)
+      || this.state.lastTrickTurnDirection
       || (this.state.lastTrickSide < 0 ? 1 : -1);
     if (side) {
       this.state.lastTrickSide = side;
@@ -586,6 +604,7 @@ export class HalfpipeSimulation {
     duration,
     retention,
     anchorX = null,
+    turnDirection = 1,
   ) {
     if (Number.isFinite(anchorX)) this.state.pipeX = anchorX;
     this.state.tricksAttempted += 1;
@@ -609,12 +628,13 @@ export class HalfpipeSimulation {
     this.state.trickProgress = 0;
     this.state.turningPoints += 1;
     this.state.lastTurningPointX = this.state.pipeX;
-    this.state.lastTrickTurnDirection = 1;
+    const committedTurnDirection = Math.sign(Number(turnDirection) || 0) || 1;
+    this.state.lastTrickTurnDirection = committedTurnDirection;
     this.state.lastTrickSide = signWithEpsilon(
       this.state.pipeX,
       this.velocityEpsilon,
     );
-    this.state.facingTurns += 1;
+    this.state.facingTurns += committedTurnDirection;
     this._emit('TRICK_STARTED', {
       trick: type,
       side: this.state.lastTrickSide,
@@ -669,10 +689,13 @@ export class HalfpipeSimulation {
         finalQuality,
         1,
         this.state.lastTrickSide,
+        this.state.lastTrickTurnDirection,
       );
     } else {
       this.state.surfaceTrickPhase = 'FAIL';
-      if (this.state.surfaceTrickFacingCommitted) this.state.facingTurns -= 1;
+      if (this.state.surfaceTrickFacingCommitted) {
+        this.state.facingTurns -= this.state.lastTrickTurnDirection || 1;
+      }
       this._failTrick(type, failReason);
       if (type === 'hand-plant') this._startCrash(failReason || 'HAND_PLANT_FAILED');
     }
@@ -790,12 +813,15 @@ export class HalfpipeSimulation {
     ) {
       const quality = (wallFraction - this.kickTurnMinFraction)
         / Math.max(1e-4, 1 - this.kickTurnMinFraction);
+      const turnDirection = this._visualTurnDirectionForInput(this.turnIntent);
       return this._startSurfaceTrick(
         'kick-turn',
         quality,
         velocity,
         this.trickPresentation.kickTurnDuration,
         this.kickTurnRetention,
+        null,
+        turnDirection,
       );
     }
 
@@ -836,6 +862,7 @@ export class HalfpipeSimulation {
     this.state.airTurnOverturned = false;
     this.state.airTurnFailedReason = null;
     this.state.airRotationDegrees = 0;
+    this.state.airRotationSignedDegrees = 0;
     this.state.airRotationTargetDegrees = 0;
     this.state.airLaunchVelocity = verticalVelocity;
     this.state.backflipHold = 0;
@@ -865,7 +892,7 @@ export class HalfpipeSimulation {
   }
 
   _startAirTurn(turnInput) {
-    const direction = Math.sign(Number(turnInput) || 0) || 1;
+    const direction = this._visualTurnDirectionForInput(turnInput) || 1;
     this.state.airTurnActive = true;
     this.state.airTurnAttempted = true;
     this.state.airTurnDirection = direction;
@@ -875,6 +902,7 @@ export class HalfpipeSimulation {
     this.state.airTurnOverturned = false;
     this.state.airTurnFailedReason = null;
     this.state.airRotationDegrees = 0;
+    this.state.airRotationSignedDegrees = 0;
     this.state.airRotationTargetDegrees = 0;
     this.state.trickType = 'aerial-turn';
     this.state.trickProgress = 0;
@@ -891,12 +919,16 @@ export class HalfpipeSimulation {
 
     const cfg = PHASE4_GAMEPLAY_CONFIG.aerial;
     const resolved = nearestRotationTarget(
-      this.state.airRotationDegrees,
+      this.state.airRotationSignedDegrees,
       cfg.targetStepDegrees,
       cfg.maximumDegrees,
     );
     this.state.airTurnActive = false;
+    this.state.airRotationDegrees = resolved.rotation;
     this.state.airRotationTargetDegrees = resolved.target;
+    this.state.airTurnDirection = Math.sign(this.state.airRotationSignedDegrees)
+      || this.state.airTurnDirection
+      || 1;
 
     if (resolved.rotation < cfg.targetStepDegrees - cfg.validErrorDegrees) {
       this.state.airTurnFailedReason = 'UNDER_ROTATED';
@@ -928,31 +960,28 @@ export class HalfpipeSimulation {
     if (!this.state.airTurnAttempted || this.state.airTurnFailedReason) return;
 
     this.state.airTurnElapsed += dt;
-    const stillHolding = this.turnIntent === this.state.airTurnDirection;
+    const inputDirection = this._visualTurnDirectionForInput(this.turnIntent);
 
-    if (stillHolding) {
+    // Rotation is now continuously reversible in-air. Releasing the stick/key
+    // merely pauses rotation; pressing the opposite direction subtracts angle,
+    // so an under/over-turn can be corrected right up until landing.
+    if (inputDirection !== 0) {
       this.state.airTurnActive = true;
       this.state.airTurnHold += dt;
-      this.state.airRotationDegrees += cfg.rotationDegreesPerSecond * dt;
+      this.state.airRotationSignedDegrees += (
+        inputDirection * cfg.rotationDegreesPerSecond * dt
+      );
+      this.state.airRotationDegrees = Math.abs(this.state.airRotationSignedDegrees);
+      this.state.airTurnDirection = Math.sign(this.state.airRotationSignedDegrees)
+        || inputDirection;
       this.state.trickType = 'aerial-turn';
       this.state.trickProgress = (
         (this.state.airRotationDegrees % cfg.targetStepDegrees)
         / cfg.targetStepDegrees
       );
-
-      if (
-        this.state.airRotationDegrees
-        > cfg.maximumDegrees + cfg.hardOverrunDegrees
-      ) {
-        this.state.airTurnOverturned = true;
-        this.state.airTurnActive = false;
-        this.state.airTurnFailedReason = 'OVER_ROTATED';
-        this._failTrick('aerial-turn', 'OVER_ROTATED');
-      }
-      return;
+    } else {
+      this.state.airTurnActive = false;
     }
-
-    if (this.state.airTurnActive) this._finishAirTurnFromInput();
   }
 
   _startBackflip() {
@@ -1058,7 +1087,7 @@ export class HalfpipeSimulation {
     if (this.state.backflipActive && !this.state.backflipFailedReason) {
       this._finishBackflipFromInput();
     }
-    if (this.state.airTurnActive && !this.state.airTurnFailedReason) {
+    if (this.state.airTurnAttempted && !this.state.airTurnFailedReason) {
       this._finishAirTurnFromInput();
     }
 
@@ -1112,7 +1141,7 @@ export class HalfpipeSimulation {
 
     let landedTrick = null;
     if (attemptedTrick && trickSucceeded && landing.quality !== LANDING_QUALITIES.BAIL) {
-      const heightQuality = clamp01((currentAirHeight - 0.2) / 11);
+      const heightQuality = clamp01((currentAirHeight - 0.2) / 6.5);
       const rotationQuality = rotationQualityFromDegrees(
         rotationDegrees,
         rotationTargetDegrees,
@@ -1154,6 +1183,7 @@ export class HalfpipeSimulation {
         totalQuality,
         landing.scoreMultiplier,
         side,
+        isBackflip ? 0 : this.state.airTurnDirection,
       );
     }
 
@@ -1201,6 +1231,7 @@ export class HalfpipeSimulation {
     this.state.airTurnOverturned = false;
     this.state.airTurnFailedReason = null;
     this.state.airRotationDegrees = 0;
+    this.state.airRotationSignedDegrees = 0;
     this.state.airRotationTargetDegrees = 0;
     this.state.backflipHold = 0;
     this.state.backflipActive = false;
