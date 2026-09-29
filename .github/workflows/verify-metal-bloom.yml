@@ -1,0 +1,31 @@
+name: Verify Metal Lighting And Coping Bloom
+
+on:
+  push:
+    branches:
+      - fix/halfpipe-metal-lighting-coping-bloom-v1
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - name: Start Vite
+        shell: bash
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/halfpipe-vite.log 2>&1 &
+          for i in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:5173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/halfpipe-vite.log
+          exit 1
+      - run: npm run check:browser
