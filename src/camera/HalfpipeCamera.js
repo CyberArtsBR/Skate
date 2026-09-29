@@ -37,8 +37,13 @@ export class HalfpipeCamera {
       this.dynamicActive = true;
     }
 
+    const trackedY = THREE.MathUtils.clamp(
+      y,
+      tracking.enterHeight,
+      tracking.maxTrackedHeight,
+    );
     const rawShift = this.dynamicActive
-      ? Math.max(0, y - tracking.enterHeight) * tracking.followRatio
+      ? Math.max(0, trackedY - tracking.enterHeight) * tracking.followRatio
       : 0;
     const desiredShift = THREE.MathUtils.clamp(
       rawShift,
