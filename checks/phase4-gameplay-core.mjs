@@ -98,6 +98,18 @@ assert.equal(surface.state.score, 0);
 while (surface.state.surfaceTrickActive) surface.stepFixed();
 assert.ok(surface.state.score > 0);
 
+const failedHandPlant = new HalfpipeSimulation(profile);
+failedHandPlant.reset({
+  pipeX: -(profile.flatHalfWidth + profile.transitionWidth * 0.995),
+  tangentVelocity: -7,
+});
+failedHandPlant.handPlantBufferRemaining = 0.1;
+failedHandPlant.stepFixed();
+assert.equal(failedHandPlant.state.surfaceTrickActive, true);
+while (failedHandPlant.state.surfaceTrickActive) failedHandPlant.stepFixed();
+assert.equal(failedHandPlant.state.crashActive, true);
+assert.equal(failedHandPlant.state.crashReason, 'HAND_PLANT_TIMING');
+
 const scoring = new HalfpipeSimulation(profile);
 const first = scoring._awardValidatedTrick('kick-turn',1,1,-1);
 const second = scoring._awardValidatedTrick('kick-turn',1,1,1);
