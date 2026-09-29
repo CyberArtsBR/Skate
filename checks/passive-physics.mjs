@@ -262,11 +262,16 @@ for (let index = 0; index < 60 && aerialTurnSim.snapshot().mode !== 'airborne'; 
   aerialTurnSim.stepFixed();
 }
 assert.equal(aerialTurnSim.snapshot().mode, 'airborne', 'aerial-turn probe must launch');
-aerialTurnSim.setTurnIntent(1);
+aerialTurnSim.setTurnIntent(-1);
 for (let index = 0; index < 36; index += 1) aerialTurnSim.stepFixed();
 aerialTurnSim.setTurnIntent(0);
 aerialTurnSim.stepFixed();
-assert.equal(aerialTurnSim.snapshot().airTurnCompleted, true, 'aerial 180 must be earned from held rotation input');
+assert.equal(
+  aerialTurnSim.snapshot().airTurnCompleted,
+  false,
+  'releasing aerial input should pause rotation until landing validation',
+);
+assert.equal(aerialTurnSim.snapshot().airTurnFailedReason, null);
 for (let index = 0; index < 900 && aerialTurnSim.snapshot().mode === 'airborne'; index += 1) {
   aerialTurnSim.stepFixed();
 }
