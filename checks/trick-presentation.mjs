@@ -151,7 +151,7 @@ assert.ok(
 // Hand Plant: coping-only AND facing-side-only.
 const lowHand = new HalfpipeSimulation(profile);
 lowHand.reset({
-  pipeX: wallX(profile, -1, 0.99),
+  pipeX: wallX(profile, -1, 0.975),
   tangentVelocity: -7,
 });
 lowHand.setHandPlantHeld(true);
@@ -175,9 +175,32 @@ assert.equal(
   'front-facing hand plant must not trigger on RIGHT wall',
 );
 
+const bufferedHand = new HalfpipeSimulation(profile);
+bufferedHand.reset({
+  pipeX: wallX(profile, -1, 0.985),
+  tangentVelocity: -7,
+});
+bufferedHand.setHandPlantHeld(true);
+bufferedHand.stepFixed();
+bufferedHand.setHandPlantHeld(false);
+for (let index = 0; index < 60 && bufferedHand.snapshot().lastTrick !== 'hand-plant'; index += 1) {
+  bufferedHand.stepFixed();
+}
+assert.equal(
+  bufferedHand.snapshot().lastTrick,
+  'hand-plant',
+  'a near-coping hand-plant button tap should be buffered until the rider reaches the coping zone',
+);
+assert.ok(
+  Math.abs(
+    bufferedHand.snapshot().pipeX - (profile.leftLip + bufferedHand.lipInset)
+  ) < 1e-9,
+  'buffered hand plant must execute at the actual coping, not at the early button-press position',
+);
+
 const hand = new HalfpipeSimulation(profile);
 hand.reset({
-  pipeX: wallX(profile, -1, 0.999),
+  pipeX: wallX(profile, -1, 0.995),
   tangentVelocity: -7,
 });
 hand.setHandPlantHeld(true);
