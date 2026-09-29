@@ -54,11 +54,11 @@ const dropInProbe = await page.evaluate(() => {
     const world = foundation.rider.skateboard.root.localToWorld(point.clone());
     return world.toArray();
   });
-  const lipY = foundation.profile.sample(foundation.profile.leftLip).y;
+  const lipY = foundation.profile.sample(foundation.profile.rightLip).y;
   const topWheelY = Math.max(...wheelWorld.map((point) => point[1]));
   return {
     pipeX: state.pipeX,
-    leftLip: foundation.profile.leftLip,
+    rightLip: foundation.profile.rightLip,
     lipY,
     topWheelY,
     topWheelGap: lipY - topWheelY,
@@ -246,10 +246,10 @@ const trickPresentationProbe = await page.evaluate(() => {
   );
 
   simulation.reset({
-    pipeX: wallX(1, 0.84),
-    tangentVelocity: 7,
+    pipeX: wallX(-1, 0.84),
+    tangentVelocity: -7,
   });
-  simulation.setTurnIntent(-1);
+  simulation.setTurnIntent(1);
   simulation.stepFixed();
   simulation.setTurnIntent(0);
   for (let index = 0; index < 43; index += 1) simulation.stepFixed();
@@ -262,8 +262,8 @@ const trickPresentationProbe = await page.evaluate(() => {
   };
 
   simulation.reset({
-    pipeX: wallX(1, 0.995),
-    tangentVelocity: 7,
+    pipeX: wallX(-1, 0.997),
+    tangentVelocity: -7,
   });
   simulation.setHandPlantHeld(true);
   simulation.stepFixed();
