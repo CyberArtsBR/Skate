@@ -19,8 +19,12 @@ export const GAME_CONFIG = Object.freeze({
     }),
   }),
   skateboard: Object.freeze({
-    scale: 0.112,
-    wheelRadius: 0.036,
+    // Previous board read visually like a mini-skate next to the 2.32m rider.
+    // Increase the whole asset so trucks/wheels/deck all read at a believable
+    // gameplay scale, then extend only the deck length for a fuller silhouette.
+    scale: 0.132,
+    deckLengthScale: 1.14,
+    wheelRadius: 0.043,
     surfaceClearance: 0.18,
   }),
   rider: Object.freeze({

@@ -55,7 +55,13 @@ export class SkateboardVisual {
       if (!object.isMesh) return;
       object.castShadow = true;
       object.receiveShadow = true;
-      if (/Board1/i.test(object.name)) this.deck = object;
+      if (/Board1/i.test(object.name)) {
+        this.deck = object;
+        // Keep trucks and wheels uniformly scaled so they stay round and keep
+        // their measured contact geometry. Only lengthen the authored deck on
+        // its forward axis to avoid the toy/mini-skate silhouette.
+        object.scale.x *= GAME_CONFIG.skateboard.deckLengthScale;
+      }
       if (WHEEL_PATTERN.test(object.name)) {
         wheelCandidates.push(object.parent || object);
         wheelMeshes.push(object);
@@ -151,6 +157,8 @@ export class SkateboardVisual {
     this.root.userData.measuredWheelDiameter = this.measuredWheelDiameter;
     this.root.userData.surfaceSupportPointCount = this.surfaceSupportPoints.length;
     this.root.userData.sourceScale = GAME_CONFIG.skateboard.scale;
+    this.root.userData.deckLengthScale = GAME_CONFIG.skateboard.deckLengthScale;
+    this.root.userData.visualDimensions = this.dimensions.toArray();
     return this;
   }
 
