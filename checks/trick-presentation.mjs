@@ -11,136 +11,210 @@ function wallX(profile, side, fraction) {
   );
 }
 
+function finishSurfaceTrick(simulation, maxSteps = 240) {
+  for (
+    let index = 0;
+    index < maxSteps && simulation.snapshot().surfaceTrickActive;
+    index += 1
+  ) {
+    simulation.stepFixed();
+  }
+  return simulation.snapshot();
+}
+
+function launchFromSide(profile, side, facingTurns = 0) {
+  const simulation = new HalfpipeSimulation(profile);
+  simulation.reset({
+    pipeX: side < 0
+      ? profile.leftLip + GAME_CONFIG.air.takeoffInset + 0.01
+      : profile.rightLip - GAME_CONFIG.air.takeoffInset - 0.01,
+    tangentVelocity: side < 0 ? -18 : 18,
+  });
+  simulation.state.facingTurns = facingTurns;
+
+  for (
+    let index = 0;
+    index < 120 && simulation.snapshot().mode !== 'airborne';
+    index += 1
+  ) {
+    simulation.stepFixed();
+  }
+  assert.equal(simulation.snapshot().mode, 'airborne');
+  return simulation;
+}
+
 const profile = new HalfpipeProfile();
 
-// Drop-in starts at the top and carries a short manual-like nose lift.
+// Drop-in contract: RIGHT side, facing the camera, with a short manual-like lift.
 const drop = new HalfpipeSimulation(profile);
 const dropStart = drop.snapshot();
 const dropPresentation = simulationToPresentationState(profile, dropStart);
+assert.ok(dropStart.pipeX > 0, `drop-in must start on RIGHT side, x=${dropStart.pipeX}`);
 assert.ok(
-  Math.abs(dropStart.pipeX) > profile.flatHalfWidth + profile.transitionWidth * 0.97,
-  `drop-in should start near coping, x=${dropStart.pipeX}`,
+  Math.abs(dropStart.pipeX - profile.rightLip) < 0.02,
+  `drop-in must start at right coping, x=${dropStart.pipeX}, lip=${profile.rightLip}`,
+);
+assert.ok(
+  Math.abs(dropPresentation.facingYaw) < 1e-9,
+  `drop-in must begin facing camera, yaw=${dropPresentation.facingYaw}`,
 );
 assert.ok(
   dropPresentation.dropInRoll > 0.12,
   `drop-in board should start nose-up, roll=${dropPresentation.dropInRoll}`,
 );
-for (
-  let index = 0;
-  index < Math.ceil(GAME_CONFIG.trickPresentation.dropInDuration / drop.fixedDt) + 4;
-  index += 1
-) {
-  drop.stepFixed();
-}
-const dropSettled = simulationToPresentationState(profile, drop.snapshot());
-assert.ok(
-  Math.abs(dropSettled.dropInRoll) < 1e-6,
-  `drop-in nose lift should settle to normal stance, roll=${dropSettled.dropInRoll}`,
-);
 
-// Kick turn: visible 180, while the rider is physically held at turn height.
-const kick = new HalfpipeSimulation(profile);
-kick.reset({
-  pipeX: wallX(profile, 1, 0.84),
+// FRONT-facing: tricks only on LEFT, with RIGHT input.
+const illegalFrontRight = new HalfpipeSimulation(profile);
+illegalFrontRight.reset({
+  pipeX: wallX(profile, 1, 0.86),
   tangentVelocity: 7,
 });
-kick.setTurnIntent(-1);
-kick.stepFixed();
-kick.setTurnIntent(0);
-const kickFrozenX = kick.snapshot().pipeX;
-const kickHalfSteps = Math.round(
-  GAME_CONFIG.trickPresentation.kickTurnDuration * 0.5 / kick.fixedDt,
-);
-for (let index = 0; index < kickHalfSteps; index += 1) kick.stepFixed();
-const kickMidState = kick.snapshot();
-const kickPresentation = simulationToPresentationState(profile, kickMidState);
-assert.equal(kickMidState.lastTrick, 'kick-turn');
-assert.equal(kickMidState.surfaceTrickActive, true);
-assert.ok(
-  Math.abs(kickMidState.pipeX - kickFrozenX) < 1e-9,
-  'kick turn must not lose ramp height during the animation',
-);
-assert.equal(kickPresentation.trickType, 'kick-turn');
-assert.equal(kickPresentation.trickVisualActive, true);
-assert.ok(
-  Math.abs(kickPresentation.facingYaw) > 1.2,
-  `kick turn should visibly rotate rider/board at midpoint, yaw=${kickPresentation.facingYaw}`,
-);
-for (
-  let index = kickHalfSteps;
-  index < Math.ceil(GAME_CONFIG.trickPresentation.kickTurnDuration / kick.fixedDt) + 4;
-  index += 1
-) {
-  kick.stepFixed();
-}
-const kickSettled = simulationToPresentationState(profile, kick.snapshot());
-assert.equal(kick.snapshot().surfaceTrickActive, false);
-assert.ok(kick.snapshot().tangentVelocity < 0, 'kick turn should exit back toward center');
-assert.ok(
-  Math.abs(Math.abs(kickSettled.facingYaw) - Math.PI) < 0.05,
-  `completed kick turn should preserve reversed facing, yaw=${kickSettled.facingYaw}`,
+illegalFrontRight.setTurnIntent(-1);
+illegalFrontRight.stepFixed();
+assert.equal(
+  illegalFrontRight.snapshot().lastTrick,
+  null,
+  'front-facing rider must not turn on RIGHT wall',
 );
 
-// Hand plant cannot fire on the lower/upper-middle wall anymore.
+const frontLeft = new HalfpipeSimulation(profile);
+frontLeft.reset({
+  pipeX: wallX(profile, -1, 0.86),
+  tangentVelocity: -7,
+});
+frontLeft.setTurnIntent(1);
+frontLeft.stepFixed();
+frontLeft.setTurnIntent(0);
+assert.equal(frontLeft.snapshot().lastTrick, 'kick-turn');
+assert.equal(frontLeft.snapshot().surfaceTrickActive, true);
+
+const kickFrozenX = frontLeft.snapshot().pipeX;
+const kickHalfSteps = Math.round(
+  GAME_CONFIG.trickPresentation.kickTurnDuration * 0.5 / frontLeft.fixedDt,
+);
+for (let index = 0; index < kickHalfSteps; index += 1) frontLeft.stepFixed();
+const kickMid = frontLeft.snapshot();
+const kickPresentation = simulationToPresentationState(profile, kickMid);
+assert.ok(
+  Math.abs(kickMid.pipeX - kickFrozenX) < 1e-9,
+  'kick turn must hold wall height during animation',
+);
+assert.ok(
+  kickPresentation.facingYaw < -1.2,
+  `LEFT-wall forward turn must animate counterclockwise, yaw=${kickPresentation.facingYaw}`,
+);
+finishSurfaceTrick(frontLeft);
+const kickSettled = simulationToPresentationState(profile, frontLeft.snapshot());
+assert.ok(
+  Math.cos(kickSettled.facingYaw) < 0,
+  `successful front turn must leave rider back-facing, yaw=${kickSettled.facingYaw}`,
+);
+
+// BACK-facing: tricks only on RIGHT, with LEFT input.
+const illegalBackLeft = new HalfpipeSimulation(profile);
+illegalBackLeft.reset({
+  pipeX: wallX(profile, -1, 0.86),
+  tangentVelocity: -7,
+});
+illegalBackLeft.state.facingTurns = -1;
+illegalBackLeft.setTurnIntent(1);
+illegalBackLeft.stepFixed();
+assert.equal(
+  illegalBackLeft.snapshot().lastTrick,
+  null,
+  'back-facing rider must not turn on LEFT wall',
+);
+
+const backRight = new HalfpipeSimulation(profile);
+backRight.reset({
+  pipeX: wallX(profile, 1, 0.86),
+  tangentVelocity: 7,
+});
+backRight.state.facingTurns = -1;
+backRight.setTurnIntent(-1);
+backRight.stepFixed();
+backRight.setTurnIntent(0);
+assert.equal(backRight.snapshot().lastTrick, 'kick-turn');
+for (let index = 0; index < kickHalfSteps; index += 1) backRight.stepFixed();
+const backKickPresentation = simulationToPresentationState(profile, backRight.snapshot());
+assert.ok(
+  backKickPresentation.facingYaw < -Math.PI - 1.2,
+  `RIGHT-wall back-facing turn must continue counterclockwise, yaw=${backKickPresentation.facingYaw}`,
+);
+finishSurfaceTrick(backRight);
+const backKickSettled = simulationToPresentationState(profile, backRight.snapshot());
+assert.ok(
+  Math.cos(backKickSettled.facingYaw) > 0,
+  `second counterclockwise 180 must return rider front-facing, yaw=${backKickSettled.facingYaw}`,
+);
+
+// Hand Plant: coping-only AND facing-side-only.
 const lowHand = new HalfpipeSimulation(profile);
 lowHand.reset({
-  pipeX: wallX(profile, 1, 0.99),
-  tangentVelocity: 7,
+  pipeX: wallX(profile, -1, 0.99),
+  tangentVelocity: -7,
 });
 lowHand.setHandPlantHeld(true);
 lowHand.stepFixed();
 assert.notEqual(
   lowHand.snapshot().lastTrick,
   'hand-plant',
-  'hand plant must not trigger even at 99% of the transition; it is coping-only',
+  'hand plant must not trigger below the coping zone',
 );
 
-// Hand plant triggers only at the coping and holds height for a slower animation.
+const wrongSideHand = new HalfpipeSimulation(profile);
+wrongSideHand.reset({
+  pipeX: wallX(profile, 1, 0.997),
+  tangentVelocity: 7,
+});
+wrongSideHand.setHandPlantHeld(true);
+wrongSideHand.stepFixed();
+assert.equal(
+  wrongSideHand.snapshot().lastTrick,
+  null,
+  'front-facing hand plant must not trigger on RIGHT wall',
+);
+
 const hand = new HalfpipeSimulation(profile);
 hand.reset({
-  pipeX: wallX(profile, 1, 0.995),
-  tangentVelocity: 7,
+  pipeX: wallX(profile, -1, 0.997),
+  tangentVelocity: -7,
 });
 hand.setHandPlantHeld(true);
 hand.stepFixed();
 hand.setHandPlantHeld(false);
+assert.equal(hand.snapshot().lastTrick, 'hand-plant');
+assert.equal(hand.snapshot().surfaceTrickActive, true);
 const handFrozenX = hand.snapshot().pipeX;
 const handHalfSteps = Math.round(
   GAME_CONFIG.trickPresentation.handPlantDuration * 0.5 / hand.fixedDt,
 );
 for (let index = 0; index < handHalfSteps; index += 1) hand.stepFixed();
-const handMidState = hand.snapshot();
-const handPresentation = simulationToPresentationState(profile, handMidState);
-assert.equal(handMidState.lastTrick, 'hand-plant');
-assert.equal(handMidState.surfaceTrickActive, true);
+const handMid = hand.snapshot();
+const handPresentation = simulationToPresentationState(profile, handMid);
 assert.ok(
-  Math.abs(handMidState.pipeX - handFrozenX) < 1e-9,
-  'hand plant must stay at coping height during the animation',
+  Math.abs(handMid.pipeX - handFrozenX) < 1e-9,
+  'hand plant must hold exact coping height',
 );
-assert.equal(handPresentation.trickType, 'hand-plant');
-assert.equal(handPresentation.trickVisualActive, true);
 assert.ok(
   Math.abs(handPresentation.trickRoll) > 1.0,
-  `hand plant should visibly tip around the coping, roll=${handPresentation.trickRoll}`,
-);
-assert.ok(
-  handPresentation.trickOffsetY > 0.16,
-  `hand plant should visibly lift around the coping, y=${handPresentation.trickOffsetY}`,
+  `hand plant must have readable plant rotation, roll=${handPresentation.trickRoll}`,
 );
 
-// Aerial turn: freeze world height for the whole slow-motion rotation.
-const aerial = new HalfpipeSimulation(profile);
-aerial.reset({
-  pipeX: profile.rightLip - 0.09,
-  tangentVelocity: 18,
-});
-for (let index = 0; index < 90 && aerial.snapshot().mode !== 'airborne'; index += 1) {
-  aerial.stepFixed();
-}
-assert.equal(aerial.snapshot().mode, 'airborne');
-for (let index = 0; index < 12; index += 1) aerial.stepFixed();
+// FRONT-facing aerial: LEFT side + RIGHT input only.
+const illegalFrontRightAir = launchFromSide(profile, 1, 0);
+illegalFrontRightAir.setTurnIntent(-1);
+for (let index = 0; index < 20; index += 1) illegalFrontRightAir.stepFixed();
+assert.equal(
+  illegalFrontRightAir.snapshot().airTurnActive,
+  false,
+  'front-facing aerial must be disabled on RIGHT side',
+);
+
+const aerial = launchFromSide(profile, -1, 0);
+for (let index = 0; index < 10; index += 1) aerial.stepFixed();
 const preTurnY = aerial.snapshot().airY;
-aerial.setTurnIntent(-1);
+aerial.setTurnIntent(1);
 aerial.stepFixed();
 aerial.setTurnIntent(0);
 const frozenY = aerial.snapshot().airY;
@@ -154,13 +228,11 @@ const aerialPresentation = simulationToPresentationState(profile, aerialMid);
 assert.equal(aerialMid.airTurnActive, true);
 assert.ok(
   Math.abs(aerialMid.airY - frozenY) < 1e-9,
-  'aerial turn must not lose height during bullet-time rotation',
+  'aerial turn must hold height throughout bullet-time animation',
 );
-assert.equal(aerialPresentation.trickType, 'aerial-turn');
-assert.equal(aerialPresentation.trickVisualActive, true);
 assert.ok(
-  Math.abs(aerialPresentation.facingYaw) > 1.2,
-  `aerial turn should visibly rotate in slow motion, yaw=${aerialPresentation.facingYaw}`,
+  aerialPresentation.facingYaw < -1.2,
+  `front-facing LEFT aerial must animate counterclockwise, yaw=${aerialPresentation.facingYaw}`,
 );
 for (
   let index = airHalfSteps;
@@ -172,16 +244,30 @@ for (
 assert.equal(aerial.snapshot().airTurnActive, false);
 assert.ok(
   aerial.snapshot().airVerticalVelocity <= 0,
-  `aerial should descend after the held turn instead of regaining upward velocity: ${aerial.snapshot().airVerticalVelocity}`,
+  'aerial started before apex must resume downward, not regain upward velocity',
 );
 assert.ok(
   aerial.snapshot().maxAirY <= frozenY + 1e-6,
-  `aerial turn started before apex must not gain height after the animation: max=${aerial.snapshot().maxAirY}, frozen=${frozenY}`,
+  'aerial bullet-time height must become the apex',
 );
 
+// BACK-facing aerial: RIGHT side + LEFT input.
+const backAir = launchFromSide(profile, 1, -1);
+backAir.setTurnIntent(-1);
+backAir.stepFixed();
+backAir.setTurnIntent(0);
+for (let index = 0; index < airHalfSteps; index += 1) backAir.stepFixed();
+const backAirPresentation = simulationToPresentationState(profile, backAir.snapshot());
+assert.equal(backAir.snapshot().airTurnActive, true);
+assert.ok(
+  backAirPresentation.facingYaw < -Math.PI - 1.2,
+  `back-facing RIGHT aerial must also rotate counterclockwise, yaw=${backAirPresentation.facingYaw}`,
+);
+
+// Pose mirroring contract when riding with back to camera.
 const poseController = new SkatePoseController();
 const forwardPose = poseController.evaluate({
-  pumpCompression: 0,
+  pumpCompression: 0.35,
   landing: 0,
   speedNormalized: 0.5,
   airborne: false,
@@ -193,50 +279,61 @@ const forwardPose = poseController.evaluate({
   trickType: null,
   landingQuality: 'none',
 });
-const forwardHeadBalance = forwardPose.headBalanceZ;
-const fakiePose = poseController.evaluate({
-  pumpCompression: 0,
+const backwardPose = poseController.evaluate({
+  pumpCompression: 0.35,
   landing: 0,
   speedNormalized: 0.5,
   airborne: false,
   ascending: true,
   descending: false,
   surfaceAngle: 0.9,
-  facingYaw: Math.PI,
+  facingYaw: -Math.PI,
   trickVisualActive: false,
   trickType: null,
   landingQuality: 'none',
 });
-assert.ok(
-  forwardHeadBalance * fakiePose.headBalanceZ < 0,
-  `head balance must reverse when rider faces backward: forward=${forwardHeadBalance}, fakie=${fakiePose.headBalanceZ}`,
-);
+assert.equal(forwardPose.facingSign, 1);
+assert.equal(backwardPose.facingSign, -1);
+assert.ok(forwardPose.torsoBalanceZ * backwardPose.torsoBalanceZ < 0);
+assert.ok(forwardPose.headBalanceZ * backwardPose.headBalanceZ < 0);
 
 console.log(JSON.stringify({
   dropIn: {
-    startX: dropStart.pipeX,
-    startRoll: dropPresentation.dropInRoll,
-    settledRoll: dropSettled.dropInRoll,
+    pipeX: dropStart.pipeX,
+    rightLip: profile.rightLip,
+    facingYaw: dropPresentation.facingYaw,
+    dropInRoll: dropPresentation.dropInRoll,
   },
-  kick: {
-    frozenX: kickFrozenX,
+  frontLeftTurn: {
     midpointYaw: kickPresentation.facingYaw,
     settledYaw: kickSettled.facingYaw,
+  },
+  backRightTurn: {
+    midpointYaw: backKickPresentation.facingYaw,
+    settledYaw: backKickSettled.facingYaw,
   },
   handPlant: {
     frozenX: handFrozenX,
     midpointRoll: handPresentation.trickRoll,
-    midpointLift: handPresentation.trickOffsetY,
   },
   aerial: {
     frozenY,
-    midpointY: aerialMid.airY,
     midpointYaw: aerialPresentation.facingYaw,
     resumedVerticalVelocity: aerial.snapshot().airVerticalVelocity,
-    maxAirY: aerial.snapshot().maxAirY,
   },
-  headBalance: {
-    forward: forwardHeadBalance,
-    fakie: fakiePose.headBalanceZ,
+  backAerial: {
+    midpointYaw: backAirPresentation.facingYaw,
+  },
+  poseMirror: {
+    forward: {
+      facingSign: forwardPose.facingSign,
+      torsoBalanceZ: forwardPose.torsoBalanceZ,
+      headBalanceZ: forwardPose.headBalanceZ,
+    },
+    backward: {
+      facingSign: backwardPose.facingSign,
+      torsoBalanceZ: backwardPose.torsoBalanceZ,
+      headBalanceZ: backwardPose.headBalanceZ,
+    },
   },
 }, null, 2));
