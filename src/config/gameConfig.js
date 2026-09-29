@@ -67,10 +67,10 @@ export const GAME_CONFIG = Object.freeze({
     durationSeconds: 75,
   }),
   gameplay: Object.freeze({
-    // Run the authoritative motion at half real-time speed. This preserves the
+    // Run the authoritative motion at three-quarter real-time speed. This preserves the
     // established ramp trajectories, aerial heights and trick rules while
-    // giving the player twice as much real-world time to read and control them.
-    motionTimeScale: 0.5,
+    // giving the player more real-world time to read and control them than the original 1.0x pace.
+    motionTimeScale: 0.75,
   }),
   arcadeMotion: Object.freeze({
     downhillGravityScale: 1.12,

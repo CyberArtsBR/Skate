@@ -47,8 +47,8 @@ const profile = new HalfpipeProfile();
 
 assert.equal(
   GAME_CONFIG.gameplay.motionTimeScale,
-  0.5,
-  'production gameplay motion must run at exactly half real-time speed',
+  0.75,
+  'production gameplay motion must run at three-quarter real-time speed',
 );
 
 // Drop-in contract: RIGHT side, facing the camera, with a short manual-like lift.
