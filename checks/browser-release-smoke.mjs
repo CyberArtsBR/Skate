@@ -160,7 +160,6 @@ const rosterIds = await page.evaluate(() => (
 assert.equal(rosterIds.length, 10);
 
 const rigPoseSignatures = {};
-const rigRestSignatures = {};
 const rigSignatureSlots = [
   'hips',
   'spine',
@@ -226,14 +225,9 @@ for (const heroId of rosterIds) {
     throw error;
   }
 
-  const rigProbe = await page.evaluate((slots) => {
+  rigPoseSignatures[heroId] = await page.evaluate((slots) => {
     const foundation = window.__HALFPIPE_FOUNDATION__;
     const adapter = foundation.rider.chimpion.rigAdapter;
-    const rest = Object.fromEntries(
-      slots
-        .filter((slot) => adapter.restModelRotations[slot])
-        .map((slot) => [slot, adapter.restModelRotations[slot].toArray()]),
-    );
     adapter.applySkatePose({
       stance: 'regular',
       facingSign: 1,
@@ -254,27 +248,12 @@ for (const heroId of rosterIds) {
     });
     const signature = adapter.getModelSpacePoseSignature(slots);
     foundation.rider.setPresentationState(foundation.rider.presentationState);
-    return { rest, signature };
+    return signature;
   }, rigSignatureSlots);
-  rigRestSignatures[heroId] = rigProbe.rest;
-  rigPoseSignatures[heroId] = rigProbe.signature;
 }
 
 const hereticSignature = rigPoseSignatures.heretic;
 assert.ok(hereticSignature, 'Heretic reference pose signature must be captured');
-const rigRetargetDeltas = {};
-for (const [heroId, signature] of Object.entries(rigPoseSignatures)) {
-  rigRetargetDeltas[heroId] = {};
-  for (const slot of rigSignatureSlots) {
-    if (!hereticSignature[slot] || !signature[slot]) continue;
-    rigRetargetDeltas[heroId][slot] = quaternionAngleDegrees(
-      hereticSignature[slot],
-      signature[slot],
-    );
-  }
-}
-console.log('RIG_RETARGET_DELTAS=' + JSON.stringify(rigRetargetDeltas));
-console.log('RIG_RUNTIME_REST=' + JSON.stringify(rigRestSignatures));
 
 for (const [heroId, signature] of Object.entries(rigPoseSignatures)) {
   for (const slot of rigSignatureSlots) {
@@ -448,8 +427,7 @@ console.log(JSON.stringify({
   restartedResumed,
   customization,
   heroThumbs,
-  rigPoseSignatures,
-  rigRestSignatures,
+  rigRetargetVerified: Object.keys(rigPoseSignatures).length,
   reset,
   webglResilience,
   consoleErrors,
