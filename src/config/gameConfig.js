@@ -19,12 +19,12 @@ export const GAME_CONFIG = Object.freeze({
     }),
   }),
   skateboard: Object.freeze({
-    // Previous board read visually like a mini-skate next to the 2.32m rider.
-    // Increase the whole asset so trucks/wheels/deck all read at a believable
-    // gameplay scale, then extend only the deck length for a fuller silhouette.
-    scale: 0.132,
-    deckLengthScale: 1.14,
-    wheelRadius: 0.043,
+    // Keep the board deliberately substantial next to the 2.32m rider.
+    // Uniform scale keeps trucks/wheels/contact geometry coherent; the deck
+    // receives a small extra X extension for a full-size street/vert silhouette.
+    scale: 0.155,
+    deckLengthScale: 1.18,
+    wheelRadius: 0.05,
     surfaceClearance: 0.18,
   }),
   rider: Object.freeze({
@@ -111,13 +111,18 @@ export const GAME_CONFIG = Object.freeze({
     far: 180,
     position: Object.freeze([0, 6.0, 24.5]),
     target: Object.freeze([0, 3.9, 0]),
-    dynamicAirFraming: Object.freeze({
-      enterHeight: 7.6,
-      exitHeight: 7.0,
-      maxTrackedHeight: 10.5,
-      maxFov: 38,
-      maxTargetY: 6.6,
-      response: 5.5,
+    dynamicAirTracking: Object.freeze({
+      // Keep the California Games-style camera angle and FOV fixed. Once the
+      // rider gets high enough, move the whole camera rig upward instead of
+      // zooming out. Camera position and look target move by the same Y offset,
+      // so pitch/angle never changes.
+      enterHeight: 7.4,
+      exitHeight: 6.8,
+      maxTrackedHeight: 11.5,
+      followRatio: 0.92,
+      maxVerticalShift: 3.6,
+      riseResponse: 7.0,
+      fallResponse: 6.0,
     }),
   }),
 });
