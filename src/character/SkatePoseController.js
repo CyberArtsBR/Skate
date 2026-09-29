@@ -24,7 +24,7 @@ export class SkatePoseController {
     const facingSign = facingBack ? -1 : 1;
     const handPlant = state.trickVisualActive && state.trickType === 'hand-plant';
     const ascendingPrep = Boolean(
-      ascending
+      state.rampAscending
       && !air
       && !state.trickVisualActive
       && !handPlant
@@ -36,7 +36,7 @@ export class SkatePoseController {
     // Ascending the wall is now an immediate preload: knees compress and both
     // arms come down near the knees, like preparing to pop off the coping.
     const compression = ascendingPrep
-      ? clamp01(0.76 + pump * 0.18 + speed * 0.06)
+      ? clamp01(0.84 + pump * 0.10 + speed * 0.06)
       : clamp01(
         0.28
         + pump * 0.42
@@ -52,16 +52,16 @@ export class SkatePoseController {
       compression,
       hipFlex: handPlant
         ? 0.03
-        : ascendingPrep ? 0.22 + compression * 0.08 : 0.07 + compression * 0.16,
+        : ascendingPrep ? 0.28 + compression * 0.08 : 0.07 + compression * 0.16,
       kneeFlex: handPlant
         ? 0.22
-        : ascendingPrep ? 0.82 + compression * 0.18 : 0.38 + compression * 0.42,
+        : ascendingPrep ? 0.94 + compression * 0.20 : 0.38 + compression * 0.42,
       ankleFlex: handPlant
         ? -0.03
-        : ascendingPrep ? -0.16 : -0.08 - compression * 0.07,
+        : ascendingPrep ? -0.19 : -0.08 - compression * 0.07,
       torsoCounter: handPlant
         ? 0.04
-        : ascendingPrep ? 0.055 : 0.12 + speed * 0.05 - landing * 0.04,
+        : ascendingPrep ? 0.025 : 0.12 + speed * 0.05 - landing * 0.04,
       torsoBalanceZ: -surfaceAngle * 0.56 * facingSign,
       headBalanceZ: -surfaceAngle * 0.045 * facingSign,
       headLook: handPlant
@@ -73,8 +73,8 @@ export class SkatePoseController {
       // up" fakie pose.
       armBalance: handPlant
         ? 1.0
-        : ascendingPrep ? 1.08 : 0.58 + air * 0.08 + landing * 0.06,
-      forearmDrop: ascendingPrep ? 0.24 : 0.11,
+        : ascendingPrep ? 1.22 : 0.58 + air * 0.08 + landing * 0.06,
+      forearmDrop: ascendingPrep ? 0.32 : 0.11,
       airborne: Boolean(state.airborne),
     });
     return this.pose;
