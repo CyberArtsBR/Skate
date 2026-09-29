@@ -31,9 +31,24 @@ function smoothstep01(value) {
   return t * t * (3 - 2 * t);
 }
 
-function rotationQualityFromDegrees(rotationDegrees) {
-  const error = Math.abs((Number(rotationDegrees) || 0) - 180);
-  return clamp01(1 - error / 55);
+function nearestRotationTarget(rotationDegrees, stepDegrees, maximumDegrees) {
+  const rotation = Math.max(0, Math.abs(Number(rotationDegrees) || 0));
+  const step = Math.max(1, Math.abs(Number(stepDegrees) || 180));
+  const maximum = Math.max(step, Math.abs(Number(maximumDegrees) || step));
+  const target = Math.max(step, Math.min(maximum, Math.round(rotation / step) * step));
+  return {
+    rotation,
+    target,
+    error: Math.abs(rotation - target),
+  };
+}
+
+function rotationQualityFromDegrees(rotationDegrees, targetDegrees = 180) {
+  const error = Math.abs(
+    Math.abs(Number(rotationDegrees) || 0)
+    - Math.abs(Number(targetDegrees) || 180),
+  );
+  return clamp01(1 - error / 70);
 }
 
 export class HalfpipeSimulation {
@@ -102,6 +117,7 @@ export class HalfpipeSimulation {
     this.pumpIntent = 0;
     this.turnIntent = 0;
     this.handPlantHeld = false;
+    this.backflipHeld = false;
     this.handPlantBufferRemaining = 0;
 
     this.accumulator = 0;
@@ -157,6 +173,7 @@ export class HalfpipeSimulation {
 
       turnIntent: 0,
       handPlantHeld: false,
+      backflipHeld: false,
       trickType: null,
       trickProgress: 0,
       trickCount: 0,
@@ -206,6 +223,17 @@ export class HalfpipeSimulation {
       airTurnOverturned: false,
       airTurnFailedReason: null,
       airRotationDegrees: 0,
+      airRotationTargetDegrees: 0,
+      airLaunchVelocity: 0,
+
+      backflipHold: 0,
+      backflipActive: false,
+      backflipAttempted: false,
+      backflipCompleted: false,
+      backflipFailedReason: null,
+      backflipRotationDegrees: 0,
+      backflipTargetDegrees: 0,
+      backflipInputArmed: true,
 
       landingActive: false,
       landingQuality: null,
@@ -238,6 +266,7 @@ export class HalfpipeSimulation {
     this.pumpIntent = 0;
     this.turnIntent = 0;
     this.handPlantHeld = false;
+    this.backflipHeld = false;
     this._lastPumpInput = 0;
     this._lastPumpDesiredIntent = 0;
     this._lastDirection = signWithEpsilon(this.state.tangentVelocity, this.velocityEpsilon);
@@ -353,6 +382,11 @@ export class HalfpipeSimulation {
       );
     }
     return this.handPlantHeld;
+  }
+
+  setBackflipHeld(held) {
+    this.backflipHeld = Boolean(held);
+    return this.backflipHeld;
   }
 
   _pumpPhase(previousX, previousVelocity) {
@@ -478,7 +512,8 @@ export class HalfpipeSimulation {
     this.state.lastTrick = type;
     this.state.lastTrickTime = this.state.time;
     this.state.lastTrickPoints = points;
-    this.state.lastTrickTurnDirection = 1;
+    this.state.lastTrickTurnDirection = Math.sign(this.turnIntent)
+      || (this.state.lastTrickSide < 0 ? 1 : -1);
     if (side) {
       this.state.lastTrickSide = side;
       this.state.lastCompletedTrickSide = side;
@@ -709,17 +744,13 @@ export class HalfpipeSimulation {
     }
 
     const side = previousX < 0 ? -1 : previousX > 0 ? 1 : 0;
-    const allowedSide = this._allowedTrickSide();
-    if (side === 0 || side !== allowedSide) {
-      return { velocity, turned: false, frozen: false };
-    }
+    if (side === 0) return { velocity, turned: false, frozen: false };
 
     const sample = this._sampleIncreasingX(previousX);
     const predictedX = previousX
       + velocity * sample.tangent.x * this.fixedDt;
     const wallFraction = this._wallFraction(previousX);
     const predictedWallFraction = this._wallFraction(predictedX);
-    const expectedTurnIntent = this._expectedTurnIntentForAllowedSide();
 
     const handPlantRequested = (
       this.handPlantHeld || this.handPlantBufferRemaining > 0
@@ -751,8 +782,10 @@ export class HalfpipeSimulation {
       );
     }
 
+    // Turns are intentionally symmetric: either horizontal direction can
+    // initiate a 180 on either wall, regardless of the rider's current facing.
     if (
-      this.turnIntent === expectedTurnIntent
+      this.turnIntent !== 0
       && wallFraction >= this.kickTurnMinFraction
     ) {
       const quality = (wallFraction - this.kickTurnMinFraction)
@@ -803,6 +836,16 @@ export class HalfpipeSimulation {
     this.state.airTurnOverturned = false;
     this.state.airTurnFailedReason = null;
     this.state.airRotationDegrees = 0;
+    this.state.airRotationTargetDegrees = 0;
+    this.state.airLaunchVelocity = verticalVelocity;
+    this.state.backflipHold = 0;
+    this.state.backflipActive = false;
+    this.state.backflipAttempted = false;
+    this.state.backflipCompleted = false;
+    this.state.backflipFailedReason = null;
+    this.state.backflipRotationDegrees = 0;
+    this.state.backflipTargetDegrees = 0;
+    this.state.backflipInputArmed = !this.backflipHeld;
     this.state.trickType = null;
     this.state.trickProgress = 0;
     this.state.pumpActive = false;
@@ -821,75 +864,86 @@ export class HalfpipeSimulation {
     return takeoff;
   }
 
-  _startAirTurn(expectedTurn) {
+  _startAirTurn(turnInput) {
+    const direction = Math.sign(Number(turnInput) || 0) || 1;
     this.state.airTurnActive = true;
     this.state.airTurnAttempted = true;
-    this.state.airTurnDirection = 1;
+    this.state.airTurnDirection = direction;
     this.state.airTurnElapsed = 0;
     this.state.airTurnHold = 0;
     this.state.airTurnCompleted = false;
     this.state.airTurnOverturned = false;
     this.state.airTurnFailedReason = null;
     this.state.airRotationDegrees = 0;
+    this.state.airRotationTargetDegrees = 0;
     this.state.trickType = 'aerial-turn';
     this.state.trickProgress = 0;
     this.state.tricksAttempted += 1;
     this._emit('TRICK_STARTED', {
       trick: 'aerial-turn',
       side: this.state.airSide,
-      input: expectedTurn,
+      input: direction,
     });
   }
 
   _finishAirTurnFromInput() {
     if (!this.state.airTurnAttempted || this.state.airTurnFailedReason) return;
 
-    const rotation = this.state.airRotationDegrees;
     const cfg = PHASE4_GAMEPLAY_CONFIG.aerial;
+    const resolved = nearestRotationTarget(
+      this.state.airRotationDegrees,
+      cfg.targetStepDegrees,
+      cfg.maximumDegrees,
+    );
     this.state.airTurnActive = false;
+    this.state.airRotationTargetDegrees = resolved.target;
 
-    if (rotation < cfg.validMinDegrees) {
+    if (resolved.rotation < cfg.targetStepDegrees - cfg.validErrorDegrees) {
       this.state.airTurnFailedReason = 'UNDER_ROTATED';
       this._failTrick('aerial-turn', 'UNDER_ROTATED');
-    } else if (rotation > cfg.validMaxDegrees) {
-      this.state.airTurnOverturned = true;
-      this.state.airTurnFailedReason = 'OVER_ROTATED';
-      this._failTrick('aerial-turn', 'OVER_ROTATED');
+    } else if (resolved.error > cfg.validErrorDegrees) {
+      const reason = resolved.rotation < resolved.target
+        ? 'UNDER_ROTATED'
+        : 'OVER_ROTATED';
+      this.state.airTurnOverturned = reason === 'OVER_ROTATED';
+      this.state.airTurnFailedReason = reason;
+      this._failTrick('aerial-turn', reason);
     } else {
       this.state.airTurnCompleted = true;
     }
   }
 
-  _updateAirTurn(trickSideAllowed, expectedTurn) {
+  _updateAirTurn() {
     const dt = this.fixedDt;
     const cfg = PHASE4_GAMEPLAY_CONFIG.aerial;
 
     if (
       !this.state.airTurnAttempted
-      && trickSideAllowed
-      && this.turnIntent === expectedTurn
+      && !this.state.backflipAttempted
+      && this.turnIntent !== 0
     ) {
-      this._startAirTurn(expectedTurn);
+      this._startAirTurn(this.turnIntent);
     }
 
-    if (!this.state.airTurnAttempted || this.state.airTurnFailedReason) {
-      return;
-    }
+    if (!this.state.airTurnAttempted || this.state.airTurnFailedReason) return;
 
     this.state.airTurnElapsed += dt;
-    const stillHolding = trickSideAllowed && this.turnIntent === expectedTurn;
+    const stillHolding = this.turnIntent === this.state.airTurnDirection;
 
     if (stillHolding) {
       this.state.airTurnActive = true;
       this.state.airTurnHold += dt;
       this.state.airRotationDegrees += cfg.rotationDegreesPerSecond * dt;
       this.state.trickType = 'aerial-turn';
-      this.state.trickProgress = Math.min(
-        1,
-        this.state.airRotationDegrees / 180,
+      this.state.trickProgress = (
+        (this.state.airRotationDegrees % cfg.targetStepDegrees)
+        / cfg.targetStepDegrees
       );
 
-      if (this.state.airRotationDegrees > cfg.overturnDegrees) {
+      if (
+        this.state.airRotationDegrees
+        > cfg.maximumDegrees + cfg.hardOverrunDegrees
+      ) {
         this.state.airTurnOverturned = true;
         this.state.airTurnActive = false;
         this.state.airTurnFailedReason = 'OVER_ROTATED';
@@ -898,26 +952,141 @@ export class HalfpipeSimulation {
       return;
     }
 
-    if (this.state.airTurnActive) {
-      this._finishAirTurnFromInput();
+    if (this.state.airTurnActive) this._finishAirTurnFromInput();
+  }
+
+  _startBackflip() {
+    this.state.backflipActive = true;
+    this.state.backflipAttempted = true;
+    this.state.backflipHold = 0;
+    this.state.backflipCompleted = false;
+    this.state.backflipFailedReason = null;
+    this.state.backflipRotationDegrees = 0;
+    this.state.backflipTargetDegrees = 0;
+    this.state.trickType = 'backflip';
+    this.state.trickProgress = 0;
+    this.state.tricksAttempted += 1;
+    this._emit('TRICK_STARTED', {
+      trick: 'backflip',
+      side: this.state.airSide,
+      input: 'hold',
+    });
+  }
+
+  _backflipMaximumDegrees() {
+    const cfg = PHASE4_GAMEPLAY_CONFIG.backflip;
+    return this.state.airLaunchVelocity >= cfg.doubleMinimumLaunchVelocity
+      ? cfg.doubleDegrees
+      : cfg.singleDegrees;
+  }
+
+  _finishBackflipFromInput() {
+    if (!this.state.backflipAttempted || this.state.backflipFailedReason) return;
+
+    const cfg = PHASE4_GAMEPLAY_CONFIG.backflip;
+    const maximum = this._backflipMaximumDegrees();
+    const resolved = nearestRotationTarget(
+      this.state.backflipRotationDegrees,
+      cfg.singleDegrees,
+      maximum,
+    );
+    this.state.backflipActive = false;
+    this.state.backflipTargetDegrees = resolved.target;
+
+    if (resolved.rotation < cfg.singleDegrees - cfg.validErrorDegrees) {
+      this.state.backflipFailedReason = 'UNDER_FLIPPED';
+      this._failTrick('backflip', 'UNDER_FLIPPED');
+    } else if (resolved.error > cfg.validErrorDegrees) {
+      const reason = resolved.rotation < resolved.target
+        ? 'UNDER_FLIPPED'
+        : 'OVER_FLIPPED';
+      this.state.backflipFailedReason = reason;
+      this._failTrick('backflip', reason);
+    } else {
+      this.state.backflipCompleted = true;
     }
   }
 
+  _updateBackflip() {
+    const dt = this.fixedDt;
+    const cfg = PHASE4_GAMEPLAY_CONFIG.backflip;
+
+    // A button held before takeoff must be released once before it can start a
+    // flip. This prevents hand-plant/confirm holds from becoming accidental
+    // backflips while still allowing a press immediately after leaving coping.
+    if (!this.state.backflipInputArmed) {
+      if (!this.backflipHeld) this.state.backflipInputArmed = true;
+      return;
+    }
+
+    if (
+      !this.state.backflipAttempted
+      && !this.state.airTurnAttempted
+      && this.backflipHeld
+    ) {
+      this._startBackflip();
+    }
+
+    if (!this.state.backflipAttempted || this.state.backflipFailedReason) return;
+
+    const maximum = this._backflipMaximumDegrees();
+    if (this.backflipHeld) {
+      this.state.backflipActive = true;
+      this.state.backflipHold += dt;
+      this.state.backflipRotationDegrees += cfg.rotationDegreesPerSecond * dt;
+      this.state.trickType = 'backflip';
+      this.state.trickProgress = (
+        (this.state.backflipRotationDegrees % cfg.singleDegrees)
+        / cfg.singleDegrees
+      );
+
+      if (
+        this.state.backflipRotationDegrees
+        > maximum + cfg.hardOverrunDegrees
+      ) {
+        this.state.backflipActive = false;
+        this.state.backflipFailedReason = 'OVER_FLIPPED';
+        this._failTrick('backflip', 'OVER_FLIPPED');
+      }
+      return;
+    }
+
+    if (this.state.backflipActive) this._finishBackflipFromInput();
+  }
+
   _resolveLanding(side, baseY, impactVelocity) {
+    if (this.state.backflipActive && !this.state.backflipFailedReason) {
+      this._finishBackflipFromInput();
+    }
     if (this.state.airTurnActive && !this.state.airTurnFailedReason) {
       this._finishAirTurnFromInput();
     }
 
-    const attemptedTrick = this.state.airTurnAttempted;
-    const failedManeuver = Boolean(this.state.airTurnFailedReason);
-    const trickSucceeded = !attemptedTrick || this.state.airTurnCompleted;
+    const isBackflip = this.state.backflipAttempted;
+    const attemptedTrick = isBackflip || this.state.airTurnAttempted;
+    const failedReason = isBackflip
+      ? this.state.backflipFailedReason
+      : this.state.airTurnFailedReason;
+    const trickSucceeded = !attemptedTrick || (
+      isBackflip
+        ? this.state.backflipCompleted
+        : this.state.airTurnCompleted
+    );
+    const rotationDegrees = isBackflip
+      ? this.state.backflipRotationDegrees
+      : this.state.airRotationDegrees;
+    const rotationTargetDegrees = isBackflip
+      ? (this.state.backflipTargetDegrees || PHASE4_GAMEPLAY_CONFIG.backflip.singleDegrees)
+      : (this.state.airRotationTargetDegrees || PHASE4_GAMEPLAY_CONFIG.aerial.targetStepDegrees);
+
     const landing = evaluateLanding({
       attemptedTrick,
       trickSucceeded,
-      rotationDegrees: this.state.airRotationDegrees,
+      rotationDegrees,
+      rotationTargetDegrees,
       impactSpeed: Math.abs(impactVelocity),
       returnDirectionValid: true,
-      failedManeuver,
+      failedManeuver: Boolean(failedReason),
     });
 
     this.state.landingActive = true;
@@ -941,23 +1110,47 @@ export class HalfpipeSimulation {
         - (this.state.currentAirBaseY ?? baseY),
     );
 
+    let landedTrick = null;
     if (attemptedTrick && trickSucceeded && landing.quality !== LANDING_QUALITIES.BAIL) {
-      const heightQuality = clamp01((currentAirHeight - 0.2) / 3.8);
-      const rotationQuality = rotationQualityFromDegrees(this.state.airRotationDegrees);
+      const heightQuality = clamp01((currentAirHeight - 0.2) / 11);
+      const rotationQuality = rotationQualityFromDegrees(
+        rotationDegrees,
+        rotationTargetDegrees,
+      );
+      const rotationRate = isBackflip
+        ? PHASE4_GAMEPLAY_CONFIG.backflip.rotationDegreesPerSecond
+        : PHASE4_GAMEPLAY_CONFIG.aerial.rotationDegreesPerSecond;
+      const maneuverHold = isBackflip
+        ? this.state.backflipHold
+        : this.state.airTurnHold;
+      const idealHold = rotationTargetDegrees / Math.max(1, rotationRate);
       const holdQuality = clamp01(
-        this.state.airTurnHold / Math.max(this.aerialIdealHoldSeconds, 1e-4),
+        1 - Math.abs(maneuverHold - idealHold) / Math.max(0.24, idealHold * 0.38),
       );
       const landingQuality = clamp01(landing.scoreMultiplier / 1.2);
       const totalQuality = clamp01(
-        heightQuality * 0.35
-        + rotationQuality * 0.35
+        heightQuality * 0.3
+        + rotationQuality * 0.4
         + holdQuality * 0.15
         + landingQuality * 0.15,
       );
-      this.state.facingTurns += 1;
+
+      if (isBackflip) {
+        landedTrick = rotationTargetDegrees >= PHASE4_GAMEPLAY_CONFIG.backflip.doubleDegrees
+          ? 'double-backflip'
+          : 'backflip';
+      } else {
+        const halfTurns = Math.max(
+          1,
+          Math.round(rotationTargetDegrees / PHASE4_GAMEPLAY_CONFIG.aerial.targetStepDegrees),
+        );
+        this.state.facingTurns += halfTurns * (this.state.airTurnDirection || 1);
+        landedTrick = 'aerial-' + rotationTargetDegrees;
+      }
+
       this.state.tricksLanded += 1;
       this._awardValidatedTrick(
-        'aerial-turn',
+        landedTrick,
         totalQuality,
         landing.scoreMultiplier,
         side,
@@ -970,11 +1163,13 @@ export class HalfpipeSimulation {
       scoreMultiplier: landing.scoreMultiplier,
       momentumRetention: landing.momentumRetention,
       currentAirHeight,
-      rotationDegrees: this.state.airRotationDegrees,
+      rotationDegrees,
+      rotationTargetDegrees,
+      trick: landedTrick,
     });
 
     if (landing.quality === LANDING_QUALITIES.BAIL) {
-      const reason = this.state.airTurnFailedReason || 'BAD_LANDING';
+      const reason = failedReason || 'BAD_LANDING';
       this._startCrash(reason);
     }
 
@@ -987,6 +1182,8 @@ export class HalfpipeSimulation {
 
     this.state.mode = 'contact';
     this.state.pipeX = this.state.airAnchorX ?? this.state.pipeX;
+    // On a bail this naturally sends the rider from either wall toward the
+    // middle of the pipe, matching the requested slide-down recovery.
     this.state.tangentVelocity = side < 0 ? landingSpeed : -landingSpeed;
     this.state.airSide = 0;
     this.state.airAnchorX = null;
@@ -994,6 +1191,7 @@ export class HalfpipeSimulation {
     this.state.currentAirBaseY = null;
     this.state.airY = null;
     this.state.airVerticalVelocity = 0;
+    this.state.airLaunchVelocity = 0;
     this.state.airTurnHold = 0;
     this.state.airTurnDirection = 0;
     this.state.airTurnElapsed = 0;
@@ -1003,6 +1201,15 @@ export class HalfpipeSimulation {
     this.state.airTurnOverturned = false;
     this.state.airTurnFailedReason = null;
     this.state.airRotationDegrees = 0;
+    this.state.airRotationTargetDegrees = 0;
+    this.state.backflipHold = 0;
+    this.state.backflipActive = false;
+    this.state.backflipAttempted = false;
+    this.state.backflipCompleted = false;
+    this.state.backflipFailedReason = null;
+    this.state.backflipRotationDegrees = 0;
+    this.state.backflipTargetDegrees = 0;
+    this.state.backflipInputArmed = true;
     this.state.trickType = null;
     this.state.trickProgress = 0;
     this._lastDirection = signWithEpsilon(
@@ -1017,12 +1224,9 @@ export class HalfpipeSimulation {
     const side = this.state.airSide || (this.state.pipeX < 0 ? -1 : 1);
     const anchorX = this.state.airAnchorX ?? this.state.pipeX;
     const baseY = this.state.airBaseY ?? this._sampleIncreasingX(anchorX).y;
-    const allowedSide = this._allowedTrickSide();
-    const expectedTurn = this._expectedTurnIntentForAllowedSide();
-    const trickSideAllowed = side === allowedSide;
-
     this.state.turnIntent = this.turnIntent;
     this.state.handPlantHeld = this.handPlantHeld;
+    this.state.backflipHeld = this.backflipHeld;
     this.state.pumpIntent = 0;
     this.state.pumpDesiredIntent = 0;
     this.state.pumpWindowInfluence = 0;
@@ -1030,7 +1234,8 @@ export class HalfpipeSimulation {
     this.state.pumpActive = false;
     this.state.lastPumpWork = 0;
 
-    this._updateAirTurn(trickSideAllowed, expectedTurn);
+    this._updateBackflip();
+    this._updateAirTurn();
 
     const previousVerticalVelocity = this.state.airVerticalVelocity;
     const verticalVelocity = previousVerticalVelocity - this.airGravity * dt;
