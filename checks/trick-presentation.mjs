@@ -255,52 +255,54 @@ assert.equal(
 
 const aerial = launchFromSide(profile, -1, 0);
 for (let index = 0; index < 10; index += 1) aerial.stepFixed();
-const preTurnY = aerial.snapshot().airY;
+const turnStartY = aerial.snapshot().airY;
 aerial.setTurnIntent(1);
-aerial.stepFixed();
-aerial.setTurnIntent(0);
-const frozenY = aerial.snapshot().airY;
-assert.ok(Math.abs(frozenY - preTurnY) < 0.2);
-const airHalfSteps = Math.round(
-  GAME_CONFIG.trickPresentation.aerialTurnDuration * 0.5 / aerial.fixedDt,
-);
+const cleanTurnSteps = Math.round(0.5 / aerial.fixedDt);
+const airHalfSteps = Math.round(cleanTurnSteps * 0.5);
 for (let index = 0; index < airHalfSteps; index += 1) aerial.stepFixed();
 const aerialMid = aerial.snapshot();
 const aerialPresentation = simulationToPresentationState(profile, aerialMid);
 assert.equal(aerialMid.airTurnActive, true);
 assert.ok(
-  Math.abs(aerialMid.airY - frozenY) < 1e-9,
-  'aerial turn must hold height throughout bullet-time animation',
+  Math.abs(aerialMid.airY - turnStartY) > 1e-4,
+  'aerial rotation must not freeze authoritative vertical physics',
+);
+assert.ok(
+  aerialMid.airRotationDegrees > 70 && aerialMid.airRotationDegrees < 110,
+  `half-held aerial should be near 90 degrees: ${aerialMid.airRotationDegrees}`,
 );
 assert.ok(
   aerialPresentation.facingYaw > 1.2,
   `front-facing LEFT aerial must animate counterclockwise on camera, yaw=${aerialPresentation.facingYaw}`,
 );
-for (
-  let index = airHalfSteps;
-  index < Math.ceil(GAME_CONFIG.trickPresentation.aerialTurnDuration / aerial.fixedDt) + 4;
-  index += 1
-) {
+for (let index = airHalfSteps; index < cleanTurnSteps; index += 1) {
   aerial.stepFixed();
 }
+aerial.setTurnIntent(0);
+aerial.stepFixed();
+assert.equal(
+  aerial.snapshot().airTurnCompleted,
+  true,
+  'aerial 180 must complete from sufficient held rotation input',
+);
 assert.equal(aerial.snapshot().airTurnActive, false);
 assert.ok(
-  aerial.snapshot().airVerticalVelocity <= 0,
-  'aerial started before apex must resume downward, not regain upward velocity',
-);
-assert.ok(
-  aerial.snapshot().maxAirY <= frozenY + 1e-6,
-  'aerial bullet-time height must become the apex',
+  aerial.snapshot().airRotationDegrees >= 176
+    && aerial.snapshot().airRotationDegrees <= 188,
+  `clean aerial rotation should resolve near 180 degrees: ${aerial.snapshot().airRotationDegrees}`,
 );
 
 // BACK-facing aerial: RIGHT side + LEFT input.
 const backAir = launchFromSide(profile, 1, 1);
 backAir.setTurnIntent(-1);
-backAir.stepFixed();
-backAir.setTurnIntent(0);
 for (let index = 0; index < airHalfSteps; index += 1) backAir.stepFixed();
 const backAirPresentation = simulationToPresentationState(profile, backAir.snapshot());
 assert.equal(backAir.snapshot().airTurnActive, true);
+assert.ok(
+  backAir.snapshot().airRotationDegrees > 70
+    && backAir.snapshot().airRotationDegrees < 110,
+  `back-facing half-held aerial should be near 90 degrees: ${backAir.snapshot().airRotationDegrees}`,
+);
 assert.ok(
   backAirPresentation.facingYaw > Math.PI + 1.2,
   `back-facing RIGHT aerial must also rotate counterclockwise on camera, yaw=${backAirPresentation.facingYaw}`,
@@ -466,7 +468,7 @@ console.log(JSON.stringify({
     midpointRoll: handPresentation.trickRoll,
   },
   aerial: {
-    frozenY,
+    turnStartY,
     midpointYaw: aerialPresentation.facingYaw,
     resumedVerticalVelocity: aerial.snapshot().airVerticalVelocity,
   },
