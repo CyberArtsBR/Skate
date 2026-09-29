@@ -75,6 +75,9 @@ export class SkateboardVisual {
       kickTurnPivot: { amount: 0, side: 'rear' },
       airStyle: 0,
     };
+    this.deckColorMaterials = null;
+    this.deckColorOriginals = null;
+    this.deckColor = null;
   }
 
   async load() {
@@ -220,6 +223,40 @@ export class SkateboardVisual {
     this.root.userData.proportionAudit = this.proportionAudit;
     this.root.userData.presentationHooks = this.presentationHooks;
     return this;
+  }
+
+  _prepareDeckColorMaterials() {
+    if (!this.deck || this.deckColorMaterials) return;
+    const original = Array.isArray(this.deck.material)
+      ? this.deck.material
+      : [this.deck.material];
+    this.deckColorMaterials = original.map((material) => material?.clone?.() || material);
+    this.deck.material = Array.isArray(this.deck.material)
+      ? this.deckColorMaterials
+      : this.deckColorMaterials[0];
+    this.deckColorOriginals = this.deckColorMaterials.map((material) => (
+      material?.color?.clone?.() || null
+    ));
+  }
+
+  setDeckColor(color = null) {
+    if (!this.deck) return false;
+    this._prepareDeckColorMaterials();
+    this.deckColor = color === null || color === undefined ? null : Number(color);
+
+    this.deckColorMaterials.forEach((material, index) => {
+      if (!material?.color) return;
+      if (this.deckColor === null) {
+        const original = this.deckColorOriginals[index];
+        if (original) material.color.copy(original);
+      } else {
+        material.color.setHex(this.deckColor);
+      }
+      material.needsUpdate = true;
+    });
+
+    this.root.userData.deckColor = this.deckColor;
+    return true;
   }
 
   rotateWheels(distance) {
