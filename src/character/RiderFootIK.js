@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GAME_CONFIG } from '../config/gameConfig.js';
 
 const worldJointPosition = new THREE.Vector3();
 const worldEffectorPosition = new THREE.Vector3();
@@ -84,6 +85,7 @@ export class RiderFootIK {
       target.position.set(spec.x, deckY + clearance + spec.ankleHeight, spec.z);
       target.userData.foot = side;
       target.userData.stanceRole = spec.role;
+      target.userData.baseY = target.position.y;
       this.skateboard.root.add(target);
       this.targets[side] = target;
     }
@@ -105,8 +107,15 @@ export class RiderFootIK {
     return foot.getWorldPosition(new THREE.Vector3()).distanceTo(target);
   }
 
-  update({ airborne = false } = {}) {
+  update({ airborne = false, facingYaw = 0 } = {}) {
     if (!this.enabled) return this.result;
+
+    const backAmount = (1 - Math.cos(Number(facingYaw) || 0)) * 0.5;
+    const targetDrop = GAME_CONFIG.rider.fakieFootTargetDrop * backAmount;
+    for (const target of Object.values(this.targets)) {
+      target.position.y = target.userData.baseY - targetDrop;
+    }
+
     this.riderRoot.updateWorldMatrix(true, true);
     const weight = airborne ? 0.72 : 1;
     this.result.leftError = this.solveLeg('left', weight);
