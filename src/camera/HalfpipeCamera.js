@@ -18,6 +18,7 @@ export class HalfpipeCamera {
     this.target = this.baseTarget.clone();
     this.dynamicActive = false;
     this.dynamicAmount = 0;
+    this.verticalShift = 0;
     this.camera.lookAt(this.target);
   }
 
@@ -27,41 +28,49 @@ export class HalfpipeCamera {
   }
 
   updateForRider({ y = 0, airborne = false } = {}, dt = 0) {
-    const dynamic = this.config.dynamicAirFraming;
-    if (!dynamic) return this.snapshot();
+    const tracking = this.config.dynamicAirTracking;
+    if (!tracking) return this.snapshot();
 
     if (this.dynamicActive) {
-      if (!airborne || y <= dynamic.exitHeight) this.dynamicActive = false;
-    } else if (airborne && y >= dynamic.enterHeight) {
+      if (!airborne || y <= tracking.exitHeight) this.dynamicActive = false;
+    } else if (airborne && y >= tracking.enterHeight) {
       this.dynamicActive = true;
     }
 
-    const heightRange = Math.max(0.001, dynamic.maxTrackedHeight - dynamic.enterHeight);
-    const desiredAmount = this.dynamicActive
-      ? THREE.MathUtils.clamp((y - dynamic.enterHeight) / heightRange, 0, 1)
+    const rawShift = this.dynamicActive
+      ? Math.max(0, y - tracking.enterHeight) * tracking.followRatio
       : 0;
+    const desiredShift = THREE.MathUtils.clamp(
+      rawShift,
+      0,
+      tracking.maxVerticalShift,
+    );
+    const response = desiredShift > this.verticalShift
+      ? tracking.riseResponse
+      : tracking.fallResponse;
 
-    this.dynamicAmount = damp(
-      this.dynamicAmount,
-      desiredAmount,
-      dynamic.response,
+    this.verticalShift = damp(
+      this.verticalShift,
+      desiredShift,
+      response,
       dt,
     );
+    this.dynamicAmount = tracking.maxVerticalShift > 0
+      ? THREE.MathUtils.clamp(
+        this.verticalShift / tracking.maxVerticalShift,
+        0,
+        1,
+      )
+      : 0;
 
-    const desiredFov = THREE.MathUtils.lerp(
-      this.config.fov,
-      dynamic.maxFov,
-      this.dynamicAmount,
-    );
-    const desiredTargetY = THREE.MathUtils.lerp(
-      this.baseTarget.y,
-      dynamic.maxTargetY,
-      this.dynamicAmount,
-    );
-
-    this.camera.fov = damp(this.camera.fov, desiredFov, dynamic.response, dt);
-    this.target.y = damp(this.target.y, desiredTargetY, dynamic.response, dt);
+    // Never zoom and never change the presentation angle. Moving both camera
+    // and target by the exact same vertical offset preserves their direction
+    // vector while allowing high airs to remain on-screen.
+    this.camera.fov = this.config.fov;
     this.camera.position.copy(this.basePosition);
+    this.camera.position.y += this.verticalShift;
+    this.target.copy(this.baseTarget);
+    this.target.y += this.verticalShift;
     this.camera.lookAt(this.target);
     this.camera.updateProjectionMatrix();
 
@@ -71,6 +80,7 @@ export class HalfpipeCamera {
   resetDynamic() {
     this.dynamicActive = false;
     this.dynamicAmount = 0;
+    this.verticalShift = 0;
     this.camera.fov = this.config.fov;
     this.camera.position.copy(this.basePosition);
     this.target.copy(this.baseTarget);
@@ -83,6 +93,7 @@ export class HalfpipeCamera {
     return {
       dynamicActive: this.dynamicActive,
       dynamicAmount: this.dynamicAmount,
+      verticalShift: this.verticalShift,
       fov: this.camera.fov,
       targetY: this.target.y,
       position: this.camera.position.toArray(),
