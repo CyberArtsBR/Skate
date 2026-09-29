@@ -17,5 +17,16 @@ export function repetitionMultiplier(repeatCount) {
 export function scoreRangeForTrick(scoringConfig, type) {
   if (type === 'kick-turn') return scoringConfig.kickTurn;
   if (type === 'hand-plant') return scoringConfig.handPlant;
+  if (type === 'backflip') return scoringConfig.backflip || scoringConfig.aerialTurn;
+  if (type === 'double-backflip') {
+    return scoringConfig.doubleBackflip || scoringConfig.backflip || scoringConfig.aerialTurn;
+  }
+
+  const aerialMatch = /^aerial-(180|360|540|720|900)$/.exec(String(type || ''));
+  if (aerialMatch) {
+    const key = 'aerial' + aerialMatch[1];
+    return scoringConfig[key] || scoringConfig.aerialTurn;
+  }
+
   return scoringConfig.aerialTurn;
 }
