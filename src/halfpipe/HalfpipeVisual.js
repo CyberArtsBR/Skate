@@ -130,7 +130,12 @@ function findRidingSurface(root) {
 
   const namedCandidates = [];
   root.traverse((object) => {
-    if (!object.isMesh || !object.geometry || !isVisibleInHierarchy(object)) return;
+    if (
+      !object.isMesh
+      || !object.geometry
+      || object.userData?.visualGlowOnly
+      || !isVisibleInHierarchy(object)
+    ) return;
     if (/ground/i.test(object.name)) return;
     if (/(half.?pipe|riding|ride|ramp|surface)/i.test(object.name)) namedCandidates.push(object);
   });
@@ -148,7 +153,12 @@ function findRidingSurface(root) {
   // establishes visual alignment for replacement art assets.
   const candidates = [];
   root.traverse((object) => {
-    if (!object.isMesh || !object.geometry || !isVisibleInHierarchy(object)) return;
+    if (
+      !object.isMesh
+      || !object.geometry
+      || object.userData?.visualGlowOnly
+      || !isVisibleInHierarchy(object)
+    ) return;
     if (/ground/i.test(object.name)) return;
     const box = worldBounds(object);
     const size = box.getSize(new THREE.Vector3());
