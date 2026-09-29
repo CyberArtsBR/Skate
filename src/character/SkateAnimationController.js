@@ -134,15 +134,14 @@ export class SkateAnimationController {
       : rawState.airborne && !this.wasAirborne
         ? 48
         : 10;
-    this.smoothedFootIK = damp(
-      this.smoothedFootIK,
-      targetFootIK,
-      footIKResponse,
-      dt,
-    );
-    if (bailFootLock && this.smoothedFootIK > 0.985) {
-      this.smoothedFootIK = 1;
-    }
+    this.smoothedFootIK = bailFootLock
+      ? 1
+      : damp(
+        this.smoothedFootIK,
+        targetFootIK,
+        footIKResponse,
+        dt,
+      );
     this.smoothedPreload = damp(
       this.smoothedPreload,
       clamp01(rawState.preloadCompression),
