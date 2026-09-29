@@ -17,7 +17,7 @@ export class SkatePoseController {
     const descending = state.descending ? 1 : 0;
     const surfaceAngle = THREE.MathUtils.clamp(Number(state.surfaceAngle) || 0, -1.25, 1.25);
     const facingBack = Math.cos(Number(state.facingYaw) || 0) < 0;
-    const headFacingSign = facingBack ? -1 : 1;
+    const facingSign = facingBack ? -1 : 1;
     const handPlant = state.trickVisualActive && state.trickType === 'hand-plant';
     const landingScale = state.landingQuality === 'hard'
       ? 1.2
@@ -34,13 +34,14 @@ export class SkatePoseController {
 
     Object.assign(this.pose, {
       stance: this.stance,
+      facingSign,
       compression,
       hipFlex: handPlant ? 0.03 : 0.07 + compression * 0.16,
       kneeFlex: handPlant ? 0.22 : 0.38 + compression * 0.42,
       ankleFlex: handPlant ? -0.03 : -0.08 - compression * 0.07,
       torsoCounter: handPlant ? 0.04 : 0.12 + speed * 0.05 - landing * 0.04,
-      torsoBalanceZ: -surfaceAngle * 0.56,
-      headBalanceZ: -surfaceAngle * 0.045 * headFacingSign,
+      torsoBalanceZ: -surfaceAngle * 0.56 * facingSign,
+      headBalanceZ: -surfaceAngle * 0.045 * facingSign,
       headLook: handPlant ? 0.08 : 0.18 + speed * 0.03,
       armBalance: handPlant ? 1.0 : 0.58 + air * 0.08 + landing * 0.06,
       airborne: Boolean(state.airborne),
