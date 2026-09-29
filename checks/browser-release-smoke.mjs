@@ -90,12 +90,16 @@ await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls');
 await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'countdown');
+const startPrompt = await page.locator('.countdown-label').textContent();
+assert.equal(startPrompt, 'PRESS ANY BUTTON TO START');
+await page.waitForTimeout(200);
+await page.keyboard.press('Space');
 try {
   await page.waitForFunction(
     () => window.__HALFPIPE_FOUNDATION__.session.phase === 'running'
       && window.__HALFPIPE_FOUNDATION__.flow.state === 'run',
     null,
-    { timeout: 6000 },
+    { timeout: 3000 },
   );
 } catch (error) {
   const diagnostic = await page.evaluate(() => ({
@@ -118,7 +122,7 @@ await page.waitForFunction(
   { timeout: 2500 },
 );
 const runningLater = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot());
-assert.ok(runningLater.remaining < runningStart.remaining, 'session timer must progress after countdown');
+assert.ok(runningLater.remaining < runningStart.remaining, 'session timer must progress after press-any-button start');
 
 await page.keyboard.press('KeyP');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.session.phase === 'paused');
