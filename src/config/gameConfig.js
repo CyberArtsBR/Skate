@@ -3,7 +3,7 @@ export const GAME_CONFIG = Object.freeze({
     halfpipe: '/models/halfpipe/halfpipe.glb',
     skateboard: '/models/skateboard/skateboard.glb',
     chimpion: '/models/characters/The%20Heretic.glb',
-    background: '/images/backgrounds/halfpipe-hollywood-original.jpg',
+    background: '/images/backgrounds/halfpipe-chimpions-merch.jpg',
   }),
   renderer: Object.freeze({
     maxPixelRatio: 2,
