@@ -23,12 +23,11 @@ export function evaluatePumpRating({
   const error = fraction - idealCenter;
   const absoluteError = Math.abs(error);
 
-  // V7 intentionally narrows the timing windows. Pumping should reward
-  // deliberate timing rather than continuously adding speed whenever the
-  // player happens to hold the correct direction.
-  if (absoluteError <= 0.10) return PUMP_RATINGS.PERFECT;
-  if (absoluteError <= 0.22) return PUMP_RATINGS.GOOD;
-  if (absoluteError <= 0.34) return PUMP_RATINGS.WEAK;
+  // V8 keeps pumping skill-based, but widens the windows enough that a bail
+  // does not leave the player trapped at low speed for too long.
+  if (absoluteError <= 0.13) return PUMP_RATINGS.PERFECT;
+  if (absoluteError <= 0.27) return PUMP_RATINGS.GOOD;
+  if (absoluteError <= 0.42) return PUMP_RATINGS.WEAK;
 
   return error < 0 ? PUMP_RATINGS.EARLY : PUMP_RATINGS.LATE;
 }
@@ -36,10 +35,10 @@ export function evaluatePumpRating({
 export function pumpAccuracyWeight(rating) {
   switch (rating) {
     case PUMP_RATINGS.PERFECT: return 1;
-    case PUMP_RATINGS.GOOD: return 0.78;
-    case PUMP_RATINGS.WEAK: return 0.48;
+    case PUMP_RATINGS.GOOD: return 0.84;
+    case PUMP_RATINGS.WEAK: return 0.58;
     case PUMP_RATINGS.EARLY:
-    case PUMP_RATINGS.LATE: return 0.2;
+    case PUMP_RATINGS.LATE: return 0.3;
     default: return 0;
   }
 }
