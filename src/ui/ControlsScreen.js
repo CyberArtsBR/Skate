@@ -60,8 +60,9 @@ export class ControlsScreen {
   render() {
     const rows = [
       [glyphFor('pumpUp', this.family) + ' / ' + glyphFor('pumpDown', this.family), 'PUMP / CONTROL SPEED'],
-      [glyphFor('turnLeft', this.family) + ' / ' + glyphFor('turnRight', this.family), 'TURN / AERIAL 180'],
-      [glyphFor('handPlant', this.family), 'HAND PLANT AT COPING'],
+      [glyphFor('turnLeft', this.family) + ' / ' + glyphFor('turnRight', this.family), 'TURN / AERIAL 180-900 · EITHER WALL'],
+      [glyphFor('backflip', this.family), 'HOLD AFTER TAKEOFF · BACKFLIP / DOUBLE'],
+      [glyphFor('handPlant', this.family), 'HAND PLANT AT COPING · EITHER WALL'],
       [glyphFor('pause', this.family), 'PAUSE'],
     ];
     this.list.innerHTML = rows.map(([glyph, label]) => (

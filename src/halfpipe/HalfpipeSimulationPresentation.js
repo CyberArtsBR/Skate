@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import {
   normalizeLandingQuality,
@@ -121,6 +122,7 @@ export function simulationToPresentationState(profile, simulationState) {
   let trickType = simulationState.trickType || null;
   let trickProgress = clamp01(simulationState.trickProgress);
   let trickRoll = 0;
+  let trickPitch = 0;
   let trickOffsetX = 0;
   let trickOffsetY = 0;
   let trickVisualActive = false;
@@ -148,13 +150,40 @@ export function simulationToPresentationState(profile, simulationState) {
 
   if (
     airborne
-    && (simulationState.airTurnActive || trickType === 'aerial-turn')
+    && (
+      simulationState.backflipAttempted
+      || simulationState.backflipActive
+      || trickType === 'backflip'
+    )
   ) {
-    facingYaw = finalFacingYaw + turnDirection * Math.PI * trickProgress;
+    const flipDegrees = Math.max(0, Number(simulationState.backflipRotationDegrees) || 0);
+    const flipRadians = THREE.MathUtils.degToRad(flipDegrees);
+    const segment = (flipDegrees % 360) / 360;
+    trickPitch = -flipRadians;
+    trickRoll = -currentSide * 0.05 * Math.sin(Math.PI * segment);
+    trickProgress = segment;
+    trickVisualActive = flipDegrees > 0;
+    trickType = 'backflip';
+  } else if (
+    airborne
+    && (
+      simulationState.airTurnAttempted
+      || simulationState.airTurnActive
+      || trickType === 'aerial-turn'
+    )
+  ) {
+    const explicitRotation = Math.max(0, Number(simulationState.airRotationDegrees) || 0);
+    const rotationDegrees = explicitRotation > 0
+      ? explicitRotation
+      : clamp01(simulationState.trickProgress) * 180;
+    const segment = (rotationDegrees % 180) / 180;
+    facingYaw = finalFacingYaw
+      + turnDirection * THREE.MathUtils.degToRad(rotationDegrees);
     trickRoll = -currentSide
       * trickConfig.aerialRoll
-      * Math.sin(Math.PI * trickProgress);
-    trickVisualActive = trickProgress > 0;
+      * Math.sin(Math.PI * segment);
+    trickProgress = segment;
+    trickVisualActive = rotationDegrees > 0;
     trickType = 'aerial-turn';
   } else if (
     !airborne
@@ -195,9 +224,12 @@ export function simulationToPresentationState(profile, simulationState) {
   const landingAnticipation = airborne && verticalVelocity < 0
     ? clamp01(1 - airHeight / 2.2)
     : 0;
-  const airTuck = airborne
+  const baseAirTuck = airborne
     ? clamp01(smoothstep01(airHeight / 3.2) * (1 - landingAnticipation * 0.45))
     : 0;
+  const airTuck = airborne && trickType === 'backflip'
+    ? Math.max(0.82, baseAirTuck)
+    : baseAirTuck;
   const landing = explicitLanding(simulationState);
   const landingQuality = explicitLandingQuality(simulationState);
 
@@ -220,6 +252,7 @@ export function simulationToPresentationState(profile, simulationState) {
     facingYaw,
     turnDirection,
     trickRoll,
+    trickPitch,
     trickOffsetX,
     trickOffsetY,
     trickVisualActive,

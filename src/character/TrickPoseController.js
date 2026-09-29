@@ -42,6 +42,14 @@ export class TrickPoseController {
       output.bodyYaw = direction * 0.08 * envelope;
       output.bodyY = 0.04 * envelope;
       output.bodyX = -(Number(state.wallSide) || 1) * 0.035 * envelope;
+    } else if (state.airborne && state.trickType === 'backflip') {
+      // Pull the rider tightly over the deck while the presentation carrier
+      // performs the authoritative pitch rotation.
+      const tuck = Math.max(0.72, clamp01(state.airTuck));
+      output.boardRoll += (this.stance === 'goofy' ? -1 : 1) * 0.025 * tuck;
+      output.bodyY = -0.12 * tuck;
+      output.bodyX = -0.035 * tuck;
+      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.35;
     } else if (state.airborne) {
       output.boardRoll += (this.stance === 'goofy' ? -1 : 1)
         * 0.035

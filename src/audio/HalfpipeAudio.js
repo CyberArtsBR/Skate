@@ -58,6 +58,70 @@ function makeNoiseBuffer(context, seconds = 1.5) {
   return buffer;
 }
 
+function createProceduralRockBuffer(context) {
+  const sampleRate = context.sampleRate;
+  const bpm = 150;
+  const beat = 60 / bpm;
+  const eighth = beat * 0.5;
+  const bars = 4;
+  const duration = beat * 4 * bars;
+  const frames = Math.max(1, Math.floor(sampleRate * duration));
+  const buffer = context.createBuffer(2, frames, sampleRate);
+  const left = buffer.getChannelData(0);
+  const right = buffer.getChannelData(1);
+
+  // Original retro hard-rock riff. The square/saw harmonic stack deliberately
+  // evokes 32-bit-era game audio without copying any existing composition.
+  const riff = [40, 40, 43, 45, 40, 47, 45, 43, 40, 40, 50, 47, 45, 43, 38, 43];
+  const midiToHz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+  const fract = (value) => value - Math.floor(value);
+
+  for (let i = 0; i < frames; i += 1) {
+    const t = i / sampleRate;
+    const eighthIndex = Math.floor(t / eighth);
+    const note = riff[eighthIndex % riff.length];
+    const noteTime = t - eighthIndex * eighth;
+    const noteEnvelope = Math.min(1, noteTime / 0.008)
+      * Math.pow(Math.max(0, 1 - noteTime / eighth), 0.45);
+    const frequency = midiToHz(note);
+    const phase = Math.PI * 2 * frequency * t;
+    const guitarRaw =
+      Math.sin(phase)
+      + Math.sin(phase * 2) * 0.34
+      + Math.sin(phase * 3) * 0.25
+      + Math.sin(phase * 5) * 0.12;
+    const guitar = Math.tanh(guitarRaw * 2.4) * 0.24 * noteEnvelope;
+
+    const bassPhase = Math.PI * 2 * (frequency * 0.5) * t;
+    const bass = Math.tanh(Math.sin(bassPhase) * 3.4)
+      * 0.15 * noteEnvelope;
+
+    const beatIndex = Math.floor(t / beat);
+    const beatTime = t - beatIndex * beat;
+    const kickEnvelope = Math.exp(-beatTime * 24);
+    const kickFrequency = 52 + 72 * Math.exp(-beatTime * 34);
+    const kick = Math.sin(Math.PI * 2 * kickFrequency * beatTime)
+      * kickEnvelope * 0.34;
+
+    const beatInBar = beatIndex % 4;
+    const noise = fract(Math.sin((i + 1) * 12.9898) * 43758.5453) * 2 - 1;
+    const snareEnvelope = (beatInBar === 1 || beatInBar === 3)
+      ? Math.exp(-beatTime * 30)
+      : 0;
+    const snare = noise * snareEnvelope * 0.19;
+
+    const hatTime = t - eighthIndex * eighth;
+    const hat = noise * Math.exp(-hatTime * 95) * 0.055;
+
+    const mono = Math.tanh((guitar + bass + kick + snare + hat) * 1.15);
+    const side = Math.sin(phase * 1.006 + 0.7) * 0.018 * noteEnvelope;
+    left[i] = Math.max(-0.92, Math.min(0.92, mono + side));
+    right[i] = Math.max(-0.92, Math.min(0.92, mono - side));
+  }
+
+  return buffer;
+}
+
 export class HalfpipeAudio {
   constructor(options = {}) {
     this.manifest = createAudioManifest(options.manifest);
@@ -90,6 +154,8 @@ export class HalfpipeAudio {
     this.musicVoices = new Set();
     this.ambienceVoices = new Map();
     this.currentMusic = null;
+    this.proceduralRockBuffer = null;
+    this.paused = false;
 
     this.lastComboMultiplier = 1;
     this.timerWarningsPlayed = new Set();
@@ -670,6 +736,42 @@ export class HalfpipeAudio {
       });
     }, { delay: 0.045 });
 
+    this._assetOr('sfx.crowdOh', () => {
+      // Short layered vowel-like crowd reaction at the collision moment.
+      this._tone({
+        frequency: 190,
+        endFrequency: 145,
+        duration: 0.62,
+        gain: 0.042,
+        type: 'sine',
+        delay: 0.08,
+      });
+      this._tone({
+        frequency: 238,
+        endFrequency: 178,
+        duration: 0.58,
+        gain: 0.032,
+        type: 'triangle',
+        delay: 0.095,
+      });
+      this._tone({
+        frequency: 152,
+        endFrequency: 118,
+        duration: 0.66,
+        gain: 0.026,
+        type: 'sine',
+        delay: 0.11,
+      });
+      this._noiseBurst({
+        duration: 0.42,
+        gain: 0.026,
+        frequency: 760,
+        type: 'lowpass',
+        q: 0.45,
+        delay: 0.09,
+      });
+    }, { delay: 0.08 });
+
     this._assetOr('sfx.bailRecovery', () => {
       this._noiseBurst({
         duration: 0.12,
@@ -890,10 +992,17 @@ export class HalfpipeAudio {
     return true;
   }
 
+  setPaused(paused) {
+    this.paused = Boolean(paused);
+    this.skate?.setPaused(this.paused);
+    return this.paused;
+  }
+
   update(state = {}, dt = 1 / 60) {
     if (this.disposed) return;
 
     if (this.isReady) {
+      this.skate?.setPaused(this.paused);
       this.skate?.update(state, dt);
     }
 
@@ -930,11 +1039,19 @@ export class HalfpipeAudio {
     if (this.currentMusic?.name === name && !restart) return true;
 
     const descriptor = this.manifest.music?.[name];
-    if (!descriptor?.url) return false;
+    if (!descriptor) return false;
 
     const key = 'music.' + name;
     let buffer = this.buffers.get(key);
-    if (!buffer) {
+    if (
+      !buffer
+      && descriptor.placeholder === 'procedural-32bit-hard-rock'
+      && this.context
+    ) {
+      this.proceduralRockBuffer ||= createProceduralRockBuffer(this.context);
+      buffer = this.proceduralRockBuffer;
+      this.buffers.set(key, buffer);
+    } else if (!buffer && descriptor.url) {
       try {
         buffer = await this._loadBuffer(key, descriptor.url);
       } catch {
@@ -1127,6 +1244,7 @@ export class HalfpipeAudio {
     this.buffers.clear();
     this.loading.clear();
     this.cooldowns.clear();
+    this.proceduralRockBuffer = null;
 
     if (
       this.ownsContext

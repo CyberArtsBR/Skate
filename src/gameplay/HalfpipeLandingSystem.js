@@ -9,10 +9,10 @@ export const LANDING_QUALITIES = Object.freeze({
 });
 
 const RESULTS = Object.freeze({
-  PERFECT: Object.freeze({ scoreMultiplier: 1.2, momentumRetention: 1.0 }),
-  CLEAN: Object.freeze({ scoreMultiplier: 1.0, momentumRetention: 0.94 }),
-  SKETCHY: Object.freeze({ scoreMultiplier: 0.78, momentumRetention: 0.82 }),
-  HEAVY: Object.freeze({ scoreMultiplier: 0.5, momentumRetention: 0.65 }),
+  PERFECT: Object.freeze({ scoreMultiplier: 1.2, momentumRetention: 1 }),
+  CLEAN: Object.freeze({ scoreMultiplier: 1, momentumRetention: 0.98 }),
+  SKETCHY: Object.freeze({ scoreMultiplier: 0.72, momentumRetention: 0.9 }),
+  HEAVY: Object.freeze({ scoreMultiplier: 0.38, momentumRetention: 0.76 }),
   BAIL: Object.freeze({ scoreMultiplier: 0, momentumRetention: 0.35 }),
 });
 
@@ -20,6 +20,7 @@ export function evaluateLanding({
   attemptedTrick = false,
   trickSucceeded = true,
   rotationDegrees = 180,
+  rotationTargetDegrees = 180,
   impactSpeed = 0,
   returnDirectionValid = true,
   failedManeuver = false,
@@ -27,7 +28,10 @@ export function evaluateLanding({
   const cfg = PHASE4_GAMEPLAY_CONFIG.landing;
   const impact = Math.max(0, Number(impactSpeed) || 0);
   const rotationError = attemptedTrick
-    ? Math.abs((Number(rotationDegrees) || 0) - 180)
+    ? Math.abs(
+      Math.abs(Number(rotationDegrees) || 0)
+      - Math.max(0, Math.abs(Number(rotationTargetDegrees) || 0)),
+    )
     : 0;
 
   let quality;
@@ -63,6 +67,7 @@ export function evaluateLanding({
     quality,
     impact,
     rotationError,
+    rotationTargetDegrees,
     scoreMultiplier: result.scoreMultiplier,
     momentumRetention: result.momentumRetention,
   };

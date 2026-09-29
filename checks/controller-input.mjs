@@ -87,6 +87,19 @@ for (const buttonIndex of [0, 1, 2]) {
   assert.equal(input.snapshot().handPlantHeld, false);
 }
 
+for (const buttonIndex of [0, 1, 2, 3]) {
+  input.pollGamepad([makePad({ buttons: { [buttonIndex]: true } })]);
+  assert.equal(
+    input.snapshot().backflipHeld,
+    true,
+    'face button ' + buttonIndex + ' should arm/hold an airborne backflip',
+  );
+  input.pollGamepad([makePad()]);
+  input.consumeActions();
+  input.consumeUIActions();
+  assert.equal(input.snapshot().backflipHeld, false);
+}
+
 input.pollGamepad([makePad({ buttons: { 0: true } })]);
 assert.deepEqual(input.consumeActions(), {
   confirm: true,
