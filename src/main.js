@@ -15,12 +15,19 @@ import { simulationToPresentationState } from './halfpipe/HalfpipeSimulationPres
 import { SkateboardVisual } from './skateboard/SkateboardVisual.js';
 import { ChimpionLoader } from './character/ChimpionLoader.js';
 import { RiderController } from './character/RiderController.js';
+import {
+  RIDER_ROSTER,
+  SKATEBOARD_COLORS,
+  riderById,
+  skateboardColorById,
+} from './config/riderRoster.js';
 import { HalfpipeCamera } from './camera/HalfpipeCamera.js';
 import { HalfpipeHUD } from './ui/HalfpipeHUD.js';
 import { HalfpipePumpInput } from './input/HalfpipePumpInput.js';
 import { HalfpipeSession, formatSessionTime } from './game/HalfpipeSession.js';
 import { HALFPIPE_FLOW_STATE, HalfpipeGameFlow } from './game/HalfpipeGameFlow.js';
 import { ControlsScreen } from './ui/ControlsScreen.js';
+import { HeroSelectScreen } from './ui/HeroSelectScreen.js';
 import { CountdownOverlay } from './ui/CountdownOverlay.js';
 import { PauseMenu } from './ui/PauseMenu.js';
 import { ResultsScreen } from './ui/ResultsScreen.js';
@@ -50,10 +57,14 @@ scene.add(profileDebug.root);
 
 const GRAPHICS_STORAGE_KEY = 'chimpions-halfpipe.graphics-quality';
 const AUDIO_STORAGE_KEY = 'chimpions-halfpipe.master-volume';
+const RIDER_STORAGE_KEY = 'chimpions-halfpipe.rider';
+const BOARD_COLOR_STORAGE_KEY = 'chimpions-halfpipe.board-color';
 const GRAPHICS_NAMES = Object.freeze(Object.keys(GRAPHICS_PRESETS));
 const vfx = new HalfpipeVFX(scene);
 let currentAudioVolume = readStoredNumber(AUDIO_STORAGE_KEY, 0.8);
 let currentGraphicsPreset = restoreGraphicsPreset();
+let selectedHeroId = readStoredString(RIDER_STORAGE_KEY, 'heretic');
+let selectedBoardColorId = readStoredString(BOARD_COLOR_STORAGE_KEY, 'original');
 const audio = new HalfpipeAudio({
   masterVolume: currentAudioVolume,
   onHaptics: playControllerHaptics,
@@ -63,10 +74,6 @@ quality.setPreset(currentGraphicsPreset);
 const titleScreen = createMenuScreen('title-screen', 'CALIFORNIA HALF-PIPE', 'CHIMPIONS HALF-PIPE', [
   ['start', 'START GAME'],
   ['controls', 'CONTROLS'],
-]);
-const characterScreen = createMenuScreen('character-screen', 'SELECT RIDER', 'THE HERETIC', [
-  ['select', 'RIDE AS THE HERETIC'],
-  ['back', 'BACK'],
 ]);
 const graphicsScreen = createMenuScreen('graphics-screen', 'SETTINGS', 'GRAPHICS', [
   ...GRAPHICS_NAMES.map((name) => [name, name.toUpperCase()]),
@@ -81,6 +88,8 @@ const audioScreen = createMenuScreen('audio-screen', 'SETTINGS', 'AUDIO', [
 
 let halfpipe = null;
 let rider = null;
+let skateboardVisual = null;
+let currentHeroId = null;
 let presentationBinder = null;
 let presentationDebug = null;
 let simulation = null;
@@ -135,6 +144,15 @@ function readStoredNumber(key, fallback) {
     if (raw === null || raw === undefined || raw === '') return fallback;
     const value = Number(raw);
     return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readStoredString(key, fallback) {
+  try {
+    const raw = String(globalThis.localStorage?.getItem(key) || '').trim();
+    return raw || fallback;
   } catch {
     return fallback;
   }
@@ -215,6 +233,27 @@ const gameFlow = new HalfpipeGameFlow({
   },
 });
 
+const heroSelectScreen = new HeroSelectScreen(stage, {
+  heroes: RIDER_ROSTER,
+  boardColors: SKATEBOARD_COLORS,
+  selectedHeroId,
+  selectedBoardColorId,
+  onHeroChange(hero) {
+    selectedHeroId = hero?.id || 'heretic';
+    persistSetting(RIDER_STORAGE_KEY, selectedHeroId);
+  },
+  onBoardColorChange(boardColor) {
+    selectedBoardColorId = boardColor?.id || 'original';
+    persistSetting(BOARD_COLOR_STORAGE_KEY, selectedBoardColorId);
+    skateboardVisual?.setDeckColor(boardColor?.color ?? null);
+  },
+  onConfirm() {
+    void beginControlsFromCharacter();
+  },
+  onBack() {
+    gameFlow.transitionTo(HALFPIPE_FLOW_STATE.TITLE);
+  },
+});
 const controlsScreen = new ControlsScreen(stage, { onBack: handleControlsExit });
 const countdown = new CountdownOverlay(stage, {
   onComplete() {
@@ -244,7 +283,7 @@ const resultsScreen = new ResultsScreen(stage, {
 
 function hideAllFlowScreens() {
   titleScreen.hide();
-  characterScreen.hide();
+  heroSelectScreen.hide();
   controlsScreen.hide();
   countdown.hide();
   pauseMenu.hide();
@@ -256,7 +295,7 @@ function hideAllFlowScreens() {
 function syncFlowUI({ state } = gameFlow.snapshot()) {
   hideAllFlowScreens();
   if (state === HALFPIPE_FLOW_STATE.TITLE) titleScreen.show();
-  else if (state === HALFPIPE_FLOW_STATE.CHARACTER_SELECT) characterScreen.show();
+  else if (state === HALFPIPE_FLOW_STATE.CHARACTER_SELECT) heroSelectScreen.show();
   else if (state === HALFPIPE_FLOW_STATE.CONTROLS) controlsScreen.show();
   else if (state === HALFPIPE_FLOW_STATE.PAUSE) pauseMenu.show();
   else if (state === HALFPIPE_FLOW_STATE.RESULTS) resultsScreen.show(buildResultsStats());
@@ -267,10 +306,47 @@ function beginCharacterSelect() {
   gameFlow.transitionTo(HALFPIPE_FLOW_STATE.CHARACTER_SELECT);
 }
 
-function beginControlsFromCharacter() {
+async function applySelectedCustomization() {
+  const hero = heroSelectScreen.selectedHero || riderById(selectedHeroId);
+  const boardColor = heroSelectScreen.selectedBoardColor
+    || skateboardColorById(selectedBoardColorId);
+
+  selectedHeroId = hero.id;
+  selectedBoardColorId = boardColor.id;
+  persistSetting(RIDER_STORAGE_KEY, selectedHeroId);
+  persistSetting(BOARD_COLOR_STORAGE_KEY, selectedBoardColorId);
+  skateboardVisual?.setDeckColor(boardColor.color);
+
+  if (!rider || currentHeroId === hero.id) return true;
+
+  heroSelectScreen.setBusy(true, 'LOADING ' + hero.name.toUpperCase() + '...');
+  const nextChimpion = new ChimpionLoader(hero.modelUrl);
+  try {
+    await nextChimpion.load();
+    rider.replaceChimpion(nextChimpion);
+    currentHeroId = hero.id;
+    unregisterRiderQuality?.();
+    unregisterRiderQuality = quality.registerObject(rider.root);
+    applySimulationState(simulation.snapshot(), {
+      rotateWheels: false,
+      presentationDt: 0,
+    });
+    heroSelectScreen.setBusy(false, '');
+    return true;
+  } catch (error) {
+    nextChimpion.dispose();
+    heroSelectScreen.setBusy(false, 'RIDER LOAD FAILED · TRY ANOTHER CHIMPION');
+    console.error('[Halfpipe] Rider load failed', error);
+    return false;
+  }
+}
+
+async function beginControlsFromCharacter() {
+  if (!await applySelectedCustomization()) return false;
   controlsReturnState = HALFPIPE_FLOW_STATE.COUNTDOWN;
   controlsScreen.backButton.textContent = 'START RUN';
   gameFlow.transitionTo(HALFPIPE_FLOW_STATE.CONTROLS);
+  return true;
 }
 
 function handleControlsExit() {
@@ -616,14 +692,7 @@ function routeControllerUI(actions) {
     return true;
   }
   if (gameFlow.state === HALFPIPE_FLOW_STATE.CHARACTER_SELECT) {
-    if (actions.confirm) {
-      beginControlsFromCharacter();
-      return true;
-    }
-    if (actions.cancel) {
-      gameFlow.transitionTo(HALFPIPE_FLOW_STATE.TITLE);
-      return true;
-    }
+    return heroSelectScreen.handleControllerActions(actions);
   }
   return false;
 }
@@ -777,8 +846,7 @@ function onKeyDown(event) {
     return;
   }
   if (gameFlow.state === HALFPIPE_FLOW_STATE.CHARACTER_SELECT) {
-    if (event.code === 'Enter' || event.code === 'Space') beginControlsFromCharacter();
-    else if (event.code === 'Escape') gameFlow.transitionTo(HALFPIPE_FLOW_STATE.TITLE);
+    heroSelectScreen.handleKeyboardEvent(event);
     return;
   }
   if (gameFlow.state === HALFPIPE_FLOW_STATE.RUN && (event.code === 'KeyP' || event.code === 'Escape')) {
@@ -794,11 +862,6 @@ function wireMenuButtons() {
     controlsScreen.backButton.textContent = 'BACK';
     gameFlow.transitionTo(HALFPIPE_FLOW_STATE.CONTROLS);
   });
-  characterScreen.buttons.get('select').addEventListener('click', beginControlsFromCharacter);
-  characterScreen.buttons.get('back').addEventListener(
-    'click',
-    () => gameFlow.transitionTo(HALFPIPE_FLOW_STATE.TITLE),
-  );
   for (const name of GRAPHICS_NAMES) {
     graphicsScreen.buttons.get(name).addEventListener('click', () => setGraphicsPreset(name));
   }
@@ -837,9 +900,13 @@ async function bootstrap() {
   resize();
   wireMenuButtons();
 
+  const initialHero = riderById(selectedHeroId);
+  const initialBoardColor = skateboardColorById(selectedBoardColorId);
+  selectedHeroId = initialHero.id;
+  selectedBoardColorId = initialBoardColor.id;
   const halfpipeAsset = new HalfpipeVisual(GAME_CONFIG.assets.halfpipe);
   const skateboardAsset = new SkateboardVisual(GAME_CONFIG.assets.skateboard);
-  const chimpionAsset = new ChimpionLoader(GAME_CONFIG.assets.chimpion);
+  const chimpionAsset = new ChimpionLoader(initialHero.modelUrl);
 
   [halfpipe] = await Promise.all([
     halfpipeAsset.load(),
@@ -847,6 +914,18 @@ async function bootstrap() {
     chimpionAsset.load(),
     background.ready,
   ]);
+
+  skateboardVisual = skateboardAsset;
+  skateboardVisual.setDeckColor(initialBoardColor.color);
+  currentHeroId = initialHero.id;
+  heroSelectScreen.selectHero(
+    RIDER_ROSTER.findIndex((hero) => hero.id === initialHero.id),
+    { notify: false },
+  );
+  heroSelectScreen.selectBoardColor(
+    SKATEBOARD_COLORS.findIndex((entry) => entry.id === initialBoardColor.id),
+    { notify: false },
+  );
 
   rider = new RiderController({ skateboard: skateboardAsset, chimpion: chimpionAsset });
   scene.add(halfpipe.root, rider.root);
@@ -950,7 +1029,7 @@ function dispose() {
   pauseMenu.dispose();
   resultsScreen.dispose();
   titleScreen.dispose();
-  characterScreen.dispose();
+  heroSelectScreen.dispose();
   graphicsScreen.dispose();
   audioScreen.dispose();
   vfx.dispose();
