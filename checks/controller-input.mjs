@@ -41,10 +41,17 @@ assert.equal(input.snapshot().gamepadTurnIntent, 1);
 input.pollGamepad([makePad({ stickX: 0.1 })]);
 assert.equal(input.snapshot().gamepadTurnIntent, 0);
 
-input.pollGamepad([makePad({ buttons: { 1: true } })]);
-assert.equal(input.snapshot().handPlantHeld, true);
-input.pollGamepad([makePad()]);
-assert.equal(input.snapshot().handPlantHeld, false);
+for (const buttonIndex of [0, 1, 2]) {
+  input.pollGamepad([makePad({ buttons: { [buttonIndex]: true } })]);
+  assert.equal(
+    input.snapshot().handPlantHeld,
+    true,
+    `button ${buttonIndex} should activate hand plant`,
+  );
+  input.pollGamepad([makePad()]);
+  input.consumeActions();
+  assert.equal(input.snapshot().handPlantHeld, false);
+}
 
 input.pollGamepad([makePad({ buttons: { 0: true } })]);
 assert.deepEqual(input.consumeActions(), {
