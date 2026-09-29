@@ -24,12 +24,22 @@ export function createLighting(scene) {
   fill.position.set(12, 8, -12);
   scene.add(fill);
 
+  // Camera-side soft fill keeps the reflective front U readable. This is not
+  // intended to flatten the wood riding surface; it mainly gives the metal
+  // shell a broad highlight to complement the PMREM reflection environment.
+  const frontFill = new THREE.DirectionalLight(0xe9f4ff, 1.35);
+  frontFill.name = 'halfpipe-metal-front-fill';
+  frontFill.position.set(0, 9, 18);
+  frontFill.target.position.set(0, 4.2, 0);
+  scene.add(frontFill, frontFill.target);
+
   return {
     hemisphere,
     key,
     fill,
+    frontFill,
     dispose() {
-      scene.remove(hemisphere, key, fill);
+      scene.remove(hemisphere, key, fill, frontFill, frontFill.target);
     },
   };
 }
