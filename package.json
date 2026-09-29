@@ -27,7 +27,10 @@
     "check:browser:release": "node checks/browser-release-smoke.mjs",
     "check:release:browser": "node checks/run-npm-suite.mjs check:browser:release check:browser check:visual-contact",
     "check:release": "node checks/run-npm-suite.mjs check:static check:physics check:contact check:session check:controller check:camera check:tricks check:gameplay check:character check:ui check:integration build",
-    "check:security": "npm audit --audit-level=high"
+    "check:security": "npm audit --audit-level=high",
+    "sync:characters": "node tools/sync-chimpion-roster.mjs",
+    "prebuild": "npm run sync:characters",
+    "predev": "npm run sync:characters"
   },
   "dependencies": {
     "three": "0.180.0"
