@@ -80,7 +80,7 @@ export class RiderController {
       0,
     );
     this.trickCarrier.rotation.set(
-      0,
+      this.presentationState.trickPitch,
       this.presentationState.facingYaw,
       this.presentationState.trickRoll,
     );
