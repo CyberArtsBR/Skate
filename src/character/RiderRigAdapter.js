@@ -96,6 +96,7 @@ export class RiderRigAdapter {
     headBalanceZ = 0,
     headLook = 0.42,
     armBalance = 0.62,
+    forearmDrop = 0.11,
   } = {}) {
     this.resetPose();
     const rotation = new THREE.Quaternion();
@@ -128,13 +129,21 @@ export class RiderRigAdapter {
 
     for (const side of ['left', 'right']) {
       const sign = side === 'left' ? -1 : 1;
-      const mirrorSign = sign * facingDirection;
-      const footRoleSign = side === 'left' ? motionDirection : -motionDirection;
-      apply(`${side}Thigh`, -0.28 - compression * 0.12, mirrorSign * 0.035, footRoleSign * 0.09);
+      const footRoleSign = side === 'left' ? stanceDirection : -stanceDirection;
+
+      // Do not mirror the local leg/foot axes for fakie. The whole rider+board
+      // carrier is already yawed 180°, and mirroring these local axes a second
+      // time was pulling the feet away from the deck faster than IK could
+      // recover. IK remains the final authority for foot contact.
+      apply(`${side}Thigh`, -0.28 - compression * 0.12, sign * 0.035, footRoleSign * 0.09);
       apply(`${side}Shin`, kneeFlex, 0, 0);
-      apply(`${side}Foot`, ankleFlex, mirrorSign * 0.025, -footRoleSign * 0.025);
-      apply(`${side}UpperArm`, -0.12, -torsoCounter * 0.18 * facingDirection, mirrorSign * armBalance);
-      apply(`${side}Forearm`, -0.16, 0, mirrorSign * 0.11);
+      apply(`${side}Foot`, ankleFlex, sign * 0.025, -footRoleSign * 0.025);
+
+      // Same principle for arms: keep anatomical local signs stable, while the
+      // carrier yaw mirrors the pose on screen. This prevents fakie from
+      // turning the normal low/balanced arms into two raised arms.
+      apply(`${side}UpperArm`, -0.12, -torsoCounter * 0.18 * facingDirection, sign * armBalance);
+      apply(`${side}Forearm`, -0.16 - forearmDrop, 0, sign * 0.11);
     }
 
     this.model.updateWorldMatrix(true, true);
