@@ -1,5 +1,6 @@
 import './style.css';
 import { GAME_CONFIG } from './config/gameConfig.js';
+import { quality } from './graphics/RenderQualityManager.js';
 import { createScene } from './scene/createScene.js';
 import { createLighting } from './scene/createLighting.js';
 import { createGround } from './scene/createGround.js';
@@ -53,8 +54,7 @@ let pumpInput = null;
 
 function resize() {
   const { width, height } = stage.getBoundingClientRect();
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, GAME_CONFIG.renderer.maxPixelRatio);
-  renderer.setPixelRatio(pixelRatio);
+  renderer.setPixelRatio(quality.resolvePixelRatio(window.devicePixelRatio || 1));
   renderer.setSize(width, height, false);
   cameraController.resize(width, height);
 }
@@ -314,6 +314,7 @@ async function bootstrap() {
     background,
     ground,
     lighting,
+    graphicsQuality: quality,
   };
 }
 

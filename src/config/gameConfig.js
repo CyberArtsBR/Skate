@@ -9,13 +9,13 @@ export const GAME_CONFIG = Object.freeze({
     maxPixelRatio: 2,
     clearColor: 0x000000,
     shadowMapSize: 2048,
-    environmentIntensity: 0.8,
+    environmentIntensity: 0.84,
     copingGlow: Object.freeze({
-      emissiveIntensity: 0.45,
+      emissiveIntensity: 0.34,
       innerExpansion: 0.012,
-      innerOpacity: 0.028,
+      innerOpacity: 0.021,
       outerExpansion: 0.026,
-      outerOpacity: 0.012,
+      outerOpacity: 0.009,
     }),
   }),
   skateboard: Object.freeze({

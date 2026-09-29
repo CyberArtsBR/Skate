@@ -35,6 +35,7 @@ const SLOT_ALIASES = Object.freeze({
 function normalizeName(name = '') {
   return name.toLowerCase().replace(/mixamorig\d*/g, '').replace(/[^a-z0-9]/g, '');
 }
+
 function findBone(bones, aliases) {
   const exact = bones.find((bone) => aliases.includes(normalizeName(bone.name)));
   if (exact) return exact;
@@ -96,8 +97,16 @@ export class RiderRigAdapter {
     headBalanceZ = 0,
     headLook = 0.42,
     armBalance = 0.62,
+    leftArmBalance = armBalance,
+    rightArmBalance = armBalance,
     forearmDrop = 0.11,
+    leftForearmDrop = forearmDrop,
+    rightForearmDrop = forearmDrop,
+    armLag = 0,
+    torsoSettle = 0,
   } = {}) {
+    // Every frame starts from authored rest pose. Procedural animation and IK
+    // therefore cannot accumulate quaternion drift over time.
     this.resetPose();
     const rotation = new THREE.Quaternion();
     const euler = new THREE.Euler();
@@ -111,16 +120,16 @@ export class RiderRigAdapter {
     const stanceDirection = stance === 'goofy' ? -1 : 1;
     const facingDirection = facingSign < 0 ? -1 : 1;
     const motionDirection = stanceDirection * facingDirection;
-    apply('hips', -hipFlex, 0, 0);
+    apply('hips', -hipFlex, 0, torsoSettle * 0.18);
     apply(
       'spine',
-      -0.055 * compression,
+      -0.055 * compression + torsoSettle * 0.28,
       -torsoCounter * 0.35 * motionDirection,
       torsoBalanceZ * 0.36,
     );
     apply(
       'chest',
-      -0.025 * compression,
+      -0.025 * compression + torsoSettle * 0.42,
       -torsoCounter * 0.65 * motionDirection,
       torsoBalanceZ * 0.64,
     );
@@ -130,20 +139,24 @@ export class RiderRigAdapter {
     for (const side of ['left', 'right']) {
       const sign = side === 'left' ? -1 : 1;
       const footRoleSign = side === 'left' ? stanceDirection : -stanceDirection;
+      const sideArmBalance = side === 'left' ? leftArmBalance : rightArmBalance;
+      const sideForearmDrop = side === 'left' ? leftForearmDrop : rightForearmDrop;
 
-      // Do not mirror the local leg/foot axes for fakie. The whole rider+board
-      // carrier is already yawed 180°, and mirroring these local axes a second
-      // time was pulling the feet away from the deck faster than IK could
-      // recover. IK remains the final authority for foot contact.
+      // Do not mirror local leg/foot axes for fakie. The presentation carrier
+      // already owns the 180 yaw and IK remains final authority for deck contact.
       apply(`${side}Thigh`, -0.28 - compression * 0.12, sign * 0.035, footRoleSign * 0.09);
       apply(`${side}Shin`, kneeFlex, 0, 0);
       apply(`${side}Foot`, ankleFlex, sign * 0.025, -footRoleSign * 0.025);
 
-      // Same principle for arms: keep anatomical local signs stable, while the
-      // carrier yaw mirrors the pose on screen. This prevents fakie from
-      // turning the normal low/balanced arms into two raised arms.
-      apply(`${side}UpperArm`, -0.12, -torsoCounter * 0.18 * facingDirection, sign * armBalance);
-      apply(`${side}Forearm`, -0.16 - forearmDrop, 0, sign * 0.11);
+      // Arm lag is deliberately small: it creates follow-through without
+      // normal skating ever reading as ragdoll motion.
+      apply(
+        `${side}UpperArm`,
+        -0.12,
+        -torsoCounter * 0.18 * facingDirection + armLag * sign,
+        sign * sideArmBalance,
+      );
+      apply(`${side}Forearm`, -0.16 - sideForearmDrop, 0, sign * 0.11);
     }
 
     this.model.updateWorldMatrix(true, true);

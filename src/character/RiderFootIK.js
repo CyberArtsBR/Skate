@@ -37,6 +37,10 @@ function localFootPosition(root, foot) {
   return root.worldToLocal(foot.getWorldPosition(new THREE.Vector3()));
 }
 
+function finiteVector(vector) {
+  return Number.isFinite(vector.x) && Number.isFinite(vector.y) && Number.isFinite(vector.z);
+}
+
 export class RiderFootIK {
   constructor({ rigAdapter, riderRoot, skateboard, chimpionRoot, stance = 'regular' }) {
     this.rigAdapter = rigAdapter;
@@ -48,6 +52,7 @@ export class RiderFootIK {
     this.targets = {};
     this.result = {
       enabled: this.enabled,
+      weight: 0,
       leftError: 0,
       rightError: 0,
       maxError: 0,
@@ -96,6 +101,7 @@ export class RiderFootIK {
     const shin = this.rigAdapter.rig[`${side}Shin`];
     const foot = this.rigAdapter.rig[`${side}Foot`];
     const target = this.targets[side].getWorldPosition(new THREE.Vector3());
+    if (!finiteVector(target)) return 0;
 
     for (let iteration = 0; iteration < 5; iteration += 1) {
       rotateJointToward(shin, foot, target, weight, 0.11);
@@ -104,20 +110,37 @@ export class RiderFootIK {
       this.riderRoot.updateWorldMatrix(true, true);
     }
 
-    return foot.getWorldPosition(new THREE.Vector3()).distanceTo(target);
+    const error = foot.getWorldPosition(new THREE.Vector3()).distanceTo(target);
+    return Number.isFinite(error) ? error : 0;
   }
 
-  update({ airborne = false, facingYaw = 0 } = {}) {
+  update(state = {}) {
     if (!this.enabled) return this.result;
 
-    const backAmount = (1 - Math.cos(Number(facingYaw) || 0)) * 0.5;
+    const facingYaw = Number(state.facingYaw) || 0;
+    const backAmount = (1 - Math.cos(facingYaw)) * 0.5;
     const targetDrop = GAME_CONFIG.rider.fakieFootTargetDrop * backAmount;
     for (const target of Object.values(this.targets)) {
       target.position.y = target.userData.baseY - targetDrop;
     }
 
     this.riderRoot.updateWorldMatrix(true, true);
-    const weight = airborne ? 0.72 : 1;
+    const requestedWeight = Number(state.footIKWeight);
+    const weight = THREE.MathUtils.clamp(
+      Number.isFinite(requestedWeight)
+        ? requestedWeight
+        : state.airborne ? 0.3 : 1,
+      0,
+      1,
+    );
+    this.result.weight = weight;
+    if (weight <= 0.001) {
+      this.result.leftError = 0;
+      this.result.rightError = 0;
+      this.result.maxError = 0;
+      return this.result;
+    }
+
     this.result.leftError = this.solveLeg('left', weight);
     this.result.rightError = this.solveLeg('right', weight);
     this.result.maxError = Math.max(this.result.leftError, this.result.rightError);

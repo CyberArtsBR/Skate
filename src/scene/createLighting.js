@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GAME_CONFIG } from '../config/gameConfig.js';
+import { quality } from '../graphics/RenderQualityManager.js';
 
 export function createLighting(scene) {
   const hemisphere = new THREE.HemisphereLight(0xdaf5ff, 0x6b5140, 1.7);
@@ -9,7 +9,6 @@ export function createLighting(scene) {
   key.name = 'california-key-light';
   key.position.set(-10, 20, 14);
   key.castShadow = true;
-  key.shadow.mapSize.setScalar(GAME_CONFIG.renderer.shadowMapSize);
   key.shadow.camera.left = -20;
   key.shadow.camera.right = 20;
   key.shadow.camera.top = 18;
@@ -19,6 +18,7 @@ export function createLighting(scene) {
   key.shadow.bias = -0.00025;
   key.shadow.radius = 3;
   scene.add(key);
+  const unregisterShadow = quality.registerShadowLight(key);
 
   const fill = new THREE.DirectionalLight(0x8ec8e8, 0.95);
   fill.position.set(12, 8, -12);
@@ -29,7 +29,9 @@ export function createLighting(scene) {
     key,
     fill,
     dispose() {
+      unregisterShadow();
       scene.remove(hemisphere, key, fill);
+      key.shadow.map?.dispose?.();
     },
   };
 }

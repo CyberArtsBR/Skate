@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
+import { quality } from '../graphics/RenderQualityManager.js';
 
 const COPING_MATERIAL_NAME = 'Rail_Metal';
 
@@ -183,6 +184,7 @@ export class HalfpipeVisual {
     this.ridingSurfaceBounds = new THREE.Box3();
     this.alignment = null;
     this._surfaceRaycaster = new THREE.Raycaster();
+    this._unregisterQuality = null;
   }
 
   async load() {
@@ -207,6 +209,7 @@ export class HalfpipeVisual {
         );
 
         if (hasCopingMaterial) {
+          object.userData.copingContactZone = true;
           const preparedMaterials = sourceMaterials.map((material) => {
             if (material?.name !== COPING_MATERIAL_NAME) return material;
 
@@ -255,6 +258,8 @@ export class HalfpipeVisual {
     if (!this.ridingSurface) {
       throw new Error('Halfpipe riding surface could not be identified for visual alignment.');
     }
+    this.ridingSurface.userData.halfpipeSurfaceRole = 'riding-surface';
+    this.ridingSurface.userData.wearZoneCandidate = true;
 
     const ridingBoxBeforeAlignment = worldBounds(this.ridingSurface);
     const ridingBoundsCenterBefore = ridingBoxBeforeAlignment.getCenter(new THREE.Vector3());
@@ -298,6 +303,9 @@ export class HalfpipeVisual {
     this.root.userData.ridingSurfaceName = this.ridingSurface.name;
     this.root.userData.ridingSurfaceCenterX = alignedRidingBoundsCenter.x;
     this.root.userData.alignmentSource = this.alignment.source;
+    this.root.userData.graphicsQualityManaged = true;
+    this._unregisterQuality?.();
+    this._unregisterQuality = quality.registerObject(this.model);
     return this;
   }
 
@@ -324,6 +332,8 @@ export class HalfpipeVisual {
   }
 
   dispose() {
+    this._unregisterQuality?.();
+    this._unregisterQuality = null;
     disposeObject3D(this.model);
     this.root.removeFromParent();
   }

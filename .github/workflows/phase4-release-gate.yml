@@ -1,0 +1,76 @@
+name: Phase 4 Release Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - 'test/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Core release gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:release
+
+  browser:
+    name: Browser and visual contact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/halfpipe-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/halfpipe-preview.log
+          exit 1
+      - name: Run production browser smoke
+        env:
+          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
+        run: npm run check:browser:release
+      - name: Run deep browser smoke
+        if: always()
+        env:
+          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
+        run: npm run check:browser
+      - name: Run visual contact regression
+        if: always()
+        env:
+          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
+        run: npm run check:visual-contact
+
+  security:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:security
