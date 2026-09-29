@@ -37,8 +37,8 @@ export class SkatePoseController {
       ankleFlex: -0.08 - compression * 0.07,
       torsoCounter: 0.12 + speed * 0.05 - landing * 0.04,
       torsoBalanceZ: -surfaceAngle * 0.56,
-      headBalanceZ: -surfaceAngle * 0.12,
-      headLook: 0.42 + speed * 0.08,
+      headBalanceZ: -surfaceAngle * 0.045,
+      headLook: 0.18 + speed * 0.03,
       armBalance: 0.58 + air * 0.08 + landing * 0.06,
       airborne: Boolean(state.airborne),
     });
