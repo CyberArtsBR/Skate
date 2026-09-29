@@ -604,9 +604,10 @@ function routeControllerUI(actions) {
 
 function render(timestamp = 0) {
   if (disposed) return;
-  const frameDelta = lastFrameTime === null
+  const presentationDelta = lastFrameTime === null
     ? 0
-    : Math.max(0, Math.min(0.1, (timestamp - lastFrameTime) / 1000));
+    : Math.max(0, (timestamp - lastFrameTime) / 1000);
+  const frameDelta = Math.min(0.1, presentationDelta);
   lastFrameTime = timestamp;
 
   if (simulation && pumpInput) {
@@ -621,7 +622,7 @@ function render(timestamp = 0) {
       else if (gameFlow.state === HALFPIPE_FLOW_STATE.PAUSE) resumeRun();
     }
     if (gameplayActions.reset && gameFlow.state === HALFPIPE_FLOW_STATE.RUN) pauseRun();
-    if (gameFlow.state === HALFPIPE_FLOW_STATE.COUNTDOWN) countdown.step(frameDelta);
+    if (gameFlow.state === HALFPIPE_FLOW_STATE.COUNTDOWN) countdown.step(presentationDelta);
 
     const isRunning = (
       simulationRunning

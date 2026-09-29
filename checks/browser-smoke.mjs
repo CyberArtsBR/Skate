@@ -375,8 +375,11 @@ assert.deepEqual(state.skateboardCoordinateSystem, {
   forwardAxis: '+X',
   lateralAxis: '+Z',
   upAxis: '+Y',
+  axleAxis: '+Z',
   noseDirection: '+X',
   tailDirection: '-X',
+  leftSide: '+Z',
+  rightSide: '-Z',
   regularFrontFoot: 'left',
   regularRearFoot: 'right',
 });
