@@ -26,11 +26,12 @@
     "check:static": "node --check src/main.js && node checks/foundation-invariants.mjs && node checks/phase4-contracts.mjs && node checks/release-contracts.mjs && node checks/phase4-integration.mjs",
     "check:browser:release": "node checks/browser-release-smoke.mjs",
     "check:release:browser": "node checks/run-npm-suite.mjs check:browser:release check:browser check:visual-contact",
-    "check:release": "node checks/run-npm-suite.mjs check:static check:physics check:contact check:session check:controller check:camera check:tricks check:gameplay check:character check:ui check:integration build",
+    "check:release": "node checks/run-npm-suite.mjs check:static check:physics check:contact check:session check:controller check:camera check:tricks check:gameplay check:rigs check:character check:ui check:integration build",
     "check:security": "npm audit --audit-level=high",
     "prebuild": "npm run verify:characters",
     "predev": "npm run verify:characters",
-    "verify:characters": "node tools/verify-chimpion-roster.mjs"
+    "verify:characters": "node tools/verify-chimpion-roster.mjs",
+    "check:rigs": "node checks/rig-compatibility.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
