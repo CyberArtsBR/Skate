@@ -1,7 +1,7 @@
 export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   launch: Object.freeze({
     thresholdSpeed: 1.2,
-    visiblePopVelocity: 5.0,
+    visiblePopVelocity: 8.5,
     speedForMaximumVelocity: 22,
     maximumVerticalVelocity: 27,
   }),
