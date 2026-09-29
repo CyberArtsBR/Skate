@@ -258,7 +258,7 @@ const backFacingPoseProbe = await page.evaluate(() => {
   const rig = foundation.rider.chimpion.rigAdapter.rig;
   const world = (bone) => {
     if (!bone) return null;
-    const point = new THREE.Vector3();
+    const point = bone.position.clone();
     bone.getWorldPosition(point);
     return point.toArray();
   };
