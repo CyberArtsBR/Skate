@@ -49,9 +49,20 @@ const dropInProbe = await page.evaluate(() => {
   foundation.physics.setRunning(false);
   const state = foundation.simulation.reset();
   foundation.physics.applyCurrentState();
+  foundation.rider.root.updateWorldMatrix(true, true);
+  const wheelWorld = foundation.rider.skateboard.contactPoints.map((point) => {
+    const world = foundation.rider.skateboard.root.localToWorld(point.clone());
+    return world.toArray();
+  });
+  const lipY = foundation.profile.sample(foundation.profile.leftLip).y;
+  const topWheelY = Math.max(...wheelWorld.map((point) => point[1]));
   return {
     pipeX: state.pipeX,
     leftLip: foundation.profile.leftLip,
+    lipY,
+    topWheelY,
+    topWheelGap: lipY - topWheelY,
+    wheelWorld,
     dropInRoll: foundation.rider.presentationState.dropInRoll,
     carrierRoll: foundation.rider.trickCarrier.rotation.z,
   };
@@ -363,6 +374,10 @@ assert.ok(
 assert.ok(
   dropInProbe.dropInRoll > 0.12 && dropInProbe.carrierRoll > 0.12,
   `drop-in manual nose lift is not visible: ${JSON.stringify(dropInProbe)}`,
+);
+assert.ok(
+  Math.abs(dropInProbe.topWheelGap) < 0.16,
+  `drop-in upper wheel should begin at the coping/white bar, gap=${dropInProbe.topWheelGap}: ${JSON.stringify(dropInProbe)}`,
 );
 assert.equal(trickPresentationProbe.kick.trick, 'kick-turn');
 assert.equal(trickPresentationProbe.kick.visualActive, true);
