@@ -86,8 +86,28 @@ assertFullscreenLayout(initial, '1600x900');
 
 await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'character-select');
+await page.waitForFunction(() => document.querySelectorAll('.hero-card').length === 10);
+assert.equal(await page.locator('.hero-card').count(), 10);
+assert.equal(await page.locator('.board-swatch').count(), 9);
+
+// Default selection is The Heretic. Move right to The Commodore and move the
+// board one swatch away from Original, then verify the actual runtime assets.
+await page.keyboard.press('ArrowRight');
+await page.keyboard.press('ArrowUp');
 await page.keyboard.press('Enter');
-await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls');
+await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls', null, { timeout: 15000 });
+const customization = await page.evaluate(() => ({
+  riderId: window.__HALFPIPE_FOUNDATION__.customization.riderId,
+  selectedRiderId: window.__HALFPIPE_FOUNDATION__.customization.selectedRiderId,
+  boardColorId: window.__HALFPIPE_FOUNDATION__.customization.boardColorId,
+  sourceUrl: window.__HALFPIPE_FOUNDATION__.rider.chimpion.root.userData.sourceUrl,
+  deckColor: window.__HALFPIPE_FOUNDATION__.rider.skateboard.root.userData.deckColor,
+}));
+assert.equal(customization.riderId, 'commodore');
+assert.equal(customization.selectedRiderId, 'commodore');
+assert.equal(customization.boardColorId, 'red');
+assert.match(customization.sourceUrl, /Commodore/i);
+assert.equal(customization.deckColor, 0xc91f37);
 await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'countdown');
 const startPrompt = await page.locator('.countdown-label').textContent();
@@ -193,6 +213,7 @@ console.log(JSON.stringify({
   initial,
   runningStart,
   runningLater,
+  customization,
   reset,
   webglResilience,
   consoleErrors,
