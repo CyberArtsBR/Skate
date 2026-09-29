@@ -30,6 +30,7 @@ export const DEFAULT_RIDER_PRESENTATION_STATE = Object.freeze({
   facingYaw: 0,
   turnDirection: 1,
   trickRoll: 0,
+  trickPitch: 0,
   trickOffsetX: 0,
   trickOffsetY: 0,
   trickVisualActive: false,
@@ -70,6 +71,7 @@ export function createRiderPresentationState(overrides = {}) {
   state.facingYaw = Number(state.facingYaw) || 0;
   state.turnDirection = Math.sign(Number(state.turnDirection) || 1) || 1;
   state.trickRoll = Number(state.trickRoll) || 0;
+  state.trickPitch = Number(state.trickPitch) || 0;
   state.trickOffsetX = Number(state.trickOffsetX) || 0;
   state.trickOffsetY = Number(state.trickOffsetY) || 0;
   state.trickVisualActive = Boolean(state.trickVisualActive);
