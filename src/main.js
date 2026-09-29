@@ -221,6 +221,7 @@ const countdown = new CountdownOverlay(stage, {
   onComplete() {
     session.completeCountdown();
     simulationRunning = true;
+    audio.setPaused(false);
     lastFrameTime = null;
     gameFlow.transitionTo(HALFPIPE_FLOW_STATE.RUN);
     hud.setStatus('', 'running');
@@ -296,6 +297,7 @@ function startCountdown() {
   countdown.start();
   hud.setStatus('GET READY', 'ready');
   audio.resetSessionAudioState();
+  audio.setPaused(true);
   return true;
 }
 
@@ -304,6 +306,7 @@ function pauseRun() {
   session.pause();
   simulationRunning = false;
   pumpInput?.clearHeldState();
+  audio.setPaused(true);
   gameFlow.transitionTo(HALFPIPE_FLOW_STATE.PAUSE);
   hud.setStatus('PAUSED', 'paused');
   return true;
@@ -313,6 +316,7 @@ function resumeRun() {
   if (gameFlow.state !== HALFPIPE_FLOW_STATE.PAUSE) return false;
   session.resume();
   simulationRunning = true;
+  audio.setPaused(false);
   lastFrameTime = null;
   gameFlow.transitionTo(HALFPIPE_FLOW_STATE.RUN);
   hud.setStatus('', 'running');
@@ -531,6 +535,7 @@ function resetSimulation({ keepFlow = false } = {}) {
   hud.clearFeedback();
   updatePlayerHUD(state);
   audio.resetSessionAudioState();
+  audio.setPaused(true);
   integrationStats.longestCombo = 0;
   if (!keepFlow) gameFlow.transitionTo(HALFPIPE_FLOW_STATE.TITLE);
   return state;
@@ -541,6 +546,8 @@ function finishSession(state) {
   simulation.setPumpIntent(0);
   simulation.setTurnIntent(0);
   simulation.setHandPlantHeld(false);
+  simulation.setBackflipHeld(false);
+  audio.setPaused(true);
   if (session.phase !== 'finished') session.finish();
   updatePlayerHUD(state);
   audio.handleEvent({ type: 'SESSION_FINISHED', score: state.score || 0 });
@@ -553,11 +560,13 @@ function setSimulationRunning(nextRunning) {
     if (session.phase === 'paused') session.resume();
     else if (session.phase === 'ready' || session.phase === 'countdown') session.start();
     simulationRunning = true;
+    audio.setPaused(false);
     gameFlow.state = HALFPIPE_FLOW_STATE.RUN;
     syncFlowUI({ state: HALFPIPE_FLOW_STATE.RUN });
   } else {
     if (session.phase === 'running') session.pause();
     simulationRunning = false;
+    audio.setPaused(true);
   }
   lastFrameTime = null;
   return simulationRunning;
@@ -635,6 +644,7 @@ function render(timestamp = 0) {
     simulation.setPumpIntent(isRunning ? pumpIntent : 0);
     simulation.setTurnIntent(isRunning ? turnIntent : 0);
     simulation.setHandPlantHeld(isRunning && Boolean(pumpInput.handPlantHeld));
+    simulation.setBackflipHeld(isRunning && Boolean(pumpInput.backflipHeld));
 
     if (isRunning) {
       const result = simulation.advance(frameDelta);
