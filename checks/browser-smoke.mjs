@@ -237,6 +237,45 @@ const airTransition = await page.evaluate(() => {
   return { launch, landing };
 });
 
+const backFacingPoseProbe = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  const simulation = foundation.simulation;
+  const profile = foundation.profile;
+  const wallX = (side, fraction) => side * (
+    profile.flatHalfWidth + profile.transitionWidth * fraction
+  );
+
+  simulation.reset({
+    pipeX: wallX(1, 0.58),
+    tangentVelocity: 8,
+  });
+  simulation.state.facingTurns = 1;
+  simulation.setPumpIntent(0);
+  simulation.setTurnIntent(0);
+  simulation.setHandPlantHeld(false);
+  foundation.physics.applyCurrentState();
+
+  const rig = foundation.rider.chimpion.rigAdapter.rig;
+  const world = (bone) => {
+    if (!bone) return null;
+    const point = new THREE.Vector3();
+    bone.getWorldPosition(point);
+    return point.toArray();
+  };
+
+  return {
+    facingYaw: foundation.rider.presentationState.facingYaw,
+    ascending: foundation.rider.presentationState.ascending,
+    footIK: { ...foundation.rider.footIK.result },
+    leftHand: world(rig.leftHand),
+    rightHand: world(rig.rightHand),
+    leftKnee: world(rig.leftShin),
+    rightKnee: world(rig.rightShin),
+    leftFoot: world(rig.leftFoot),
+    rightFoot: world(rig.rightFoot),
+  };
+});
+
 const trickPresentationProbe = await page.evaluate(() => {
   const foundation = window.__HALFPIPE_FOUNDATION__;
   const simulation = foundation.simulation;
@@ -367,6 +406,16 @@ for (const station of stationStates) {
 assert.ok(stationStates[2].boardAngle < 0, 'left transition must slope down toward center');
 assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away from center');
 assert.equal(profileDebugVisible, true);
+assert.equal(backFacingPoseProbe.ascending, true);
+assert.ok(
+  Math.cos(backFacingPoseProbe.facingYaw) < 0,
+  `back-facing probe should really be fakie: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
+  backFacingPoseProbe.footIK.enabled
+    && backFacingPoseProbe.footIK.maxError < 0.2,
+  `back-facing feet must stay planted on skateboard: ${JSON.stringify(backFacingPoseProbe)}`,
+);
 assert.ok(
   dropInProbe.pipeX > 0
     && Math.abs(dropInProbe.pipeX - dropInProbe.rightLip) < 0.12,
@@ -425,4 +474,5 @@ console.log(JSON.stringify({
   airTransition,
   trickPresentationProbe,
   dropInProbe,
+  backFacingPoseProbe,
 }, null, 2));
