@@ -123,7 +123,7 @@ export const GAME_CONFIG = Object.freeze({
     takeoffInset: 0.02,
     launchMinimumSpeed: 1.2,
     minimumVerticalVelocity: 10,
-    maximumVerticalVelocity: 38,
+    maximumVerticalVelocity: 27,
     gravity: 50,
     launchVelocityScale: 1.18,
     landingVelocityRetention: 0.94,
