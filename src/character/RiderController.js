@@ -18,7 +18,8 @@ export class RiderController {
     this.root.add(this.trickCarrier);
     this.trickCarrier.add(skateboard.root, chimpion.root);
 
-    chimpion.root.position.y = skateboard.deckSurfaceY + GAME_CONFIG.rider.deckClearance;
+    this.baseChimpionY = skateboard.deckSurfaceY + GAME_CONFIG.rider.deckClearance;
+    chimpion.root.position.y = this.baseChimpionY;
     chimpion.root.position.z = 0.015;
 
     this.poseController = new SkatePoseController({ stance: GAME_CONFIG.rider.stance });
@@ -53,6 +54,12 @@ export class RiderController {
       this.presentationState.facingYaw,
       this.presentationState.trickRoll + this.presentationState.dropInRoll,
     );
+
+    const backAmount = (
+      1 - Math.cos(this.presentationState.facingYaw)
+    ) * 0.5;
+    this.chimpion.root.position.y = this.baseChimpionY
+      - GAME_CONFIG.rider.fakieBodyDrop * backAmount;
 
     const pose = this.poseController.evaluate(this.presentationState);
     this.chimpion.updatePose(pose);
