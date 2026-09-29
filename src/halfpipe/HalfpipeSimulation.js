@@ -774,13 +774,7 @@ export class HalfpipeSimulation {
       Math.min(this.profile.rightLip - this.lipInset, takeoffX),
     );
     const takeoff = this._sampleIncreasingX(anchorX);
-    const verticalVelocity = Math.min(
-      this.airMaximumVerticalVelocity,
-      Math.max(
-        this.airMinimumVerticalVelocity,
-        Math.abs(launchSpeed) * this.airLaunchVelocityScale,
-      ),
-    );
+    const verticalVelocity = this.computeLaunchVelocity(launchSpeed);
 
     this.state.mode = 'airborne';
     this.state.pipeX = anchorX;
@@ -789,26 +783,231 @@ export class HalfpipeSimulation {
     this.state.airSide = side;
     this.state.airAnchorX = anchorX;
     this.state.airBaseY = takeoff.y;
+    this.state.currentAirBaseY = takeoff.y;
     this.state.airY = takeoff.y;
     this.state.airVerticalVelocity = verticalVelocity;
     this.state.airLaunches += 1;
-    this.state.maxAirY = this.state.maxAirY === null
+    this.state.currentAirPeakY = takeoff.y;
+    this.state.runMaxAirY = this.state.runMaxAirY === null
       ? takeoff.y
-      : Math.max(this.state.maxAirY, takeoff.y);
+      : Math.max(this.state.runMaxAirY, takeoff.y);
+    this.state.maxAirY = this.state.runMaxAirY;
     this.state.lastAirPeakY = takeoff.y;
     this.state.airTurnHold = 0;
     this.state.airTurnDirection = 0;
     this.state.airTurnElapsed = 0;
     this.state.airTurnActive = false;
-    this.state.airTurnFrozenY = null;
-    this.state.airTurnStoredVerticalVelocity = 0;
+    this.state.airTurnAttempted = false;
     this.state.airTurnCompleted = false;
     this.state.airTurnOverturned = false;
+    this.state.airTurnFailedReason = null;
+    this.state.airRotationDegrees = 0;
     this.state.trickType = null;
     this.state.trickProgress = 0;
     this.state.pumpActive = false;
     this.state.lastPumpWork = 0;
+    this._emit('COPING_HIT', {
+      side,
+      speed: Math.abs(launchSpeed),
+      maneuver: 'takeoff',
+    });
+    this._emit('TAKEOFF', {
+      side,
+      incomingSpeed: Math.abs(launchSpeed),
+      verticalVelocity,
+      baseY: takeoff.y,
+    });
     return takeoff;
+  }
+
+  _startAirTurn(expectedTurn) {
+    this.state.airTurnActive = true;
+    this.state.airTurnAttempted = true;
+    this.state.airTurnDirection = 1;
+    this.state.airTurnElapsed = 0;
+    this.state.airTurnHold = 0;
+    this.state.airTurnCompleted = false;
+    this.state.airTurnOverturned = false;
+    this.state.airTurnFailedReason = null;
+    this.state.airRotationDegrees = 0;
+    this.state.trickType = 'aerial-turn';
+    this.state.trickProgress = 0;
+    this.state.tricksAttempted += 1;
+    this._emit('TRICK_STARTED', {
+      trick: 'aerial-turn',
+      side: this.state.airSide,
+      input: expectedTurn,
+    });
+  }
+
+  _finishAirTurnFromInput() {
+    if (!this.state.airTurnAttempted || this.state.airTurnFailedReason) return;
+
+    const rotation = this.state.airRotationDegrees;
+    const cfg = PHASE4_GAMEPLAY_CONFIG.aerial;
+    this.state.airTurnActive = false;
+
+    if (rotation < cfg.validMinDegrees) {
+      this.state.airTurnFailedReason = 'UNDER_ROTATED';
+      this._failTrick('aerial-turn', 'UNDER_ROTATED');
+    } else if (rotation > cfg.validMaxDegrees) {
+      this.state.airTurnOverturned = true;
+      this.state.airTurnFailedReason = 'OVER_ROTATED';
+      this._failTrick('aerial-turn', 'OVER_ROTATED');
+    } else {
+      this.state.airTurnCompleted = true;
+    }
+  }
+
+  _updateAirTurn(trickSideAllowed, expectedTurn) {
+    const dt = this.fixedDt;
+    const cfg = PHASE4_GAMEPLAY_CONFIG.aerial;
+
+    if (
+      !this.state.airTurnAttempted
+      && trickSideAllowed
+      && this.turnIntent === expectedTurn
+    ) {
+      this._startAirTurn(expectedTurn);
+    }
+
+    if (!this.state.airTurnAttempted || this.state.airTurnFailedReason) {
+      return;
+    }
+
+    this.state.airTurnElapsed += dt;
+    const stillHolding = trickSideAllowed && this.turnIntent === expectedTurn;
+
+    if (stillHolding) {
+      this.state.airTurnActive = true;
+      this.state.airTurnHold += dt;
+      this.state.airRotationDegrees += cfg.rotationDegreesPerSecond * dt;
+      this.state.trickType = 'aerial-turn';
+      this.state.trickProgress = Math.min(
+        1,
+        this.state.airRotationDegrees / 180,
+      );
+
+      if (this.state.airRotationDegrees > cfg.overturnDegrees) {
+        this.state.airTurnOverturned = true;
+        this.state.airTurnActive = false;
+        this.state.airTurnFailedReason = 'OVER_ROTATED';
+        this._failTrick('aerial-turn', 'OVER_ROTATED');
+      }
+      return;
+    }
+
+    if (this.state.airTurnActive) {
+      this._finishAirTurnFromInput();
+    }
+  }
+
+  _resolveLanding(side, baseY, impactVelocity) {
+    if (this.state.airTurnActive && !this.state.airTurnFailedReason) {
+      this._finishAirTurnFromInput();
+    }
+
+    const attemptedTrick = this.state.airTurnAttempted;
+    const failedManeuver = Boolean(this.state.airTurnFailedReason);
+    const trickSucceeded = !attemptedTrick || this.state.airTurnCompleted;
+    const landing = evaluateLanding({
+      attemptedTrick,
+      trickSucceeded,
+      rotationDegrees: this.state.airRotationDegrees,
+      impactSpeed: Math.abs(impactVelocity),
+      returnDirectionValid: true,
+      failedManeuver,
+    });
+
+    this.state.landingActive = true;
+    this.state.landingQuality = landing.quality;
+    this.state.landingImpact = landing.impact;
+    this.state.landingScoreMultiplier = landing.scoreMultiplier;
+    this.state.landingMomentumRetention = landing.momentumRetention;
+    this.state.landingTime = this.state.time;
+    this.state.landingRemaining = PHASE4_GAMEPLAY_CONFIG.landing.activeSeconds;
+    this.state.lastLandingQuality = landing.quality;
+
+    if (landing.quality === LANDING_QUALITIES.PERFECT) {
+      this.state.perfectLandings += 1;
+    } else if (landing.quality === LANDING_QUALITIES.CLEAN) {
+      this.state.cleanLandings += 1;
+    }
+
+    const currentAirHeight = Math.max(
+      0,
+      (this.state.currentAirPeakY ?? baseY)
+        - (this.state.currentAirBaseY ?? baseY),
+    );
+
+    if (attemptedTrick && trickSucceeded && landing.quality !== LANDING_QUALITIES.BAIL) {
+      const heightQuality = clamp01((currentAirHeight - 0.2) / 3.8);
+      const rotationQuality = rotationQualityFromDegrees(this.state.airRotationDegrees);
+      const holdQuality = clamp01(
+        this.state.airTurnHold / Math.max(this.aerialIdealHoldSeconds, 1e-4),
+      );
+      const landingQuality = clamp01(landing.scoreMultiplier / 1.2);
+      const totalQuality = clamp01(
+        heightQuality * 0.35
+        + rotationQuality * 0.35
+        + holdQuality * 0.15
+        + landingQuality * 0.15,
+      );
+      this.state.facingTurns += 1;
+      this.state.tricksLanded += 1;
+      this._awardValidatedTrick(
+        'aerial-turn',
+        totalQuality,
+        landing.scoreMultiplier,
+        side,
+      );
+    }
+
+    this._emit('LANDING', {
+      quality: landing.quality,
+      impact: landing.impact,
+      scoreMultiplier: landing.scoreMultiplier,
+      momentumRetention: landing.momentumRetention,
+      currentAirHeight,
+      rotationDegrees: this.state.airRotationDegrees,
+    });
+
+    if (landing.quality === LANDING_QUALITIES.BAIL) {
+      const reason = this.state.airTurnFailedReason || 'BAD_LANDING';
+      this._startCrash(reason);
+    }
+
+    const baseLandingSpeed =
+      Math.abs(impactVelocity) * this.airLandingVelocityRetention;
+    const retention = landing.quality === LANDING_QUALITIES.BAIL
+      ? PHASE4_GAMEPLAY_CONFIG.crash.bailMomentumRetention
+      : landing.momentumRetention;
+    const landingSpeed = baseLandingSpeed * retention;
+
+    this.state.mode = 'contact';
+    this.state.pipeX = this.state.airAnchorX ?? this.state.pipeX;
+    this.state.tangentVelocity = side < 0 ? landingSpeed : -landingSpeed;
+    this.state.airSide = 0;
+    this.state.airAnchorX = null;
+    this.state.airBaseY = null;
+    this.state.currentAirBaseY = null;
+    this.state.airY = null;
+    this.state.airVerticalVelocity = 0;
+    this.state.airTurnHold = 0;
+    this.state.airTurnDirection = 0;
+    this.state.airTurnElapsed = 0;
+    this.state.airTurnActive = false;
+    this.state.airTurnAttempted = false;
+    this.state.airTurnCompleted = false;
+    this.state.airTurnOverturned = false;
+    this.state.airTurnFailedReason = null;
+    this.state.airRotationDegrees = 0;
+    this.state.trickType = null;
+    this.state.trickProgress = 0;
+    this._lastDirection = signWithEpsilon(
+      this.state.tangentVelocity,
+      this.velocityEpsilon,
+    );
   }
 
   _stepAirborne() {
@@ -830,80 +1029,7 @@ export class HalfpipeSimulation {
     this.state.pumpActive = false;
     this.state.lastPumpWork = 0;
 
-    if (
-      !this.state.airTurnActive
-      && !this.state.airTurnCompleted
-      && trickSideAllowed
-      && this.turnIntent === expectedTurn
-    ) {
-      this.state.airTurnActive = true;
-      this.state.airTurnDirection = 1;
-      this.state.airTurnElapsed = 0;
-      this.state.airTurnHold = 0;
-      this.state.airTurnFrozenY = this.state.airY ?? baseY;
-      this.state.airTurnStoredVerticalVelocity = this.state.airVerticalVelocity;
-      this.state.trickType = 'aerial-turn';
-      this.state.trickProgress = 0;
-    }
-
-    if (this.state.airTurnActive) {
-      this.state.time += dt;
-      this.state.airTurnElapsed += dt;
-      if (trickSideAllowed && this.turnIntent === expectedTurn) {
-        this.state.airTurnHold += dt;
-      }
-
-      const duration = Math.max(
-        this.fixedDt,
-        this.trickPresentation.aerialTurnDuration,
-      );
-      this.state.trickType = 'aerial-turn';
-      this.state.trickProgress = Math.min(
-        1,
-        this.state.airTurnElapsed / duration,
-      );
-      this.state.airY = this.state.airTurnFrozenY ?? this.state.airY ?? baseY;
-      this.state.airVerticalVelocity = 0;
-      this.state.tangentialAcceleration = 0;
-
-      if (this.state.airTurnHold >= this.aerialCompleteSeconds) {
-        this.state.airTurnCompleted = true;
-      }
-      if (this.state.airTurnHold > this.aerialOverturnSeconds) {
-        this.state.airTurnOverturned = true;
-      }
-
-      if (this.state.airTurnElapsed >= duration) {
-        const storedVerticalVelocity =
-          this.state.airTurnStoredVerticalVelocity;
-        this.state.airTurnActive = false;
-
-        // Bullet-time turn consumes the remaining upward phase. If the trick
-        // started before the natural apex, the held trick height becomes the
-        // new apex; gravity resumes downward from here instead of restoring
-        // positive velocity and creating a second, bugged height gain.
-        this.state.airVerticalVelocity = Math.min(
-          0,
-          storedVerticalVelocity,
-        );
-        if (storedVerticalVelocity > 0) {
-          this.state.lastAirPeakY = this.state.airY;
-          this.state.maxAirY = this.state.maxAirY === null
-            ? this.state.airY
-            : Math.max(this.state.maxAirY, this.state.airY);
-        }
-
-        this.state.airTurnFrozenY = null;
-        this.state.airTurnStoredVerticalVelocity = 0;
-        this.state.trickProgress = 1;
-        if (!this.state.airTurnCompleted) {
-          this.state.airTurnCompleted = true;
-        }
-      }
-
-      this._refreshDerivedState();
-      return this.snapshot();
-    }
+    this._updateAirTurn(trickSideAllowed, expectedTurn);
 
     const previousVerticalVelocity = this.state.airVerticalVelocity;
     const verticalVelocity = previousVerticalVelocity - this.airGravity * dt;
@@ -914,66 +1040,34 @@ export class HalfpipeSimulation {
     this.state.airVerticalVelocity = verticalVelocity;
     this.state.tangentialAcceleration = -this.airGravity;
 
-    if (previousVerticalVelocity > 0 && verticalVelocity <= 0) {
-      this.state.lastAirPeakY = nextY;
-    }
-
-    this.state.maxAirY = this.state.maxAirY === null
+    this.state.currentAirPeakY = this.state.currentAirPeakY === null
       ? nextY
-      : Math.max(this.state.maxAirY, nextY);
+      : Math.max(this.state.currentAirPeakY, nextY);
+    this.state.runMaxAirY = this.state.runMaxAirY === null
+      ? nextY
+      : Math.max(this.state.runMaxAirY, nextY);
+    this.state.maxAirY = this.state.runMaxAirY;
+    this.state.highestAir = Math.max(
+      this.state.highestAir,
+      (this.state.currentAirPeakY ?? baseY) - (this.state.currentAirBaseY ?? baseY),
+    );
+
+    if (previousVerticalVelocity > 0 && verticalVelocity <= 0) {
+      this.state.lastAirPeakY = this.state.currentAirPeakY;
+      this._emit('AIR_APEX', {
+        peakY: this.state.currentAirPeakY,
+        height: Math.max(
+          0,
+          (this.state.currentAirPeakY ?? baseY)
+            - (this.state.currentAirBaseY ?? baseY),
+        ),
+      });
+    }
 
     if (nextY <= baseY && verticalVelocity < 0) {
       nextY = baseY;
-      const landingSpeed = Math.abs(verticalVelocity) * this.airLandingVelocityRetention;
-
-      if (this.state.airTurnCompleted && !this.state.airTurnOverturned) {
-        const airHeight = Math.max(
-          0,
-          (this.state.maxAirY ?? baseY) - baseY,
-        );
-        const heightQuality = Math.max(
-          0,
-          Math.min(1, (airHeight - 0.5) / 3.5),
-        );
-        const holdQuality = Math.max(
-          0,
-          Math.min(
-            1,
-            this.state.airTurnHold / Math.max(this.aerialIdealHoldSeconds, 1e-4),
-          ),
-        );
-        this._recordTrick(
-          'aerial-turn',
-          heightQuality * 0.6 + holdQuality * 0.4,
-          1,
-        );
-      } else if (this.state.airTurnOverturned) {
-        this.state.lastTrick = 'aerial-turn-overrotated';
-        this.state.lastTrickTime = this.state.time;
-      }
-
-      this.state.mode = 'contact';
-      this.state.pipeX = anchorX;
-      this.state.tangentVelocity = side < 0 ? landingSpeed : -landingSpeed;
-      this.state.airSide = 0;
-      this.state.airAnchorX = null;
-      this.state.airBaseY = null;
-      this.state.airY = null;
-      this.state.airVerticalVelocity = 0;
-      this.state.airTurnHold = 0;
-      this.state.airTurnDirection = 0;
-      this.state.airTurnElapsed = 0;
-      this.state.airTurnActive = false;
-      this.state.airTurnFrozenY = null;
-      this.state.airTurnStoredVerticalVelocity = 0;
-      this.state.airTurnCompleted = false;
-      this.state.airTurnOverturned = false;
-      this.state.trickType = null;
-      this.state.trickProgress = 0;
-      this._lastDirection = signWithEpsilon(
-        this.state.tangentVelocity,
-        this.velocityEpsilon,
-      );
+      this.state.airY = nextY;
+      this._resolveLanding(side, baseY, verticalVelocity);
     } else {
       this.state.airY = nextY;
     }
