@@ -65,6 +65,8 @@ const dropInProbe = await page.evaluate(() => {
     wheelWorld,
     dropInRoll: foundation.rider.presentationState.dropInRoll,
     carrierRoll: foundation.rider.trickCarrier.rotation.z,
+    boardRoll: foundation.rider.boardPivot.rotation.z,
+    visualMinSeparation: foundation.presentationBinder.lastContact?.visualMinSeparation ?? null,
   };
 });
 
@@ -465,12 +467,14 @@ assert.ok(
   `drop-in should start at the top of the RIGHT wall: ${JSON.stringify(dropInProbe)}`,
 );
 assert.ok(
-  dropInProbe.dropInRoll > 0.12 && dropInProbe.carrierRoll > 0.12,
-  `drop-in manual nose lift is not visible: ${JSON.stringify(dropInProbe)}`,
+  dropInProbe.dropInRoll > 0.12 && dropInProbe.boardRoll > 0.12,
+  `drop-in rear-truck nose lift is not visible: ${JSON.stringify(dropInProbe)}`,
 );
 assert.ok(
-  Math.abs(dropInProbe.topWheelGap) < 0.05,
-  `drop-in upper wheel should begin at the coping/white bar, gap=${dropInProbe.topWheelGap}: ${JSON.stringify(dropInProbe)}`,
+  Number.isFinite(dropInProbe.visualMinSeparation)
+    && dropInProbe.visualMinSeparation >= -0.01
+    && dropInProbe.visualMinSeparation <= 0.06,
+  `drop-in support points must stay visually seated on the authored riding surface: ${JSON.stringify(dropInProbe)}`,
 );
 assert.equal(trickPresentationProbe.kick.trick, 'kick-turn');
 assert.equal(trickPresentationProbe.kick.visualActive, true);

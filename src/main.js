@@ -639,8 +639,8 @@ function render(timestamp = 0) {
     if (isRunning) {
       const result = simulation.advance(frameDelta);
       const presentationDt = result.steps * simulation.fixedDt;
+      session.step(presentationDelta);
       if (result.steps > 0) {
-        session.step(presentationDt);
         session.setScore(result.state.score || 0);
         const presentationState = applySimulationState(result.state, { presentationDt });
         const gameplayEvents = simulation.drainEvents();
@@ -653,7 +653,6 @@ function render(timestamp = 0) {
           airborne: Boolean(presentationState?.airborne),
         });
         audio.update({ ...result.state, sessionRemaining: session.remaining }, presentationDt);
-        if (session.phase === 'finished') finishSession(result.state);
       } else {
         const gameplayEvents = simulation.drainEvents();
         routeGameplayEvents(gameplayEvents, result.state, lastPresentationState);
@@ -664,6 +663,7 @@ function render(timestamp = 0) {
           airborne: Boolean(lastPresentationState?.airborne),
         });
       }
+      if (session.phase === 'finished') finishSession(result.state);
     } else {
       const idleState = simulation.snapshot();
       const gameplayEvents = simulation.drainEvents();

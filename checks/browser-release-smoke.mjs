@@ -112,7 +112,11 @@ try {
 }
 
 const runningStart = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot());
-await page.waitForTimeout(350);
+await page.waitForFunction(
+  (remaining) => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining < remaining,
+  runningStart.remaining,
+  { timeout: 2500 },
+);
 const runningLater = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot());
 assert.ok(runningLater.remaining < runningStart.remaining, 'session timer must progress after countdown');
 
@@ -128,7 +132,11 @@ await page.waitForFunction(
   () => window.__HALFPIPE_FOUNDATION__.session.phase === 'running'
     && window.__HALFPIPE_FOUNDATION__.flow.state === 'run',
 );
-await page.waitForTimeout(250);
+await page.waitForFunction(
+  (remaining) => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining < remaining,
+  pausedLater,
+  { timeout: 2500 },
+);
 const resumed = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining);
 assert.ok(resumed < pausedLater, 'timer must resume without immediately re-pausing');
 
