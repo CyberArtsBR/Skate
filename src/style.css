@@ -435,6 +435,22 @@ button:focus-visible {
   font-size: clamp(70px, 10vw, 150px);
 }
 
+.countdown-overlay.is-prompt {
+  background: rgb(2 11 18 / 24%);
+}
+
+.countdown-overlay.is-prompt .countdown-label {
+  width: min(92vw, 980px);
+  color: #fff;
+  font-size: clamp(28px, 4.4vw, 68px);
+  font-style: italic;
+  line-height: 1.06;
+  letter-spacing: 0.055em;
+  text-align: center;
+  text-wrap: balance;
+  animation: none;
+}
+
 #loading-state {
   position: absolute;
   z-index: 8;

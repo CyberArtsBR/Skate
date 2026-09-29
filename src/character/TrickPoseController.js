@@ -43,13 +43,17 @@ export class TrickPoseController {
       output.bodyY = 0.04 * envelope;
       output.bodyX = -(Number(state.wallSide) || 1) * 0.035 * envelope;
     } else if (state.airborne && state.trickType === 'backflip') {
-      // Pull the rider tightly over the deck while the presentation carrier
-      // performs the authoritative pitch rotation.
+      // Backside-invert presentation: body leads into a compact upside-down
+      // tuck while the deck trails slightly. The main 360/720 is performed by
+      // the camera-plane trick carrier; these offsets stop rider + board from
+      // looking like one rigid spinning object.
       const tuck = Math.max(0.72, clamp01(state.airTuck));
-      output.boardRoll += (this.stance === 'goofy' ? -1 : 1) * 0.025 * tuck;
-      output.bodyY = -0.12 * tuck;
-      output.bodyX = -0.035 * tuck;
-      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.35;
+      const side = Math.sign(Number(state.wallSide) || 0) || 1;
+      output.boardRoll += side * -0.11 * envelope;
+      output.bodyRoll = side * 0.18 * envelope;
+      output.bodyY = -0.17 * tuck * (0.65 + 0.35 * envelope);
+      output.bodyX = -side * 0.075 * envelope;
+      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.22;
     } else if (state.airborne) {
       output.boardRoll += (this.stance === 'goofy' ? -1 : 1)
         * 0.035

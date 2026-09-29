@@ -159,8 +159,18 @@ export function simulationToPresentationState(profile, simulationState) {
     const flipDegrees = Math.max(0, Number(simulationState.backflipRotationDegrees) || 0);
     const flipRadians = THREE.MathUtils.degToRad(flipDegrees);
     const segment = (flipDegrees % 360) / 360;
-    trickPitch = -flipRadians;
-    trickRoll = -currentSide * 0.05 * Math.sin(Math.PI * segment);
+    const invertEnvelope = Math.sin(Math.PI * segment);
+
+    // Reference-video match: the requested move is visually a BACKSIDE INVERT.
+    // Rotate in the camera plane (Z / visible roll) instead of pitching the
+    // entire rider rigidly through depth. Mirror it by wall so both sides read
+    // as the same backside inversion, then bias the presentation-only carrier
+    // slightly toward the pipe center at maximum inversion.
+    const invertDirection = -currentSide;
+    trickRoll = invertDirection * flipRadians;
+    trickPitch = invertDirection * 0.08 * invertEnvelope;
+    trickOffsetX = -currentSide * 0.22 * invertEnvelope;
+    trickOffsetY = -0.07 * invertEnvelope;
     trickProgress = segment;
     trickVisualActive = flipDegrees > 0;
     trickType = 'backflip';

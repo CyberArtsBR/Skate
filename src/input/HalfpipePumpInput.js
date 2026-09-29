@@ -105,6 +105,7 @@ export class HalfpipePumpInput {
       primary: false,
       start: false,
     };
+    this._previousAnyGamepadButton = false;
     this._previousUiButtons = {
       up: false,
       down: false,
@@ -125,6 +126,7 @@ export class HalfpipePumpInput {
       left: false,
       right: false,
       pause: false,
+      anyButton: false,
     };
 
     this._onKeyDown = (event) => {
@@ -301,6 +303,7 @@ export class HalfpipePumpInput {
     if (previousIndex !== null && previousIndex !== this.activeGamepadIndex) {
       this._previousGamepadButtons.primary = false;
       this._previousGamepadButtons.start = false;
+      this._previousAnyGamepadButton = false;
       for (const key of Object.keys(this._previousUiButtons)) {
         this._previousUiButtons[key] = false;
       }
@@ -341,6 +344,15 @@ export class HalfpipePumpInput {
       || buttonPressed(activePad, GAMEPAD_BUTTON.tertiary)
       || buttonPressed(activePad, GAMEPAD_BUTTON.quaternary)
     );
+
+    const anyGamepadButton = RELEVANT_BUTTONS.some(
+      (index) => buttonPressed(activePad, index),
+    );
+    if (anyGamepadButton && !this._previousAnyGamepadButton) {
+      this._queuedUiActions.anyButton = true;
+    }
+    this._previousAnyGamepadButton = anyGamepadButton;
+
     this.handPlantHeld = this.keyboardHandPlantHeld || this.gamepadHandPlantHeld;
     this.backflipHeld = this.keyboardBackflipHeld || this.gamepadBackflipHeld;
 
@@ -439,6 +451,7 @@ export class HalfpipePumpInput {
     this._clearQueuedActions();
     this._previousGamepadButtons.primary = false;
     this._previousGamepadButtons.start = false;
+    this._previousAnyGamepadButton = false;
     for (const key of Object.keys(this._previousUiButtons)) {
       this._previousUiButtons[key] = false;
     }
@@ -459,6 +472,7 @@ export class HalfpipePumpInput {
     this.backflipHeld = this.keyboardBackflipHeld;
     this._previousGamepadButtons.primary = false;
     this._previousGamepadButtons.start = false;
+    this._previousAnyGamepadButton = false;
     for (const key of Object.keys(this._previousUiButtons)) {
       this._previousUiButtons[key] = false;
     }

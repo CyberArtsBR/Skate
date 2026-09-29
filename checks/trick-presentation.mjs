@@ -45,6 +45,12 @@ function launchFromSide(profile, side, facingTurns = 0) {
 
 const profile = new HalfpipeProfile();
 
+assert.equal(
+  GAME_CONFIG.gameplay.motionTimeScale,
+  0.5,
+  'production gameplay motion must run at exactly half real-time speed',
+);
+
 // Drop-in contract: RIGHT side, facing the camera, with a short manual-like lift.
 const drop = new HalfpipeSimulation(profile);
 const dropStart = drop.snapshot();
@@ -290,6 +296,36 @@ assert.ok(
   aerial.snapshot().airRotationDegrees >= 176
     && aerial.snapshot().airRotationDegrees <= 188,
   `clean aerial rotation should resolve near 180 degrees: ${aerial.snapshot().airRotationDegrees}`,
+);
+
+// Requested backflip presentation follows the uploaded BACKSIDE INVERT
+// reference: a visible camera-plane inversion, not a rigid pitch through depth.
+const backsideInvert = launchFromSide(profile, -1, 0);
+backsideInvert.setBackflipHeld(true);
+const halfInvertSteps = Math.round(0.36 / backsideInvert.fixedDt);
+for (let index = 0; index < halfInvertSteps; index += 1) backsideInvert.stepFixed();
+const backsideInvertState = backsideInvert.snapshot();
+const backsideInvertPresentation = simulationToPresentationState(
+  profile,
+  backsideInvertState,
+);
+assert.equal(backsideInvertState.backflipActive, true);
+assert.ok(
+  backsideInvertState.backflipRotationDegrees > 170
+    && backsideInvertState.backflipRotationDegrees < 190,
+  `backside invert midpoint should be near 180 degrees: ${backsideInvertState.backflipRotationDegrees}`,
+);
+assert.ok(
+  Math.abs(backsideInvertPresentation.trickRoll) > 2.8,
+  `backside invert must rotate strongly in the visible camera plane: ${backsideInvertPresentation.trickRoll}`,
+);
+assert.ok(
+  Math.abs(backsideInvertPresentation.trickPitch) < 0.12,
+  `backside invert must not use the old rigid depth-axis pitch: ${backsideInvertPresentation.trickPitch}`,
+);
+assert.ok(
+  backsideInvertPresentation.trickOffsetX > 0.15,
+  `LEFT-wall backside invert should arc toward pipe center: ${backsideInvertPresentation.trickOffsetX}`,
 );
 
 // BACK-facing aerial: RIGHT side + LEFT input.
