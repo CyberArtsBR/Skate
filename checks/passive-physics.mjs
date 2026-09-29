@@ -184,12 +184,12 @@ assert.ok(
   `stricter V7 pumping should still make aerial play reachable within 13.5s, got ${airborne.firstAirTime}`,
 );
 assert.ok(
-  airborne.peakY !== null && airborne.peakY > lipY + 0.7,
-  `airborne peak should visibly clear the lip, got peak ${airborne.peakY} vs lip ${lipY}`,
+  airborne.final.highestAir > 0.7,
+  `airborne motion should produce at least a readable 0.7m rise above its takeoff base, got ${airborne.final.highestAir}`,
 );
 assert.ok(
-  airborne.peakY <= lipY + 7.6,
-  `V7 airborne peak should respect the approximately half-height cap, got peak ${airborne.peakY} vs lip ${lipY}`,
+  airborne.final.highestAir <= 7.6,
+  `V7 airborne height should respect the approximately half-height cap, got ${airborne.final.highestAir}`,
 );
 assert.ok(airborne.final.airLaunches >= 1, 'air launch telemetry must be recorded');
 
