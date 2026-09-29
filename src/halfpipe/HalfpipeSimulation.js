@@ -1342,7 +1342,20 @@ export class HalfpipeSimulation {
     const previousVelocity = this.state.tangentVelocity;
     const sample = this._sampleIncreasingX(previousX);
     const desiredIntent = this._pumpPhase(previousX, previousVelocity);
-    const effectivePumpIntent = this.state.crashActive ? 0 : this.pumpIntent;
+
+    const crashCfg = PHASE4_GAMEPLAY_CONFIG.crash;
+    const recoveryElapsed = this.state.crashActive
+      ? Math.max(0, crashCfg.recoverySeconds - this.state.recoveryRemaining)
+      : crashCfg.recoverySeconds;
+    const recoveryPumpUnlocked = (
+      !this.state.crashActive
+      || recoveryElapsed >= crashCfg.pumpLockSeconds
+    );
+
+    // Keep the immediate impact readable, then return pump authority while the
+    // bail animation is still resolving. Turning/tricks stay locked until the
+    // normal crash recovery completes.
+    const effectivePumpIntent = recoveryPumpUnlocked ? this.pumpIntent : 0;
     const effectiveTurnIntent = this.state.crashActive ? 0 : this.turnIntent;
 
     const gravityAlongTangent = -this.gravity * sample.tangent.y;
@@ -1360,7 +1373,10 @@ export class HalfpipeSimulation {
     const pumpInfluence = desiredIntent === 1
       ? 1 - upperFactor * (1 - this.pumpUpperWallRetention)
       : 1;
-    const speedEligible = Math.abs(previousVelocity) >= this.pumpMinimumSpeed;
+    const recoveryMinimumSpeed = this.state.crashActive && recoveryPumpUnlocked
+      ? crashCfg.recoveryPumpMinimumSpeed
+      : this.pumpMinimumSpeed;
+    const speedEligible = Math.abs(previousVelocity) >= recoveryMinimumSpeed;
 
     const pumpRating = evaluatePumpRating({
       intent: effectivePumpIntent,
@@ -1377,9 +1393,25 @@ export class HalfpipeSimulation {
     );
     if (shouldRecordPumpAttempt) this._updatePumpStats(pumpRating);
 
-    const ratingMultiplier = pumpRating
+    let ratingMultiplier = pumpRating
       ? PHASE4_GAMEPLAY_CONFIG.pumping.ratingMultipliers[pumpRating]
       : 0;
+
+    const recoveryPumpActive = this.state.crashActive && recoveryPumpUnlocked;
+    if (
+      recoveryPumpActive
+      && pumpRating
+      && pumpRating !== PUMP_RATINGS.WRONG
+      && ratingMultiplier > 0
+    ) {
+      // During bail recovery even an early/late but correctly directed pump
+      // should help the rider rebuild speed instead of feeling trapped.
+      ratingMultiplier = Math.max(
+        ratingMultiplier,
+        crashCfg.recoveryMinimumPumpMultiplier,
+      );
+    }
+
     const velocityDirection =
       signWithEpsilon(previousVelocity, this.velocityEpsilon) || 1;
     let pumpAcceleration = 0;
@@ -1388,12 +1420,21 @@ export class HalfpipeSimulation {
       && pumpRating !== PUMP_RATINGS.WRONG
       && ratingMultiplier > 0
     ) {
+      const recoveryAccelerationMultiplier = recoveryPumpActive
+        ? crashCfg.recoveryPumpAccelerationMultiplier
+        : 1;
       pumpAcceleration = this.pumpAcceleration
+        * recoveryAccelerationMultiplier
         * pumpInfluence
         * ratingMultiplier
         * velocityDirection;
     } else if (pumpRating === PUMP_RATINGS.WRONG) {
-      pumpAcceleration = -this.wrongPumpPenaltyAcceleration * velocityDirection;
+      const wrongPenaltyMultiplier = recoveryPumpActive
+        ? crashCfg.recoveryWrongPumpPenaltyMultiplier
+        : 1;
+      pumpAcceleration = -this.wrongPumpPenaltyAcceleration
+        * wrongPenaltyMultiplier
+        * velocityDirection;
     }
 
     const acceleration = scaledGravity + dragAcceleration + pumpAcceleration;
