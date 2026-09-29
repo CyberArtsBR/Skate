@@ -18,15 +18,28 @@ const ALLOWED = Object.freeze({
   results: new Set(['countdown', 'character-select', 'title']),
 });
 
+const DEFAULT_SETTINGS = Object.freeze({
+  reducedCameraMotion: false,
+  highContrastHud: false,
+  uiScale: 1,
+  controllerVibration: true,
+  audioVolume: 1,
+});
+
 export class HalfpipeGameFlow {
   constructor({
     initialState = HALFPIPE_FLOW_STATE.TITLE,
     callbacks = {},
+    settings = {},
   } = {}) {
     this.state = initialState;
     this.previousState = null;
     this.callbacks = { ...callbacks };
     this.listeners = new Set();
+    this.settings = sanitizeSettings({
+      ...DEFAULT_SETTINGS,
+      ...settings,
+    });
   }
 
   setCallbacks(callbacks = {}) {
@@ -61,6 +74,50 @@ export class HalfpipeGameFlow {
     return true;
   }
 
+  setSettings(patch = {}) {
+    const previous = { ...this.settings };
+    this.settings = sanitizeSettings({
+      ...this.settings,
+      ...patch,
+    });
+
+    const payload = {
+      previous,
+      settings: { ...this.settings },
+      changed: Object.keys(this.settings).filter(
+        (key) => this.settings[key] !== previous[key],
+      ),
+    };
+
+    if (payload.changed.length) {
+      this.callbacks.onSettingsChange?.(payload);
+      if (payload.changed.includes('reducedCameraMotion')) {
+        this.callbacks.onReducedCameraMotionChange?.(
+          this.settings.reducedCameraMotion,
+        );
+      }
+      if (payload.changed.includes('controllerVibration')) {
+        this.callbacks.onControllerVibrationChange?.(
+          this.settings.controllerVibration,
+        );
+      }
+      if (payload.changed.includes('audioVolume')) {
+        this.callbacks.onAudioVolumeChange?.(this.settings.audioVolume);
+      }
+      if (
+        payload.changed.includes('highContrastHud')
+        || payload.changed.includes('uiScale')
+      ) {
+        this.callbacks.onHudAccessibilityChange?.({
+          highContrast: this.settings.highContrastHud,
+          uiScale: this.settings.uiScale,
+        });
+      }
+    }
+
+    return { ...this.settings };
+  }
+
   subscribe(listener) {
     if (typeof listener !== 'function') return () => {};
     this.listeners.add(listener);
@@ -71,6 +128,7 @@ export class HalfpipeGameFlow {
     return {
       state: this.state,
       previousState: this.previousState,
+      settings: { ...this.settings },
     };
   }
 }
@@ -81,4 +139,14 @@ function stateCallbackName(state) {
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join('');
   return 'on' + suffix;
+}
+
+function sanitizeSettings(settings) {
+  return {
+    reducedCameraMotion: Boolean(settings.reducedCameraMotion),
+    highContrastHud: Boolean(settings.highContrastHud),
+    uiScale: Math.max(0.85, Math.min(1.5, Number(settings.uiScale) || 1)),
+    controllerVibration: settings.controllerVibration !== false,
+    audioVolume: Math.max(0, Math.min(1, Number(settings.audioVolume) || 0)),
+  };
 }
