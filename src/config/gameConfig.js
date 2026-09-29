@@ -88,6 +88,16 @@ export const GAME_CONFIG = Object.freeze({
   scoring: Object.freeze({
     kickTurn: Object.freeze({ min: 100, max: 300 }),
     handPlant: Object.freeze({ min: 400, max: 700 }),
+    // Rotation tiers reward the additional airtime/risk instead of treating
+    // every landed aerial as the legacy 180-point band.
+    aerial180: Object.freeze({ min: 400, max: 700 }),
+    aerial360: Object.freeze({ min: 750, max: 1150 }),
+    aerial540: Object.freeze({ min: 1250, max: 1800 }),
+    aerial720: Object.freeze({ min: 1900, max: 2700 }),
+    aerial900: Object.freeze({ min: 2800, max: 4000 }),
+    backflip: Object.freeze({ min: 1600, max: 2400 }),
+    doubleBackflip: Object.freeze({ min: 3200, max: 5000 }),
+    // Compatibility fallback for older replay/state labels.
     aerialTurn: Object.freeze({ min: 400, max: 999 }),
   }),
   trickPresentation: Object.freeze({
