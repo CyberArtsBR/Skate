@@ -42,7 +42,8 @@ const atThreshold = launch.computeLaunchVelocity(1.2);
 const justAbove = launch.computeLaunchVelocity(1.21);
 assert.ok(atThreshold > 0 && atThreshold < 2);
 assert.ok(justAbove - atThreshold < 0.05);
-assert.ok(launch.computeLaunchVelocity(18) <= 19.5 + 1e-9);
+assert.ok(launch.computeLaunchVelocity(18) > 28);
+assert.ok(launch.computeLaunchVelocity(18) <= 38 + 1e-9);
 
 launch._enterAir(-1, -12, profile.leftLip + launch.airTakeoffInset);
 launch.state.currentAirPeakY += 2;
