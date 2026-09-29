@@ -82,7 +82,7 @@ export class HalfpipeSimulation {
   }
 
   reset(initialState = {}) {
-    const defaultStartX = -(
+    const defaultStartX = (
       this.profile.flatHalfWidth
       + this.profile.transitionWidth * this.startTransitionFraction
     );
@@ -225,7 +225,22 @@ export class HalfpipeSimulation {
     return this.state.pumpDesiredIntent || 0;
   }
 
-  _recordTrick(type, quality = 1, turnDirection = 0) {
+  _isFacingBack() {
+    return Math.abs(Math.trunc(this.state.facingTurns)) % 2 === 1;
+  }
+
+  _allowedTrickSide() {
+    // Front-facing rider may only trick on LEFT. After a completed 180° turn
+    // the rider is back-facing and may only trick on RIGHT.
+    return this._isFacingBack() ? 1 : -1;
+  }
+
+  _expectedTurnIntentForAllowedSide() {
+    // Front + left wall => RIGHT input. Back + right wall => LEFT input.
+    return this._isFacingBack() ? -1 : 1;
+  }
+
+  _recordTrick(type, quality = 1, turnDirection = -1) {
     const clampedQuality = Math.max(0, Math.min(1, quality));
     const range = type === 'kick-turn'
       ? this.scoring.kickTurn
@@ -240,13 +255,11 @@ export class HalfpipeSimulation {
     this.state.trickProgress = clampedQuality;
     this.state.trickCount += 1;
     this.state.score += points;
-    const normalizedTurnDirection = signWithEpsilon(
-      turnDirection,
-      this.velocityEpsilon,
-    );
-    if (normalizedTurnDirection !== 0) {
-      this.state.facingTurns += normalizedTurnDirection;
-    }
+    // All 180° maneuver animations rotate counterclockwise from the camera's
+    // point of view. Input direction only determines whether the maneuver is
+    // legal; it does not choose the visual spin direction.
+    const normalizedTurnDirection = -1;
+    this.state.facingTurns -= 1;
     this.state.lastTrick = type;
     this.state.lastTrickTime = this.state.time;
     this.state.lastTrickPoints = points;
@@ -328,22 +341,25 @@ export class HalfpipeSimulation {
       return { velocity, turned: false, frozen: false };
     }
 
+    const side = previousX < 0 ? -1 : previousX > 0 ? 1 : 0;
+    const allowedSide = this._allowedTrickSide();
+    if (side === 0 || side !== allowedSide) {
+      return { velocity, turned: false, frozen: false };
+    }
+
     const sample = this._sampleIncreasingX(previousX);
     const predictedX = previousX
       + velocity * sample.tangent.x * this.fixedDt;
     const wallFraction = this._wallFraction(previousX);
     const predictedWallFraction = this._wallFraction(predictedX);
-    const expectedTurn = previousX < 0 ? 1 : previousX > 0 ? -1 : 0;
+    const expectedTurnIntent = this._expectedTurnIntentForAllowedSide();
 
-    // Hand Plant is a coping-only action. If B/Circle is already held while
-    // ascending, catch the frame that crosses the tiny valid lip zone and pin
-    // the rider exactly to that anchor instead of allowing an early/lower plant.
+    // Hand Plant is coping-only and is legal only on the facing-dependent side.
+    // Front-facing: LEFT wall. Back-facing: RIGHT wall.
     if (
       this.handPlantHeld
-      && expectedTurn !== 0
       && Math.max(wallFraction, predictedWallFraction) >= this.handPlantMinFraction
     ) {
-      const side = previousX < 0 ? -1 : 1;
       const handPlantAnchor = side * (
         this.profile.flatHalfWidth
         + this.profile.transitionWidth * this.handPlantMinFraction
@@ -354,7 +370,7 @@ export class HalfpipeSimulation {
       return this._startSurfaceTrick(
         'hand-plant',
         quality,
-        expectedTurn,
+        -1,
         velocity,
         this.trickPresentation.handPlantDuration,
         this.handPlantRetention,
@@ -363,8 +379,7 @@ export class HalfpipeSimulation {
     }
 
     if (
-      this.turnIntent === expectedTurn
-      && expectedTurn !== 0
+      this.turnIntent === expectedTurnIntent
       && wallFraction >= this.kickTurnMinFraction
     ) {
       const quality = (wallFraction - this.kickTurnMinFraction)
@@ -372,7 +387,7 @@ export class HalfpipeSimulation {
       return this._startSurfaceTrick(
         'kick-turn',
         quality,
-        expectedTurn,
+        -1,
         velocity,
         this.trickPresentation.kickTurnDuration,
         this.kickTurnRetention,
@@ -430,7 +445,9 @@ export class HalfpipeSimulation {
     const side = this.state.airSide || (this.state.pipeX < 0 ? -1 : 1);
     const anchorX = this.state.airAnchorX ?? this.state.pipeX;
     const baseY = this.state.airBaseY ?? this._sampleIncreasingX(anchorX).y;
-    const expectedTurn = side < 0 ? 1 : -1;
+    const allowedSide = this._allowedTrickSide();
+    const expectedTurn = this._expectedTurnIntentForAllowedSide();
+    const trickSideAllowed = side === allowedSide;
 
     this.state.turnIntent = this.turnIntent;
     this.state.handPlantHeld = this.handPlantHeld;
@@ -444,10 +461,11 @@ export class HalfpipeSimulation {
     if (
       !this.state.airTurnActive
       && !this.state.airTurnCompleted
+      && trickSideAllowed
       && this.turnIntent === expectedTurn
     ) {
       this.state.airTurnActive = true;
-      this.state.airTurnDirection = expectedTurn;
+      this.state.airTurnDirection = -1;
       this.state.airTurnElapsed = 0;
       this.state.airTurnHold = 0;
       this.state.airTurnFrozenY = this.state.airY ?? baseY;
@@ -459,7 +477,9 @@ export class HalfpipeSimulation {
     if (this.state.airTurnActive) {
       this.state.time += dt;
       this.state.airTurnElapsed += dt;
-      if (this.turnIntent === expectedTurn) this.state.airTurnHold += dt;
+      if (trickSideAllowed && this.turnIntent === expectedTurn) {
+        this.state.airTurnHold += dt;
+      }
 
       const duration = Math.max(
         this.fixedDt,
@@ -553,7 +573,7 @@ export class HalfpipeSimulation {
         this._recordTrick(
           'aerial-turn',
           heightQuality * 0.6 + holdQuality * 0.4,
-          this.state.airTurnDirection || expectedTurn,
+          -1,
         );
       } else if (this.state.airTurnOverturned) {
         this.state.lastTrick = 'aerial-turn-overrotated';
