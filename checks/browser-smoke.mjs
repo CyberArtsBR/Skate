@@ -368,8 +368,9 @@ assert.ok(stationStates[2].boardAngle < 0, 'left transition must slope down towa
 assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away from center');
 assert.equal(profileDebugVisible, true);
 assert.ok(
-  Math.abs(dropInProbe.pipeX - dropInProbe.leftLip) < 0.12,
-  `drop-in should start at the top of the left wall: ${JSON.stringify(dropInProbe)}`,
+  dropInProbe.pipeX > 0
+    && Math.abs(dropInProbe.pipeX - dropInProbe.rightLip) < 0.12,
+  `drop-in should start at the top of the RIGHT wall: ${JSON.stringify(dropInProbe)}`,
 );
 assert.ok(
   dropInProbe.dropInRoll > 0.12 && dropInProbe.carrierRoll > 0.12,
