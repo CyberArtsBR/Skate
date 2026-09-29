@@ -36,7 +36,7 @@ export const HERETIC_REFERENCE_MODEL_ROTATIONS = Object.freeze({
 });
 
 const SLOT_ALIASES = Object.freeze({
-  hips: ['ccbasehip', 'hips', 'pelvis'],
+  hips: ['ccbasehip', 'hips', 'hip', 'pelvis'],
   spine: ['ccbasespine01', 'spine01', 'spine1', 'spine'],
   chest: ['ccbasespine02', 'spine02', 'spine2', 'chest', 'upperchest'],
   neck: ['ccbasenecktwist01', 'necktwist01', 'neck'],
@@ -160,15 +160,23 @@ function normalizeName(name = '') {
 }
 
 function findBone(bones, aliases, slot = '') {
-  const exact = bones.find((bone) => aliases.includes(normalizeName(bone.name)));
-  if (exact) return exact;
+  // Alias order is semantic priority, not just a list of acceptable names.
+  // This matters for rigs that contain both "Hip" (master body root) and
+  // "Pelvis" (leg branch). Picking by node order made torso and legs animate
+  // from different roots on Commodore/Punk/Bosun.
+  for (const alias of aliases) {
+    const exact = bones.find((bone) => normalizeName(bone.name) === alias);
+    if (exact) return exact;
+  }
 
-  const suffix = bones.find((bone) => {
-    const name = normalizeName(bone.name);
-    return !/twist|share|toe|finger|eye|breast/.test(name)
-      && aliases.some((alias) => name.endsWith(alias));
-  });
-  if (suffix) return suffix;
+  for (const alias of aliases) {
+    const suffix = bones.find((bone) => {
+      const name = normalizeName(bone.name);
+      return !/twist|share|toe|finger|eye|breast/.test(name)
+        && name.endsWith(alias);
+    });
+    if (suffix) return suffix;
+  }
 
   return findSemanticBone(bones, slot);
 }
