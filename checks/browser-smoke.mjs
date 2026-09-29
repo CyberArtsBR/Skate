@@ -300,7 +300,11 @@ const trickPresentationProbe = await page.evaluate(() => {
   simulation.setTurnIntent(1);
   simulation.stepFixed();
   simulation.setTurnIntent(0);
-  for (let index = 0; index < 43; index += 1) simulation.stepFixed();
+  const kickHalfSteps = Math.max(
+    1,
+    Math.round(simulation.snapshot().surfaceTrickDuration / simulation.fixedDt / 2),
+  );
+  for (let index = 0; index < kickHalfSteps; index += 1) simulation.stepFixed();
   foundation.physics.applyCurrentState();
   const kick = {
     trick: simulation.snapshot().lastTrick,
@@ -316,7 +320,11 @@ const trickPresentationProbe = await page.evaluate(() => {
   simulation.setHandPlantHeld(true);
   simulation.stepFixed();
   simulation.setHandPlantHeld(false);
-  for (let index = 0; index < 60; index += 1) simulation.stepFixed();
+  const handPlantHalfSteps = Math.max(
+    1,
+    Math.round(simulation.snapshot().surfaceTrickDuration / simulation.fixedDt / 2),
+  );
+  for (let index = 0; index < handPlantHalfSteps; index += 1) simulation.stepFixed();
   foundation.physics.applyCurrentState();
   const handPlant = {
     trick: simulation.snapshot().lastTrick,
