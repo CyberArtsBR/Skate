@@ -130,6 +130,51 @@ assert.equal(customization.selectedRiderId, 'commodore');
 assert.equal(customization.boardColorId, 'red');
 assert.match(customization.sourceUrl, /Commodore/i);
 assert.equal(customization.deckColor, 0xc91f37);
+
+// Validate the complete shipped roster, not only the default and one alternate.
+// Every hero must load through the production GLTF + Halfpipe rig/IK path.
+const rosterIds = await page.evaluate(() => (
+  window.__HALFPIPE_FOUNDATION__.customization.roster.map((hero) => hero.id)
+));
+assert.equal(rosterIds.length, 10);
+
+for (const heroId of rosterIds) {
+  await page.evaluate(() => {
+    const foundation = window.__HALFPIPE_FOUNDATION__;
+    if (foundation.flow.state !== 'character-select') {
+      foundation.flow.transitionTo('character-select');
+    }
+  });
+
+  await page.locator('.hero-card[data-hero-id="' + heroId + '"]').click();
+  await page.locator('[data-confirm]').click();
+
+  try {
+    await page.waitForFunction(
+      (expectedId) => (
+        window.__HALFPIPE_FOUNDATION__.flow.state === 'controls'
+        && window.__HALFPIPE_FOUNDATION__.customization.riderId === expectedId
+        && window.__HALFPIPE_FOUNDATION__.rider.chimpion.rigAdapter.valid
+      ),
+      heroId,
+      { timeout: 20000 },
+    );
+  } catch (error) {
+    const diagnostic = await page.evaluate((expectedId) => ({
+      expectedId,
+      flow: window.__HALFPIPE_FOUNDATION__?.flow?.snapshot?.(),
+      actualId: window.__HALFPIPE_FOUNDATION__?.customization?.riderId,
+      selectedId: window.__HALFPIPE_FOUNDATION__?.customization?.selectedRiderId,
+      sourceUrl: window.__HALFPIPE_FOUNDATION__?.rider?.chimpion?.root?.userData?.sourceUrl,
+      missingRequired: window.__HALFPIPE_FOUNDATION__?.rider?.chimpion?.rigAdapter?.missingRequired,
+      status: document.querySelector('[data-status]')?.textContent,
+    }), heroId);
+    console.error('Roster diagnostic:', JSON.stringify(diagnostic));
+    console.error('Roster console errors:', JSON.stringify(consoleErrors));
+    throw error;
+  }
+}
+
 await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'countdown');
 const startPrompt = await page.locator('.countdown-label').textContent();
