@@ -16,10 +16,9 @@ function average(values) {
 function median(values) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2
-    ? sorted[middle]
-    : (sorted[middle - 1] + sorted[middle]) * 0.5;
+  // Preserve the Phase 3 measurement contract exactly: with four matching
+  // wheels, use the upper middle sample instead of averaging two samples.
+  return sorted[Math.floor(sorted.length / 2)];
 }
 
 function objectPath(object, stopAt = null) {
