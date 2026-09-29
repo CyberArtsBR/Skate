@@ -339,24 +339,39 @@ assert.equal(backwardPose.facingSign, -1);
 assert.ok(forwardPose.torsoBalanceZ * backwardPose.torsoBalanceZ < 0);
 assert.ok(forwardPose.headBalanceZ * backwardPose.headBalanceZ < 0);
 
-// Going up either wall must immediately switch to and HOLD the jump-preload
-// pose for the whole ascent, then release once the rider starts descending.
-const leftAscentSim = new HalfpipeSimulation(profile);
-leftAscentSim.reset({
-  pipeX: wallX(profile, -1, 0.35),
-  tangentVelocity: -7,
+// Ramp ascent preload must now build continuously with wall height instead of
+// snapping into one deep crouch as soon as the rider starts climbing.
+const ascentFractions = [0.12, 0.45, 0.78, 0.96];
+const leftAscentSamples = ascentFractions.map((fraction) => {
+  const simulation = new HalfpipeSimulation(profile);
+  simulation.reset({
+    pipeX: wallX(profile, -1, fraction),
+    tangentVelocity: -7,
+  });
+  const presentation = simulationToPresentationState(profile, simulation.snapshot());
+  const pose = { ...poseController.evaluate(presentation) };
+  assert.equal(presentation.rampAscending, true);
+  assert.equal(pose.ascendingPrep, true);
+  return { fraction, presentation, pose };
 });
-const leftAscentPresentation = simulationToPresentationState(
-  profile,
-  leftAscentSim.snapshot(),
-);
-const leftAscentPose = { ...poseController.evaluate(leftAscentPresentation) };
-assert.equal(leftAscentPresentation.rampAscending, true);
-assert.equal(leftAscentPose.ascendingPrep, true);
+for (let index = 1; index < leftAscentSamples.length; index += 1) {
+  const previous = leftAscentSamples[index - 1];
+  const current = leftAscentSamples[index];
+  assert.ok(
+    current.presentation.preloadCompression > previous.presentation.preloadCompression,
+    `ramp preload should rise continuously: ${JSON.stringify(leftAscentSamples.map((sample) => sample.presentation.preloadCompression))}`,
+  );
+  assert.ok(
+    current.pose.kneeFlex > previous.pose.kneeFlex,
+    `knee bend should deepen progressively toward coping: ${JSON.stringify(leftAscentSamples.map((sample) => sample.pose.kneeFlex))}`,
+  );
+}
+const leftAscentPresentation = leftAscentSamples.at(-1).presentation;
+const leftAscentPose = leftAscentSamples.at(-1).pose;
 
 const rightAscentSim = new HalfpipeSimulation(profile);
 rightAscentSim.reset({
-  pipeX: wallX(profile, 1, 0.35),
+  pipeX: wallX(profile, 1, 0.78),
   tangentVelocity: 7,
 });
 rightAscentSim.state.facingTurns = 1;
@@ -367,10 +382,11 @@ const rightAscentPresentation = simulationToPresentationState(
 const rightAscentPose = { ...poseController.evaluate(rightAscentPresentation) };
 assert.equal(rightAscentPresentation.rampAscending, true);
 assert.equal(rightAscentPose.ascendingPrep, true);
+assert.equal(rightAscentPose.facingSign, -1);
 
 const descendingSim = new HalfpipeSimulation(profile);
 descendingSim.reset({
-  pipeX: wallX(profile, -1, 0.35),
+  pipeX: wallX(profile, -1, 0.78),
   tangentVelocity: 7,
 });
 const descendingPresentation = simulationToPresentationState(
@@ -380,21 +396,14 @@ const descendingPresentation = simulationToPresentationState(
 const descendingPose = { ...poseController.evaluate(descendingPresentation) };
 assert.equal(descendingPresentation.rampAscending, false);
 assert.equal(descendingPose.ascendingPrep, false);
-
-for (const prep of [leftAscentPose, rightAscentPose]) {
-  assert.ok(
-    prep.kneeFlex > descendingPose.kneeFlex + 0.35,
-    `ramp ascent should use a clearly deeper knee bend: up=${prep.kneeFlex}, down=${descendingPose.kneeFlex}`,
-  );
-  assert.ok(
-    prep.armBalance >= 1.15,
-    `ramp ascent should keep both arms down near knees: ${prep.armBalance}`,
-  );
-  assert.ok(
-    prep.forearmDrop >= 0.3,
-    `ramp ascent should maintain the forearm-down preload: ${prep.forearmDrop}`,
-  );
-}
+assert.ok(
+  leftAscentPresentation.preloadCompression > descendingPresentation.preloadCompression + 0.25,
+  'coping preload should be substantially deeper than descent compression',
+);
+assert.ok(
+  leftAscentPose.kneeFlex > leftAscentSamples[0].pose.kneeFlex + 0.12,
+  'upper transition should visibly deepen the knees without a binary snap',
+);
 
 // Turn yaw must be linear: equal time slices produce equal angular increments.
 const linearTurn = new HalfpipeSimulation(profile);
