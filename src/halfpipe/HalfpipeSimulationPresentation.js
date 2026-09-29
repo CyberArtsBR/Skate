@@ -172,7 +172,10 @@ export function simulationToPresentationState(profile, simulationState) {
       || trickType === 'aerial-turn'
     )
   ) {
-    const rotationDegrees = Math.max(0, Number(simulationState.airRotationDegrees) || 0);
+    const explicitRotation = Math.max(0, Number(simulationState.airRotationDegrees) || 0);
+    const rotationDegrees = explicitRotation > 0
+      ? explicitRotation
+      : clamp01(simulationState.trickProgress) * 180;
     const segment = (rotationDegrees % 180) / 180;
     facingYaw = finalFacingYaw
       + turnDirection * THREE.MathUtils.degToRad(rotationDegrees);
