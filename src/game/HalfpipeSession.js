@@ -12,8 +12,21 @@ export class HalfpipeSession {
     return this.snapshot();
   }
 
+  beginCountdown() {
+    if (this.phase !== 'ready') return false;
+    this.phase = 'countdown';
+    return true;
+  }
+
+  completeCountdown() {
+    if (this.phase !== 'countdown') return false;
+    this.phase = 'running';
+    return true;
+  }
+
   start() {
     if (this.phase === 'finished') return false;
+    if (this.phase === 'countdown') return this.completeCountdown();
     if (this.phase !== 'running') this.phase = 'running';
     return true;
   }
@@ -40,6 +53,18 @@ export class HalfpipeSession {
     return false;
   }
 
+  finish() {
+    this.elapsed = this.durationSeconds;
+    this.remaining = 0;
+    this.phase = 'finished';
+    return this.snapshot();
+  }
+
+  setScore(score) {
+    this.score = Math.max(0, Math.round(Number(score) || 0));
+    return this.score;
+  }
+
   step(dt) {
     if (this.phase !== 'running') return this.snapshot();
 
@@ -47,11 +72,7 @@ export class HalfpipeSession {
     this.elapsed = Math.min(this.durationSeconds, this.elapsed + delta);
     this.remaining = Math.max(0, this.durationSeconds - this.elapsed);
 
-    if (this.remaining <= 0) {
-      this.remaining = 0;
-      this.phase = 'finished';
-    }
-
+    if (this.remaining <= 0) this.finish();
     return this.snapshot();
   }
 
@@ -71,5 +92,5 @@ export function formatSessionTime(seconds) {
   const whole = Math.ceil(clamped);
   const minutes = Math.floor(whole / 60);
   const remainder = whole % 60;
-  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+  return minutes + ':' + String(remainder).padStart(2, '0');
 }
