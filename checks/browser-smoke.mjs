@@ -96,7 +96,8 @@ const state = await page.evaluate(() => {
     wheelSpinSafe: foundation.rider.skateboard.wheelSpinSafe,
     measuredWheelDiameter: foundation.rider.skateboard.measuredWheelDiameter,
     surfaceSupportPointCount: foundation.rider.skateboard.surfaceSupportPoints.length,
-    chimpionScale: foundation.rider.chimpion.model.scale.x,
+    chimpionTargetHeight: foundation.rider.chimpion.root.userData.targetHeight,
+    skateboardSourceScale: foundation.rider.skateboard.root.userData.sourceScale,
     rigCapabilities: foundation.rider.chimpion.rigAdapter.capabilities,
     groundMaterial: foundation.ground.ground.material.type,
     groundDepthWrite: foundation.ground.ground.material.depthWrite,
@@ -354,7 +355,8 @@ assert.equal(state.wheelCount, 4);
 assert.equal(state.wheelSpinSafe, false);
 assert.ok(state.measuredWheelDiameter > 0.075, `scaled skateboard wheel diameter is too small: ${state.measuredWheelDiameter}`);
 assert.ok(state.surfaceSupportPointCount >= 6);
-assert.ok(state.chimpionScale > 1, `chimpion should be visibly scaled up: ${state.chimpionScale}`);
+assert.ok(state.chimpionTargetHeight >= 2.3, `chimpion target height should be visibly larger: ${state.chimpionTargetHeight}`);
+assert.ok(state.skateboardSourceScale >= 0.11, `skateboard source scale should be visibly larger: ${state.skateboardSourceScale}`);
 assert.equal(state.rigCapabilities.gameplayFoundation, true);
 assert.equal(state.groundMaterial, 'ShadowMaterial');
 assert.equal(state.groundDepthWrite, false);
