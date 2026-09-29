@@ -100,8 +100,8 @@ assert.ok(
   'kick turn must hold wall height during animation',
 );
 assert.ok(
-  kickPresentation.facingYaw < -1.2,
-  `LEFT-wall forward turn must animate counterclockwise, yaw=${kickPresentation.facingYaw}`,
+  kickPresentation.facingYaw > 1.2,
+  `LEFT-wall forward turn must animate counterclockwise on camera, yaw=${kickPresentation.facingYaw}`,
 );
 finishSurfaceTrick(frontLeft);
 const kickSettled = simulationToPresentationState(profile, frontLeft.snapshot());
@@ -116,7 +116,7 @@ illegalBackLeft.reset({
   pipeX: wallX(profile, -1, 0.86),
   tangentVelocity: -7,
 });
-illegalBackLeft.state.facingTurns = -1;
+illegalBackLeft.state.facingTurns = 1;
 illegalBackLeft.setTurnIntent(1);
 illegalBackLeft.stepFixed();
 assert.equal(
@@ -130,7 +130,7 @@ backRight.reset({
   pipeX: wallX(profile, 1, 0.86),
   tangentVelocity: 7,
 });
-backRight.state.facingTurns = -1;
+backRight.state.facingTurns = 1;
 backRight.setTurnIntent(-1);
 backRight.stepFixed();
 backRight.setTurnIntent(0);
@@ -138,8 +138,8 @@ assert.equal(backRight.snapshot().lastTrick, 'kick-turn');
 for (let index = 0; index < kickHalfSteps; index += 1) backRight.stepFixed();
 const backKickPresentation = simulationToPresentationState(profile, backRight.snapshot());
 assert.ok(
-  backKickPresentation.facingYaw < -Math.PI - 1.2,
-  `RIGHT-wall back-facing turn must continue counterclockwise, yaw=${backKickPresentation.facingYaw}`,
+  backKickPresentation.facingYaw > Math.PI + 1.2,
+  `RIGHT-wall back-facing turn must continue counterclockwise on camera, yaw=${backKickPresentation.facingYaw}`,
 );
 finishSurfaceTrick(backRight);
 const backKickSettled = simulationToPresentationState(profile, backRight.snapshot());
@@ -231,8 +231,8 @@ assert.ok(
   'aerial turn must hold height throughout bullet-time animation',
 );
 assert.ok(
-  aerialPresentation.facingYaw < -1.2,
-  `front-facing LEFT aerial must animate counterclockwise, yaw=${aerialPresentation.facingYaw}`,
+  aerialPresentation.facingYaw > 1.2,
+  `front-facing LEFT aerial must animate counterclockwise on camera, yaw=${aerialPresentation.facingYaw}`,
 );
 for (
   let index = airHalfSteps;
@@ -260,8 +260,8 @@ for (let index = 0; index < airHalfSteps; index += 1) backAir.stepFixed();
 const backAirPresentation = simulationToPresentationState(profile, backAir.snapshot());
 assert.equal(backAir.snapshot().airTurnActive, true);
 assert.ok(
-  backAirPresentation.facingYaw < -Math.PI - 1.2,
-  `back-facing RIGHT aerial must also rotate counterclockwise, yaw=${backAirPresentation.facingYaw}`,
+  backAirPresentation.facingYaw > Math.PI + 1.2,
+  `back-facing RIGHT aerial must also rotate counterclockwise on camera, yaw=${backAirPresentation.facingYaw}`,
 );
 
 // Pose mirroring contract when riding with back to camera.
@@ -287,7 +287,7 @@ const backwardPose = { ...poseController.evaluate({
   ascending: true,
   descending: false,
   surfaceAngle: 0.9,
-  facingYaw: -Math.PI,
+  facingYaw: Math.PI,
   trickVisualActive: false,
   trickType: null,
   landingQuality: 'none',
@@ -296,6 +296,47 @@ assert.equal(forwardPose.facingSign, 1);
 assert.equal(backwardPose.facingSign, -1);
 assert.ok(forwardPose.torsoBalanceZ * backwardPose.torsoBalanceZ < 0);
 assert.ok(forwardPose.headBalanceZ * backwardPose.headBalanceZ < 0);
+
+// Going up either wall must immediately switch to the jump-preload pose.
+const ascendingPrep = { ...poseController.evaluate({
+  pumpCompression: 0,
+  landing: 0,
+  speedNormalized: 0.55,
+  airborne: false,
+  ascending: true,
+  descending: false,
+  surfaceAngle: -0.85,
+  facingYaw: 0,
+  trickVisualActive: false,
+  trickType: null,
+  landingQuality: 'none',
+}) };
+const descendingPose = { ...poseController.evaluate({
+  pumpCompression: 0,
+  landing: 0,
+  speedNormalized: 0.55,
+  airborne: false,
+  ascending: false,
+  descending: true,
+  surfaceAngle: -0.85,
+  facingYaw: 0,
+  trickVisualActive: false,
+  trickType: null,
+  landingQuality: 'none',
+}) };
+assert.equal(ascendingPrep.ascendingPrep, true);
+assert.ok(
+  ascendingPrep.kneeFlex > descendingPose.kneeFlex + 0.2,
+  `ascending rider should immediately bend knees: up=${ascendingPrep.kneeFlex}, down=${descendingPose.kneeFlex}`,
+);
+assert.ok(
+  ascendingPrep.armBalance >= 1,
+  `ascending rider should drive both arms down near knees: ${ascendingPrep.armBalance}`,
+);
+assert.ok(
+  ascendingPrep.forearmDrop > descendingPose.forearmDrop,
+  'ascending preload should lower/bend forearms more than normal riding',
+);
 
 console.log(JSON.stringify({
   dropIn: {
@@ -323,6 +364,12 @@ console.log(JSON.stringify({
   },
   backAerial: {
     midpointYaw: backAirPresentation.facingYaw,
+  },
+  ascendingPrep: {
+    kneeFlex: ascendingPrep.kneeFlex,
+    armBalance: ascendingPrep.armBalance,
+    forearmDrop: ascendingPrep.forearmDrop,
+    descendingKneeFlex: descendingPose.kneeFlex,
   },
   poseMirror: {
     forward: {
