@@ -51,7 +51,7 @@ export class RiderController {
     this.trickCarrier.rotation.set(
       0,
       this.presentationState.facingYaw,
-      this.presentationState.trickRoll,
+      this.presentationState.trickRoll + this.presentationState.dropInRoll,
     );
 
     const pose = this.poseController.evaluate(this.presentationState);
