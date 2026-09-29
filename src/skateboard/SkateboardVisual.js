@@ -150,6 +150,7 @@ export class SkateboardVisual {
     this.root.userData.wheelSpinSafe = this.wheelSpinSafe;
     this.root.userData.measuredWheelDiameter = this.measuredWheelDiameter;
     this.root.userData.surfaceSupportPointCount = this.surfaceSupportPoints.length;
+    this.root.userData.sourceScale = GAME_CONFIG.skateboard.scale;
     return this;
   }
 
