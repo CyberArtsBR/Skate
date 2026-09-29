@@ -5,6 +5,7 @@ export const DEFAULT_RIDER_PRESENTATION_STATE = Object.freeze({
   tangentVelocity: 0,
   ascending: false,
   descending: false,
+  rampAscending: false,
   pumpCompression: 0,
   airborne: false,
   verticalVelocity: 0,
@@ -42,6 +43,7 @@ export function createRiderPresentationState(overrides = {}) {
   state.dropInProgress = clamp01(state.dropInProgress);
   state.ascending = Boolean(state.ascending);
   state.descending = Boolean(state.descending);
+  state.rampAscending = Boolean(state.rampAscending);
   state.airborne = Boolean(state.airborne);
   state.pumpCompression = clamp01(state.pumpCompression);
   state.landing = clamp01(state.landing);
