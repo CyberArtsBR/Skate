@@ -88,7 +88,28 @@ await page.keyboard.press('Enter');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'character-select');
 await page.waitForFunction(() => document.querySelectorAll('.hero-card').length === 10);
 assert.equal(await page.locator('.hero-card').count(), 10);
+assert.equal(await page.locator('.hero-card-image').count(), 10);
 assert.equal(await page.locator('.board-swatch').count(), 9);
+await page.waitForFunction(() => (
+  [...document.querySelectorAll('.hero-card-image')]
+    .every((image) => image.complete && image.naturalWidth > 0)
+));
+const heroThumbs = await page.locator('.hero-card-image').evaluateAll((images) => (
+  images.map((image) => ({
+    src: new URL(image.src).pathname,
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+  }))
+));
+assert.equal(heroThumbs.length, 10);
+for (const thumb of heroThumbs) {
+  assert.match(
+    thumb.src,
+    /^\/images\/characters\/[a-z-]+\.gif$/,
+    'hero thumbnail must be served from the local vendored GIF directory',
+  );
+  assert.ok(thumb.width > 0 && thumb.height > 0, 'local hero GIF must decode');
+}
 
 // Default selection is The Heretic. Move right to The Commodore and move the
 // board one swatch away from Original, then verify the actual runtime assets.
@@ -281,6 +302,7 @@ console.log(JSON.stringify({
   runningStart,
   runningLater,
   customization,
+  heroThumbs,
   reset,
   webglResilience,
   consoleErrors,
