@@ -1,4 +1,3 @@
-import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
@@ -85,20 +84,31 @@ await browser.close();
 
 console.log(JSON.stringify(results, null, 2));
 
-assert.equal(results.alignment.source, 'authored-riding-origin');
-assert.ok(results.alignment.ridingSurfaceName, 'riding surface must be named');
-assert.ok(
+const violations = [];
+const requireContact = (condition, message) => {
+  if (!condition) violations.push(message);
+};
+
+requireContact(
+  results.alignment.source === 'authored-riding-origin',
+  'halfpipe alignment source must remain authored-riding-origin',
+);
+requireContact(
+  Boolean(results.alignment.ridingSurfaceName),
+  'riding surface must be named',
+);
+requireContact(
   Math.abs(results.alignment.appliedX - results.alignment.authoredPositionX) < 1e-8,
   `halfpipe X must preserve authored riding origin: ${results.alignment.appliedX} vs ${results.alignment.authoredPositionX}`,
 );
 
 for (const station of results.stations) {
-  assert.ok(
+  requireContact(
     station.hitCount >= 4,
     `${station.station} must raycast at least four skateboard support points against the visible riding mesh`,
   );
-  assert.ok(
-    station.visualMinSeparation >= -0.01,
+  requireContact(
+    Number.isFinite(station.visualMinSeparation) && station.visualMinSeparation >= -0.01,
     `${station.station} penetrates the visible riding mesh by ${station.visualMinSeparation}`,
   );
 }
@@ -112,10 +122,16 @@ for (const [leftName, rightName] of [
   const difference = Math.abs(
     byName[leftName].visualMinSeparation - byName[rightName].visualMinSeparation,
   );
-  assert.ok(
+  requireContact(
     difference < 0.03,
     `${leftName}/${rightName} visible-surface separation is asymmetric by ${difference}`,
   );
 }
 
-console.log(JSON.stringify(results, null, 2));
+if (violations.length) {
+  console.error('Visual contact regressions:');
+  for (const violation of violations) console.error('- ' + violation);
+  process.exitCode = 1;
+} else {
+  console.log('Visual contact regression passed.');
+}

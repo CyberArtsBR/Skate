@@ -8,6 +8,7 @@ Use this checklist for every Phase 4 integration candidate. A release is not rea
 - Run npm run check:release. This is the Render-safe gate and includes static/source contracts, physics, contact, session, controller, camera, trick presentation, and the production build.
 - Run npm run check:release:browser in CI with Playwright Chromium. This includes production browser smoke, the existing deep browser smoke, and visual-contact regression.
 - Run npm run check:security and review any high/critical npm audit findings before release.
+- Release-suite runners aggregate failures so one blocker does not hide later physics, build, browser, or visual-contact diagnostics.
 - Do not bypass visual-contact after halfpipe, skateboard, contact-clearance, scale, or alignment changes.
 
 ## Gameplay and physics
@@ -62,4 +63,6 @@ Use this checklist for every Phase 4 integration candidate. A release is not rea
 
 - ChimpionLoader currently globally clamps MeshStandardMaterial metalness and roughness. The release contract intentionally rejects this; the owning character/art integration must remove that override while preserving authored materials.
 - main.js currently has no explicit webglcontextlost/webglcontextrestored recovery contract. Browser release smoke intentionally rejects that state until the owning runtime integration adds safe handling.
+- Existing deep browser smoke reports the drop-in upper wheel about 0.141 m above the coping tolerance; owning gameplay/presentation integration must reconcile this without weakening the regression threshold blindly.
+- Existing visual-contact reports penetration at CENTER / FLAT (~0.0493 m) and LOWER RIGHT (~0.0494 m), plus left/right separation asymmetry; owning contact/presentation integration must resolve these before release.
 - Phase 4 feature modules for combo/results/landing classifications/controller glyphs may not exist on this independent branch. checks/phase4-contracts.mjs provides reusable snapshot validation without importing missing modules.

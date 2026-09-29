@@ -53,7 +53,7 @@ requireContract(
 );
 
 requireContract(
-  !/\.emissive(?:Intensity)?\s*=/.test(chimpionSource),
+  !/(?:\.emissive(?:Intensity)?\s*=|\.emissive\.(?:set|setHex|setRGB|setHSL)\s*\()/.test(chimpionSource),
   'Production character must not receive forced emissive/glow in ChimpionLoader.',
 );
 requireContract(
