@@ -34,40 +34,54 @@ export class SkateAudio {
 
     this.noiseBuffer = createNoiseBuffer(context);
 
-    this.rollSource = context.createBufferSource();
-    this.rollSource.buffer = this.noiseBuffer;
-    this.rollSource.loop = true;
     this.rollFilter = context.createBiquadFilter();
     this.rollFilter.type = 'bandpass';
     this.rollFilter.Q.value = 0.75;
     this.rollGain = context.createGain();
     this.rollGain.gain.value = 0;
-    this.rollSource.connect(this.rollFilter).connect(this.rollGain).connect(destination);
+    this.rollFilter.connect(this.rollGain).connect(destination);
 
-    this.rampSource = context.createBufferSource();
-    this.rampSource.buffer = this.noiseBuffer;
-    this.rampSource.loop = true;
     this.rampFilter = context.createBiquadFilter();
     this.rampFilter.type = 'highpass';
     this.rampFilter.frequency.value = 380;
     this.rampGain = context.createGain();
     this.rampGain.gain.value = 0;
-    this.rampSource.connect(this.rampFilter).connect(this.rampGain).connect(destination);
+    this.rampFilter.connect(this.rampGain).connect(destination);
 
-    this.windSource = context.createBufferSource();
-    this.windSource.buffer = this.noiseBuffer;
-    this.windSource.loop = true;
     this.windFilter = context.createBiquadFilter();
     this.windFilter.type = 'lowpass';
     this.windFilter.frequency.value = 900;
     this.windGain = context.createGain();
     this.windGain.gain.value = 0;
-    this.windSource.connect(this.windFilter).connect(this.windGain).connect(destination);
+    this.windFilter.connect(this.windGain).connect(destination);
 
-    const now = context.currentTime;
-    this.rollSource.start(now);
-    this.rampSource.start(now);
-    this.windSource.start(now);
+    this.rollSource = this._createLoopSource(this.noiseBuffer, this.rollFilter);
+    this.rampSource = this._createLoopSource(this.noiseBuffer, this.rampFilter);
+    this.windSource = this._createLoopSource(this.noiseBuffer, this.windFilter);
+  }
+
+  _createLoopSource(buffer, destination) {
+    const source = this.context.createBufferSource();
+    source.buffer = buffer || this.noiseBuffer;
+    source.loop = true;
+    source.connect(destination);
+    source.start(this.context.currentTime);
+    return source;
+  }
+
+  _replaceLoopSource(slot, buffer, destination) {
+    if (!buffer || this.disposed) return false;
+    const previous = this[slot];
+    try { previous?.stop(); } catch {}
+    try { previous?.disconnect(); } catch {}
+    this[slot] = this._createLoopSource(buffer, destination);
+    return true;
+  }
+
+  setContinuousBuffers({ wheelRoll, rampTexture, wind } = {}) {
+    if (wheelRoll) this._replaceLoopSource('rollSource', wheelRoll, this.rollFilter);
+    if (rampTexture) this._replaceLoopSource('rampSource', rampTexture, this.rampFilter);
+    if (wind) this._replaceLoopSource('windSource', wind, this.windFilter);
   }
 
   update(state = {}, dt = 1 / 60) {
