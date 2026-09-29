@@ -177,7 +177,7 @@ assert.equal(
 
 const hand = new HalfpipeSimulation(profile);
 hand.reset({
-  pipeX: wallX(profile, -1, 0.997),
+  pipeX: wallX(profile, -1, 0.999),
   tangentVelocity: -7,
 });
 hand.setHandPlantHeld(true);
@@ -185,6 +185,10 @@ hand.stepFixed();
 hand.setHandPlantHeld(false);
 assert.equal(hand.snapshot().lastTrick, 'hand-plant');
 assert.equal(hand.snapshot().surfaceTrickActive, true);
+assert.ok(
+  Math.abs(hand.snapshot().pipeX - (profile.leftLip + hand.lipInset)) < 1e-9,
+  `hand plant must pin exactly to left coping/white bar: x=${hand.snapshot().pipeX}, lip=${profile.leftLip}`,
+);
 const handFrozenX = hand.snapshot().pipeX;
 const handHalfSteps = Math.round(
   GAME_CONFIG.trickPresentation.handPlantDuration * 0.5 / hand.fixedDt,
@@ -199,6 +203,21 @@ assert.ok(
 assert.ok(
   Math.abs(handPresentation.trickRoll) > 1.0,
   `hand plant must have readable plant rotation, roll=${handPresentation.trickRoll}`,
+);
+
+// Hand Plant can never activate once the rider is airborne.
+const noAirHandPlant = launchFromSide(profile, -1, 0);
+noAirHandPlant.setHandPlantHeld(true);
+for (let index = 0; index < 30; index += 1) noAirHandPlant.stepFixed();
+assert.notEqual(
+  noAirHandPlant.snapshot().lastTrick,
+  'hand-plant',
+  'hand plant must be impossible in air',
+);
+assert.equal(
+  noAirHandPlant.snapshot().surfaceTrickActive,
+  false,
+  'airborne hand-plant input must not create a surface trick',
 );
 
 // FRONT-facing aerial: LEFT side + RIGHT input only.
@@ -363,6 +382,14 @@ linearTurn.reset({
 linearTurn.setTurnIntent(1);
 linearTurn.stepFixed();
 linearTurn.setTurnIntent(0);
+assert.ok(
+  GAME_CONFIG.trickPresentation.kickTurnDuration <= 0.42,
+  `kick turn should be faster and snappier: ${GAME_CONFIG.trickPresentation.kickTurnDuration}`,
+);
+assert.ok(
+  GAME_CONFIG.trickPresentation.aerialTurnDuration <= 0.47,
+  `aerial turn should be faster and snappier: ${GAME_CONFIG.trickPresentation.aerialTurnDuration}`,
+);
 const durationSteps = Math.round(
   GAME_CONFIG.trickPresentation.kickTurnDuration / linearTurn.fixedDt,
 );
