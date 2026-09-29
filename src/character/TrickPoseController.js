@@ -61,17 +61,23 @@ export class TrickPoseController {
         * clamp01(state.airTuck);
       output.bodyYaw = Number(state.secondaryLag) || 0;
     } else if (String(state.landingQuality || '').toLowerCase() === 'bail') {
-      // Presentation-only separation for a failed landing. The authoritative
-      // contact root remains untouched while body and deck visibly lose sync,
-      // then return to neutral as the landing envelope decays.
+      // Keep the rider physically connected to the deck during a bail.
+      // The impact should read through the skeleton/pose system, not by
+      // pulling the body carrier away from foot targets on the skateboard.
       const bail = clamp01(state.landing);
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
-      output.boardYaw = side * direction * 0.2 * bail;
-      output.boardRoll += side * 0.15 * bail;
-      output.bodyYaw = -side * direction * 0.24 * bail;
-      output.bodyRoll = -side * 0.22 * bail;
-      output.bodyX = -side * 0.07 * bail;
-      output.bodyY = -0.06 * bail;
+
+      // Small deck wobble only: enough to sell instability without forcing
+      // either planted foot beyond its reachable IK range.
+      output.boardYaw = side * direction * 0.035 * bail;
+      output.boardRoll += side * 0.045 * bail;
+
+      // Restrained body carrier reaction. Most of the visible bail response is
+      // handled by SkatePoseController so both feet can remain deck-locked.
+      output.bodyYaw = -side * direction * 0.045 * bail;
+      output.bodyRoll = -side * 0.075 * bail;
+      output.bodyX = -side * 0.012 * bail;
+      output.bodyY = -0.025 * bail;
     }
 
     return output;
