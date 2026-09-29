@@ -58,7 +58,7 @@ export function simulationToPresentationState(profile, simulationState) {
     airborne
     && (simulationState.airTurnActive || trickType === 'aerial-turn')
   ) {
-    const direction = Number(simulationState.airTurnDirection) || -1;
+    const direction = Number(simulationState.airTurnDirection) || 1;
     const eased = easeInOut(trickProgress);
     facingYaw = finalFacingYaw + direction * Math.PI * eased;
     trickRoll = -currentSide
