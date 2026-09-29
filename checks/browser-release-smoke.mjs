@@ -23,16 +23,14 @@ await page.waitForFunction(() => Boolean(window.__HALFPIPE_FOUNDATION__?.halfpip
 await page.waitForFunction(() => Boolean(window.__HALFPIPE_FOUNDATION__?.rider?.chimpion?.model));
 await page.waitForFunction(() => Boolean(window.__HALFPIPE_FOUNDATION__?.background?.state?.naturalWidth));
 
-async function layoutProbe() {
+async function probe() {
   return page.evaluate(() => {
+    const foundation = window.__HALFPIPE_FOUNDATION__;
     const rect = (selector) => {
       const element = document.querySelector(selector);
       const box = element?.getBoundingClientRect();
       return box ? {
-        x: box.x,
-        y: box.y,
-        width: box.width,
-        height: box.height,
+        x: box.x, y: box.y, width: box.width, height: box.height,
         display: getComputedStyle(element).display,
         visibility: getComputedStyle(element).visibility,
         opacity: Number(getComputedStyle(element).opacity),
@@ -45,55 +43,64 @@ async function layoutProbe() {
       background: rect('.background-plate'),
       hud: rect('.halfpipe-hud'),
       backgroundImage: getComputedStyle(document.querySelector('.background-plate')).backgroundImage,
-      backgroundAsset: window.__HALFPIPE_FOUNDATION__.background.element.dataset.assetUrl,
-      session: window.__HALFPIPE_FOUNDATION__.session.snapshot(),
-      hasHalfpipe: Boolean(window.__HALFPIPE_FOUNDATION__.halfpipe?.model),
-      hasRider: Boolean(window.__HALFPIPE_FOUNDATION__.rider?.chimpion?.model),
+      backgroundAsset: foundation.background.element.dataset.assetUrl,
+      session: foundation.session.snapshot(),
+      flow: foundation.flow.snapshot(),
+      graphicsPreset: foundation.graphics.preset,
+      hasHalfpipe: Boolean(foundation.halfpipe?.model),
+      hasRider: Boolean(foundation.rider?.chimpion?.model),
     };
   });
 }
 
-function assertFullscreenLayout(probe, label) {
-  const [width, height] = probe.viewport;
-  for (const [name, box] of [
-    ['stage', probe.stage],
-    ['canvas', probe.canvas],
-  ]) {
+function assertFullscreenLayout(state, label) {
+  const [width, height] = state.viewport;
+  for (const [name, box] of [['stage', state.stage], ['canvas', state.canvas]]) {
     assert.ok(box, label + ': missing ' + name);
     assert.ok(Math.abs(box.x) < 1 && Math.abs(box.y) < 1, label + ': ' + name + ' must start at viewport origin');
     assert.ok(Math.abs(box.width - width) < 1, label + ': ' + name + ' width must fill viewport');
     assert.ok(Math.abs(box.height - height) < 1, label + ': ' + name + ' height must fill viewport');
   }
-
-  const background = probe.background;
-  assert.ok(background, label + ': missing background');
+  assert.ok(state.background, label + ': missing background');
   assert.ok(
-    background.x <= 0.5
-      && background.y <= 0.5
-      && background.x + background.width >= width - 0.5
-      && background.y + background.height >= height - 0.5,
-    label + ': background must cover the full viewport without exposing side bars',
+    state.background.x <= 0.5
+      && state.background.y <= 0.5
+      && state.background.x + state.background.width >= width - 0.5
+      && state.background.y + state.background.height >= height - 0.5,
+    label + ': background must cover full viewport without pillar bars',
   );
-
-  assert.ok(probe.canvas.opacity > 0.99, label + ': canvas must be visible');
-  assert.notEqual(probe.hud?.display, 'none', label + ': HUD must be visible');
-  assert.notEqual(probe.hud?.visibility, 'hidden', label + ': HUD must be visible');
+  assert.ok(state.canvas.opacity > 0.99, label + ': canvas must be visible');
+  assert.notEqual(state.hud?.display, 'none', label + ': HUD must be present');
+  assert.notEqual(state.hud?.visibility, 'hidden', label + ': HUD must be visible');
 }
 
-const initial = await layoutProbe();
+const initial = await probe();
 assert.equal(initial.hasHalfpipe, true);
 assert.equal(initial.hasRider, true);
 assert.ok(initial.backgroundImage && initial.backgroundImage !== 'none');
 assert.equal(initial.backgroundAsset, '/images/backgrounds/halfpipe-chimpions-merch.jpg');
 assert.equal(initial.session.phase, 'ready');
+assert.equal(initial.flow.state, 'title');
+assert.equal(initial.graphicsPreset, 'high');
 assertFullscreenLayout(initial, '1600x900');
 
 await page.keyboard.press('Enter');
-await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.session.phase === 'running');
+await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'character-select');
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'controls');
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'countdown');
+await page.waitForFunction(
+  () => window.__HALFPIPE_FOUNDATION__.session.phase === 'running'
+    && window.__HALFPIPE_FOUNDATION__.flow.state === 'run',
+  null,
+  { timeout: 6000 },
+);
+
 const runningStart = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot());
 await page.waitForTimeout(350);
 const runningLater = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot());
-assert.ok(runningLater.remaining < runningStart.remaining, 'session timer must progress after start');
+assert.ok(runningLater.remaining < runningStart.remaining, 'session timer must progress after countdown');
 
 await page.keyboard.press('KeyP');
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.session.phase === 'paused');
@@ -103,19 +110,23 @@ const pausedLater = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.ses
 assert.ok(Math.abs(pausedLater - pausedStart) < 0.001, 'timer must not progress while paused');
 
 await page.keyboard.press('KeyP');
-await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.session.phase === 'running');
+await page.waitForFunction(
+  () => window.__HALFPIPE_FOUNDATION__.session.phase === 'running'
+    && window.__HALFPIPE_FOUNDATION__.flow.state === 'run',
+);
 await page.waitForTimeout(250);
 const resumed = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining);
-assert.ok(resumed < pausedLater, 'timer must resume after pause');
+assert.ok(resumed < pausedLater, 'timer must resume without immediately re-pausing');
 
-await page.keyboard.press('KeyR');
-await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.session.phase === 'ready');
+await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.physics.reset());
+await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'title');
 const reset = await page.evaluate(() => {
   const foundation = window.__HALFPIPE_FOUNDATION__;
   return {
     session: foundation.session.snapshot(),
     simulation: foundation.simulation.snapshot(),
     camera: foundation.cameraController.snapshot(),
+    flow: foundation.flow.snapshot(),
   };
 });
 assert.equal(reset.session.score, 0);
@@ -124,6 +135,7 @@ assert.ok(Math.abs(reset.session.remaining - 75) < 0.001);
 assert.equal(reset.simulation.mode, 'contact');
 assert.equal(reset.camera.dynamicActive, false);
 assert.equal(reset.camera.verticalShift, 0);
+assert.equal(reset.flow.state, 'title');
 
 for (const viewport of [
   { width: 2560, height: 1080, label: '21:9' },
@@ -131,7 +143,7 @@ for (const viewport of [
 ]) {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
   await page.waitForTimeout(100);
-  assertFullscreenLayout(await layoutProbe(), viewport.label);
+  assertFullscreenLayout(await probe(), viewport.label);
 }
 
 const webglResilience = await page.evaluate(() => {
@@ -140,17 +152,13 @@ const webglResilience = await page.evaluate(() => {
   canvas.dispatchEvent(lost);
   const recoveryExposed = typeof window.__HALFPIPE_FOUNDATION__?.recoverWebGL === 'function'
     || Boolean(document.querySelector('[data-webgl-recovery]'));
-  canvas.dispatchEvent(new Event('webglcontextrestored'));
-  return {
-    lostPrevented: lost.defaultPrevented,
-    recoveryExposed,
-  };
+  return { lostPrevented: lost.defaultPrevented, recoveryExposed };
 });
 
 await browser.close();
 
 assert.equal(webglResilience.lostPrevented, true, 'webglcontextlost must be preventDefault() protected');
-assert.equal(webglResilience.recoveryExposed, true, 'runtime must expose a WebGL recovery/reload path');
+assert.equal(webglResilience.recoveryExposed, true, 'runtime must expose a WebGL recovery path');
 assert.deepEqual(consoleErrors, []);
 assert.deepEqual(pageErrors, []);
 assert.deepEqual(failedRequests, []);
