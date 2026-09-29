@@ -402,8 +402,18 @@ export class HalfpipePumpInput {
     this._padSignatures.clear();
   }
 
+  _clearQueuedActions() {
+    for (const key of Object.keys(this._queuedActions)) {
+      this._queuedActions[key] = false;
+    }
+    for (const key of Object.keys(this._queuedUiActions)) {
+      this._queuedUiActions[key] = false;
+    }
+  }
+
   _handleFocusLoss(reason) {
     this.clearHeldState();
+    this._clearQueuedActions();
     this._previousGamepadButtons.primary = false;
     this._previousGamepadButtons.start = false;
     for (const key of Object.keys(this._previousUiButtons)) {
@@ -413,6 +423,7 @@ export class HalfpipePumpInput {
   }
 
   _clearGamepadState() {
+    this._clearQueuedActions();
     this.gamepadConnected = false;
     this.gamepadId = '';
     this.gamepadFamily = 'keyboard';
