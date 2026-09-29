@@ -128,8 +128,9 @@ export class RiderRigAdapter {
 
     for (const side of ['left', 'right']) {
       const sign = side === 'left' ? -1 : 1;
-      const footRoleSign = side === 'left' ? stanceDirection : -stanceDirection;
-      apply(`${side}Thigh`, -0.28 - compression * 0.12, sign * 0.035, footRoleSign * 0.09);
+      const mirrorSign = sign * facingDirection;
+      const footRoleSign = side === 'left' ? motionDirection : -motionDirection;
+      apply(`${side}Thigh`, -0.28 - compression * 0.12, mirrorSign * 0.035, footRoleSign * 0.09);
       apply(`${side}Shin`, kneeFlex, 0, 0);
       apply(`${side}Foot`, ankleFlex, mirrorSign * 0.025, -footRoleSign * 0.025);
       apply(`${side}UpperArm`, -0.12, -torsoCounter * 0.18 * facingDirection, mirrorSign * armBalance);
