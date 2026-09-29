@@ -96,6 +96,7 @@ let disposed = false;
 let audioUnlockStarted = false;
 let unregisterRiderQuality = null;
 let controlsReturnState = HALFPIPE_FLOW_STATE.CHARACTER_SELECT;
+let startPromptArmedAt = 0;
 const integrationStats = { longestCombo: 0 };
 
 function resize() {
@@ -216,8 +217,6 @@ const gameFlow = new HalfpipeGameFlow({
 
 const controlsScreen = new ControlsScreen(stage, { onBack: handleControlsExit });
 const countdown = new CountdownOverlay(stage, {
-  onTick(value) { audio.handleEvent({ type: 'COUNTDOWN', value }); },
-  onGo() { audio.handleEvent({ type: 'COUNTDOWN', value: 'GO' }); },
   onComplete() {
     session.completeCountdown();
     simulationRunning = true;
@@ -293,12 +292,30 @@ function startCountdown() {
   resetSimulation({ keepFlow: true });
   session.beginCountdown();
   simulationRunning = false;
+  pumpInput?.clearHeldState();
+  // Discard the same confirm/button edge that opened this prompt. A short
+  // debounce plus gamepad edge tracking guarantees the player performs a new
+  // input to begin the run instead of accidentally skipping this screen.
+  pumpInput?.consumeActions();
+  pumpInput?.consumeUIActions();
+  startPromptArmedAt = (globalThis.performance?.now?.() ?? Date.now()) + 160;
   gameFlow.transitionTo(HALFPIPE_FLOW_STATE.COUNTDOWN);
-  countdown.start();
-  hud.setStatus('GET READY', 'ready');
+  countdown.showPrompt('PRESS ANY BUTTON TO START');
+  hud.setStatus('', 'ready');
   audio.resetSessionAudioState();
   audio.setPaused(true);
   return true;
+}
+
+function completeStartPrompt() {
+  if (
+    gameFlow.state !== HALFPIPE_FLOW_STATE.COUNTDOWN
+    || session.phase !== 'countdown'
+  ) return false;
+
+  const now = globalThis.performance?.now?.() ?? Date.now();
+  if (now < startPromptArmedAt) return false;
+  return countdown.completePrompt();
 }
 
 function pauseRun() {
@@ -624,14 +641,22 @@ function render(timestamp = 0) {
     controlsScreen.setControllerFamily(pumpInput.gamepadFamily);
     const gameplayActions = pumpInput.consumeActions();
     const uiActions = pumpInput.consumeUIActions();
-    const uiConsumed = routeControllerUI(uiActions);
+    let uiConsumed = false;
+
+    if (gameFlow.state === HALFPIPE_FLOW_STATE.COUNTDOWN) {
+      if (uiActions.anyButton) completeStartPrompt();
+      // Consume the same frame so START/BACK/A/B/X/Y cannot immediately pause
+      // or trigger gameplay after they are used to begin the run.
+      uiConsumed = true;
+    } else {
+      uiConsumed = routeControllerUI(uiActions);
+    }
 
     if (!uiConsumed && gameplayActions.pause) {
       if (gameFlow.state === HALFPIPE_FLOW_STATE.RUN) pauseRun();
       else if (gameFlow.state === HALFPIPE_FLOW_STATE.PAUSE) resumeRun();
     }
     if (gameplayActions.reset && gameFlow.state === HALFPIPE_FLOW_STATE.RUN) pauseRun();
-    if (gameFlow.state === HALFPIPE_FLOW_STATE.COUNTDOWN) countdown.step(presentationDelta);
 
     const isRunning = (
       simulationRunning
@@ -647,7 +672,9 @@ function render(timestamp = 0) {
     simulation.setBackflipHeld(isRunning && Boolean(pumpInput.backflipHeld));
 
     if (isRunning) {
-      const result = simulation.advance(frameDelta);
+      const result = simulation.advance(
+        frameDelta * GAME_CONFIG.gameplay.motionTimeScale,
+      );
       const presentationDt = result.steps * simulation.fixedDt;
       session.step(presentationDelta);
       if (result.steps > 0) {
@@ -700,6 +727,14 @@ function render(timestamp = 0) {
 function onKeyDown(event) {
   if (event.repeat) return;
   void unlockAudioFromGesture();
+
+  // Keyboard "any key" start must run before the pump-input preventDefault
+  // guard, because gameplay keys intentionally prevent their browser default.
+  if (gameFlow.state === HALFPIPE_FLOW_STATE.COUNTDOWN) {
+    if (completeStartPrompt()) event.preventDefault();
+    return;
+  }
+
   if (event.defaultPrevented) return;
 
   if (event.code === 'F3') {
@@ -793,6 +828,11 @@ function onWebGLContextRestored() {
   recoverWebGL();
 }
 
+function onPointerDown() {
+  void unlockAudioFromGesture();
+  if (gameFlow.state === HALFPIPE_FLOW_STATE.COUNTDOWN) completeStartPrompt();
+}
+
 async function bootstrap() {
   resize();
   wireMenuButtons();
@@ -842,7 +882,7 @@ async function bootstrap() {
 
   window.addEventListener('resize', resize);
   window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('pointerdown', unlockAudioFromGesture, { passive: true });
+  window.addEventListener('pointerdown', onPointerDown, { passive: true });
   canvas.addEventListener('webglcontextlost', onWebGLContextLost, false);
   canvas.addEventListener('webglcontextrestored', onWebGLContextRestored, false);
   animationFrame = requestAnimationFrame(render);
@@ -891,7 +931,7 @@ function dispose() {
   cancelAnimationFrame(animationFrame);
   window.removeEventListener('resize', resize);
   window.removeEventListener('keydown', onKeyDown);
-  window.removeEventListener('pointerdown', unlockAudioFromGesture);
+  window.removeEventListener('pointerdown', onPointerDown);
   canvas.removeEventListener('webglcontextlost', onWebGLContextLost, false);
   canvas.removeEventListener('webglcontextrestored', onWebGLContextRestored, false);
   unregisterRiderQuality?.();
