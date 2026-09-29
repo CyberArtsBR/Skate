@@ -297,46 +297,104 @@ assert.equal(backwardPose.facingSign, -1);
 assert.ok(forwardPose.torsoBalanceZ * backwardPose.torsoBalanceZ < 0);
 assert.ok(forwardPose.headBalanceZ * backwardPose.headBalanceZ < 0);
 
-// Going up either wall must immediately switch to the jump-preload pose.
-const ascendingPrep = { ...poseController.evaluate({
-  pumpCompression: 0,
-  landing: 0,
-  speedNormalized: 0.55,
-  airborne: false,
-  ascending: true,
-  descending: false,
-  surfaceAngle: -0.85,
-  facingYaw: 0,
-  trickVisualActive: false,
-  trickType: null,
-  landingQuality: 'none',
-}) };
-const descendingPose = { ...poseController.evaluate({
-  pumpCompression: 0,
-  landing: 0,
-  speedNormalized: 0.55,
-  airborne: false,
-  ascending: false,
-  descending: true,
-  surfaceAngle: -0.85,
-  facingYaw: 0,
-  trickVisualActive: false,
-  trickType: null,
-  landingQuality: 'none',
-}) };
-assert.equal(ascendingPrep.ascendingPrep, true);
-assert.ok(
-  ascendingPrep.kneeFlex > descendingPose.kneeFlex + 0.2,
-  `ascending rider should immediately bend knees: up=${ascendingPrep.kneeFlex}, down=${descendingPose.kneeFlex}`,
+// Going up either wall must immediately switch to and HOLD the jump-preload
+// pose for the whole ascent, then release once the rider starts descending.
+const leftAscentSim = new HalfpipeSimulation(profile);
+leftAscentSim.reset({
+  pipeX: wallX(profile, -1, 0.35),
+  tangentVelocity: -7,
+});
+const leftAscentPresentation = simulationToPresentationState(
+  profile,
+  leftAscentSim.snapshot(),
 );
-assert.ok(
-  ascendingPrep.armBalance >= 1,
-  `ascending rider should drive both arms down near knees: ${ascendingPrep.armBalance}`,
+const leftAscentPose = { ...poseController.evaluate(leftAscentPresentation) };
+assert.equal(leftAscentPresentation.rampAscending, true);
+assert.equal(leftAscentPose.ascendingPrep, true);
+
+const rightAscentSim = new HalfpipeSimulation(profile);
+rightAscentSim.reset({
+  pipeX: wallX(profile, 1, 0.35),
+  tangentVelocity: 7,
+});
+rightAscentSim.state.facingTurns = 1;
+const rightAscentPresentation = simulationToPresentationState(
+  profile,
+  rightAscentSim.snapshot(),
 );
-assert.ok(
-  ascendingPrep.forearmDrop > descendingPose.forearmDrop,
-  'ascending preload should lower/bend forearms more than normal riding',
+const rightAscentPose = { ...poseController.evaluate(rightAscentPresentation) };
+assert.equal(rightAscentPresentation.rampAscending, true);
+assert.equal(rightAscentPose.ascendingPrep, true);
+
+const descendingSim = new HalfpipeSimulation(profile);
+descendingSim.reset({
+  pipeX: wallX(profile, -1, 0.35),
+  tangentVelocity: 7,
+});
+const descendingPresentation = simulationToPresentationState(
+  profile,
+  descendingSim.snapshot(),
 );
+const descendingPose = { ...poseController.evaluate(descendingPresentation) };
+assert.equal(descendingPresentation.rampAscending, false);
+assert.equal(descendingPose.ascendingPrep, false);
+
+for (const prep of [leftAscentPose, rightAscentPose]) {
+  assert.ok(
+    prep.kneeFlex > descendingPose.kneeFlex + 0.35,
+    `ramp ascent should use a clearly deeper knee bend: up=${prep.kneeFlex}, down=${descendingPose.kneeFlex}`,
+  );
+  assert.ok(
+    prep.armBalance >= 1.15,
+    `ramp ascent should keep both arms down near knees: ${prep.armBalance}`,
+  );
+  assert.ok(
+    prep.forearmDrop >= 0.3,
+    `ramp ascent should maintain the forearm-down preload: ${prep.forearmDrop}`,
+  );
+}
+
+// Turn yaw must be linear: equal time slices produce equal angular increments.
+const linearTurn = new HalfpipeSimulation(profile);
+linearTurn.reset({
+  pipeX: wallX(profile, -1, 0.86),
+  tangentVelocity: -7,
+});
+linearTurn.setTurnIntent(1);
+linearTurn.stepFixed();
+linearTurn.setTurnIntent(0);
+const durationSteps = Math.round(
+  GAME_CONFIG.trickPresentation.kickTurnDuration / linearTurn.fixedDt,
+);
+const sampleAt = new Set([
+  Math.round(durationSteps * 0.25),
+  Math.round(durationSteps * 0.50),
+  Math.round(durationSteps * 0.75),
+]);
+const yawSamples = [0];
+for (let index = 1; index <= durationSteps; index += 1) {
+  linearTurn.stepFixed();
+  if (sampleAt.has(index)) {
+    yawSamples.push(
+      simulationToPresentationState(profile, linearTurn.snapshot()).facingYaw,
+    );
+  }
+}
+yawSamples.push(
+  simulationToPresentationState(profile, linearTurn.snapshot()).facingYaw,
+);
+assert.equal(yawSamples.length, 5);
+const yawDeltas = yawSamples.slice(1).map(
+  (value, index) => value - yawSamples[index],
+);
+const avgYawDelta = yawDeltas.reduce((sum, value) => sum + value, 0)
+  / yawDeltas.length;
+for (const delta of yawDeltas) {
+  assert.ok(
+    Math.abs(delta - avgYawDelta) < 0.12,
+    `turn rotation must stay linear without midpoint speed-up: ${JSON.stringify({ yawSamples, yawDeltas })}`,
+  );
+}
 
 console.log(JSON.stringify({
   dropIn: {
@@ -366,10 +424,15 @@ console.log(JSON.stringify({
     midpointYaw: backAirPresentation.facingYaw,
   },
   ascendingPrep: {
-    kneeFlex: ascendingPrep.kneeFlex,
-    armBalance: ascendingPrep.armBalance,
-    forearmDrop: ascendingPrep.forearmDrop,
+    leftKneeFlex: leftAscentPose.kneeFlex,
+    rightKneeFlex: rightAscentPose.kneeFlex,
+    armBalance: leftAscentPose.armBalance,
+    forearmDrop: leftAscentPose.forearmDrop,
     descendingKneeFlex: descendingPose.kneeFlex,
+  },
+  linearTurn: {
+    yawSamples,
+    yawDeltas,
   },
   poseMirror: {
     forward: {
