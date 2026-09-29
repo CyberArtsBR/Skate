@@ -213,10 +213,10 @@ const trickProfile = new HalfpipeProfile();
 
 const kickTurnSim = new HalfpipeSimulation(trickProfile);
 kickTurnSim.reset({
-  pipeX: wallX(trickProfile, 1, 0.82),
-  tangentVelocity: 8,
+  pipeX: wallX(trickProfile, -1, 0.82),
+  tangentVelocity: -8,
 });
-kickTurnSim.setTurnIntent(-1);
+kickTurnSim.setTurnIntent(1);
 const kickTurnStart = kickTurnSim.stepFixed();
 assert.equal(kickTurnStart.lastTrick, 'kick-turn');
 assert.equal(kickTurnStart.surfaceTrickActive, true);
@@ -226,15 +226,15 @@ for (let index = 0; index < 120 && kickTurnSim.snapshot().surfaceTrickActive; in
   kickTurnSim.stepFixed();
 }
 const kickTurnState = kickTurnSim.snapshot();
-assert.ok(kickTurnState.tangentVelocity < 0, 'right-wall kick turn should reverse back toward center after the slow-motion hold');
+assert.ok(kickTurnState.tangentVelocity > 0, 'left-wall kick turn should reverse back toward center after the slow-motion hold');
 assert.equal(kickTurnState.trickCount, 1);
 assert.ok(kickTurnState.lastTrickPoints >= 100 && kickTurnState.lastTrickPoints <= 300);
 assert.equal(kickTurnState.score, kickTurnState.lastTrickPoints);
 
 const handPlantSim = new HalfpipeSimulation(trickProfile);
 handPlantSim.reset({
-  pipeX: wallX(trickProfile, 1, 0.995),
-  tangentVelocity: 7,
+  pipeX: wallX(trickProfile, -1, 0.997),
+  tangentVelocity: -7,
 });
 handPlantSim.setHandPlantHeld(true);
 const handPlantStart = handPlantSim.stepFixed();
@@ -246,19 +246,19 @@ for (let index = 0; index < 180 && handPlantSim.snapshot().surfaceTrickActive; i
   handPlantSim.stepFixed();
 }
 const handPlantState = handPlantSim.snapshot();
-assert.ok(handPlantState.tangentVelocity < 0, 'hand plant should reverse the rider back into the pipe after the coping hold');
+assert.ok(handPlantState.tangentVelocity > 0, 'front-facing left-wall hand plant should reverse the rider back into the pipe after the coping hold');
 assert.ok(handPlantState.lastTrickPoints >= 400 && handPlantState.lastTrickPoints <= 700);
 
 const aerialTurnSim = new HalfpipeSimulation(trickProfile);
 aerialTurnSim.reset({
-  pipeX: trickProfile.rightLip - 0.006,
-  tangentVelocity: 20,
+  pipeX: trickProfile.leftLip + 0.03,
+  tangentVelocity: -20,
 });
 for (let index = 0; index < 60 && aerialTurnSim.snapshot().mode !== 'airborne'; index += 1) {
   aerialTurnSim.stepFixed();
 }
 assert.equal(aerialTurnSim.snapshot().mode, 'airborne', 'aerial-turn probe must launch');
-aerialTurnSim.setTurnIntent(-1);
+aerialTurnSim.setTurnIntent(1);
 for (let index = 0; index < 18; index += 1) aerialTurnSim.stepFixed();
 aerialTurnSim.setTurnIntent(0);
 for (let index = 0; index < 900 && aerialTurnSim.snapshot().mode === 'airborne'; index += 1) {
