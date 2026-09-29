@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import { HalfpipeSimulation } from '../src/halfpipe/HalfpipeSimulation.js';
+import { PHASE4_GAMEPLAY_CONFIG } from '../src/gameplay/phase4GameplayConfig.js';
+import {
+  evaluatePumpRating,
+  PUMP_RATINGS,
+} from '../src/gameplay/HalfpipePumpRating.js';
 import { evaluateLanding, LANDING_QUALITIES } from '../src/gameplay/HalfpipeLandingSystem.js';
 
 class Vec2 {
@@ -35,6 +40,36 @@ class Profile {
   }
 }
 const profile = new Profile();
+
+assert.equal(PHASE4_GAMEPLAY_CONFIG.crash.bailMomentumRetention, 0.90);
+assert.equal(PHASE4_GAMEPLAY_CONFIG.pumping.acceleration, 8.2);
+assert.equal(
+  evaluatePumpRating({
+    intent: 1,
+    desiredIntent: 1,
+    wallFraction: 0.72,
+    speedEligible: true,
+  }),
+  PUMP_RATINGS.PERFECT,
+);
+assert.equal(
+  evaluatePumpRating({
+    intent: 1,
+    desiredIntent: 1,
+    wallFraction: 0.85,
+    speedEligible: true,
+  }),
+  PUMP_RATINGS.GOOD,
+);
+assert.equal(
+  evaluatePumpRating({
+    intent: 1,
+    desiredIntent: 1,
+    wallFraction: 0.26,
+    speedEligible: true,
+  }),
+  PUMP_RATINGS.WEAK,
+);
 
 const launch = new HalfpipeSimulation(profile);
 assert.equal(launch.computeLaunchVelocity(1.19), 0);
@@ -133,6 +168,19 @@ assert.equal(evaluateLanding({impactSpeed:32}).quality, LANDING_QUALITIES.CLEAN)
 assert.equal(evaluateLanding({impactSpeed:43}).quality, LANDING_QUALITIES.SKETCHY);
 assert.equal(evaluateLanding({impactSpeed:49}).quality, LANDING_QUALITIES.HEAVY);
 assert.equal(evaluateLanding({impactSpeed:54}).quality, LANDING_QUALITIES.BAIL);
+
+const bailRecovery = new HalfpipeSimulation(profile);
+const bailTakeoff = bailRecovery._enterAir(
+  -1,
+  -20,
+  profile.leftLip + bailRecovery.airTakeoffInset,
+);
+bailRecovery._resolveLanding(-1, bailTakeoff.y, -60);
+assert.equal(bailRecovery.state.crashActive, true);
+assert.ok(
+  bailRecovery.state.tangentVelocity > 50 && bailRecovery.state.tangentVelocity < 51.5,
+  `bail should retain about 90% of landing momentum, got ${bailRecovery.state.tangentVelocity}`,
+);
 
 const surface = new HalfpipeSimulation(profile);
 surface.reset({ pipeX: -(profile.flatHalfWidth + profile.transitionWidth*0.85), tangentVelocity:-8 });
