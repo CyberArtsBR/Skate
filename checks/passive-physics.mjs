@@ -43,7 +43,7 @@ assert.equal(first.final.lipContacts, 0, 'default passive calibration should rem
 assert.equal(first.final.mode, 'contact');
 assert.ok(first.final.lastBottomCrossingTime !== null);
 assert.ok(
-  first.final.bottomCrossingInterval >= 1.8 && first.final.bottomCrossingInterval <= 2.4,
+  first.final.bottomCrossingInterval >= 2.35 && first.final.bottomCrossingInterval <= 3.2,
   `passive no-input cadence drifted outside the technical-crash approach band: ${first.final.bottomCrossingInterval}`,
 );
 assert.ok(first.final.lastCrossingSpeed > 0);
@@ -95,8 +95,13 @@ assert.equal(presentationState.pumpCompression, 0);
 function runPumped(seconds = 8) {
   const profile = new HalfpipeProfile();
   const simulation = new HalfpipeSimulation(profile);
+  simulation.reset({
+    pipeX: -(profile.flatHalfWidth + profile.transitionWidth * 0.72),
+    tangentVelocity: 0,
+  });
+  const initialAmplitude = Math.abs(simulation.snapshot().pipeX);
   const totalSteps = Math.round(seconds / simulation.fixedDt);
-  let maxAbsX = Math.abs(simulation.snapshot().pipeX);
+  let maxAbsX = initialAmplitude;
   let timeToHighAmplitude = null;
   const highAmplitudeTarget = profile.rightLip * 0.9;
 
@@ -117,15 +122,16 @@ function runPumped(seconds = 8) {
     maxAbsX,
     timeToHighAmplitude,
     highAmplitudeTarget,
+    initialAmplitude,
   };
 }
 
 const pumped = runPumped();
 assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
-assert.ok(pumped.maxAbsX > Math.abs(first.initial.pipeX), 'correct pumping should increase amplitude');
+assert.ok(pumped.maxAbsX > pumped.initialAmplitude, 'correct pumping should increase amplitude from a lower transition start');
 assert.ok(
-  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 2.6,
-  `strong correct pumping should reach 90% lip amplitude within 2.6s, got ${pumped.timeToHighAmplitude}`,
+  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 6,
+  `correct pumping should reach 90% lip amplitude within 6s from the calibration start, got ${pumped.timeToHighAmplitude}`,
 );
 assert.ok(
   ['contact', 'airborne'].includes(pumped.final.mode),
@@ -137,6 +143,7 @@ console.log(JSON.stringify({
   final: first.final,
   fixedDt: first.simulation.fixedDt,
   pumped: {
+    initialAmplitude: pumped.initialAmplitude,
     maxAbsX: pumped.maxAbsX,
     timeToHighAmplitude: pumped.timeToHighAmplitude,
     highAmplitudeTarget: pumped.highAmplitudeTarget,
@@ -173,8 +180,8 @@ const airborne = runUntilAirborne();
 const lipY = airborne.profile.sample(airborne.profile.rightLip).y;
 assert.ok(airborne.firstAirTime !== null, 'strong pumping should launch vertically above a lip');
 assert.ok(
-  airborne.firstAirTime <= 6,
-  `vertical air launch should be reachable within 6s, got ${airborne.firstAirTime}`,
+  airborne.firstAirTime <= 7.5,
+  `slower-tuned vertical air launch should be reachable within 7.5s, got ${airborne.firstAirTime}`,
 );
 assert.ok(
   airborne.peakY !== null && airborne.peakY > lipY + 0.7,
@@ -206,41 +213,59 @@ const trickProfile = new HalfpipeProfile();
 
 const kickTurnSim = new HalfpipeSimulation(trickProfile);
 kickTurnSim.reset({
-  pipeX: wallX(trickProfile, 1, 0.82),
-  tangentVelocity: 8,
+  pipeX: wallX(trickProfile, -1, 0.82),
+  tangentVelocity: -8,
 });
-kickTurnSim.setTurnIntent(-1);
-const kickTurnState = kickTurnSim.stepFixed();
-assert.equal(kickTurnState.lastTrick, 'kick-turn');
-assert.ok(kickTurnState.tangentVelocity < 0, 'right-wall kick turn should reverse back toward center');
+kickTurnSim.setTurnIntent(1);
+const kickTurnStart = kickTurnSim.stepFixed();
+assert.equal(kickTurnStart.lastTrick, 'kick-turn');
+assert.equal(kickTurnStart.surfaceTrickActive, true);
+assert.equal(kickTurnStart.tangentVelocity, 0);
+kickTurnSim.setTurnIntent(0);
+for (let index = 0; index < 120 && kickTurnSim.snapshot().surfaceTrickActive; index += 1) {
+  kickTurnSim.stepFixed();
+}
+const kickTurnState = kickTurnSim.snapshot();
+assert.ok(kickTurnState.tangentVelocity > 0, 'left-wall kick turn should reverse back toward center after the slow-motion hold');
 assert.equal(kickTurnState.trickCount, 1);
 assert.ok(kickTurnState.lastTrickPoints >= 100 && kickTurnState.lastTrickPoints <= 300);
 assert.equal(kickTurnState.score, kickTurnState.lastTrickPoints);
 
 const handPlantSim = new HalfpipeSimulation(trickProfile);
 handPlantSim.reset({
-  pipeX: wallX(trickProfile, 1, 0.95),
-  tangentVelocity: 7,
+  pipeX: wallX(trickProfile, -1, 0.999),
+  tangentVelocity: -7,
 });
 handPlantSim.setHandPlantHeld(true);
-const handPlantState = handPlantSim.stepFixed();
-assert.equal(handPlantState.lastTrick, 'hand-plant');
-assert.ok(handPlantState.tangentVelocity < 0, 'hand plant should reverse the rider back into the pipe');
+const handPlantStart = handPlantSim.stepFixed();
+assert.equal(handPlantStart.lastTrick, 'hand-plant');
+assert.equal(handPlantStart.surfaceTrickActive, true);
+assert.equal(handPlantStart.tangentVelocity, 0);
+assert.ok(
+  Math.abs(handPlantStart.pipeX - (trickProfile.leftLip + handPlantSim.lipInset)) < 1e-9,
+  `hand plant must be pinned to the physical coping/lip: ${handPlantStart.pipeX}`,
+);
+handPlantSim.setHandPlantHeld(false);
+for (let index = 0; index < 180 && handPlantSim.snapshot().surfaceTrickActive; index += 1) {
+  handPlantSim.stepFixed();
+}
+const handPlantState = handPlantSim.snapshot();
+assert.ok(handPlantState.tangentVelocity > 0, 'front-facing left-wall hand plant should reverse the rider back into the pipe after the coping hold');
 assert.ok(handPlantState.lastTrickPoints >= 400 && handPlantState.lastTrickPoints <= 700);
 
 const aerialTurnSim = new HalfpipeSimulation(trickProfile);
 aerialTurnSim.reset({
-  pipeX: trickProfile.rightLip - 0.006,
-  tangentVelocity: 20,
+  pipeX: trickProfile.leftLip + 0.03,
+  tangentVelocity: -20,
 });
 for (let index = 0; index < 60 && aerialTurnSim.snapshot().mode !== 'airborne'; index += 1) {
   aerialTurnSim.stepFixed();
 }
 assert.equal(aerialTurnSim.snapshot().mode, 'airborne', 'aerial-turn probe must launch');
-aerialTurnSim.setTurnIntent(-1);
-for (let index = 0; index < 22; index += 1) aerialTurnSim.stepFixed();
+aerialTurnSim.setTurnIntent(1);
+for (let index = 0; index < 18; index += 1) aerialTurnSim.stepFixed();
 aerialTurnSim.setTurnIntent(0);
-for (let index = 0; index < 600 && aerialTurnSim.snapshot().mode === 'airborne'; index += 1) {
+for (let index = 0; index < 900 && aerialTurnSim.snapshot().mode === 'airborne'; index += 1) {
   aerialTurnSim.stepFixed();
 }
 const aerialTurnState = aerialTurnSim.snapshot();

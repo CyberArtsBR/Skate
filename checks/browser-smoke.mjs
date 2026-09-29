@@ -44,6 +44,30 @@ const passiveProbe = await page.evaluate(() => {
       : null,
   };
 });
+const dropInProbe = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  foundation.physics.setRunning(false);
+  const state = foundation.simulation.reset();
+  foundation.physics.applyCurrentState();
+  foundation.rider.root.updateWorldMatrix(true, true);
+  const wheelWorld = foundation.rider.skateboard.contactPoints.map((point) => {
+    const world = foundation.rider.skateboard.root.localToWorld(point.clone());
+    return world.toArray();
+  });
+  const lipY = foundation.profile.sample(foundation.profile.rightLip).y;
+  const topWheelY = Math.max(...wheelWorld.map((point) => point[1]));
+  return {
+    pipeX: state.pipeX,
+    rightLip: foundation.profile.rightLip,
+    lipY,
+    topWheelY,
+    topWheelGap: lipY - topWheelY,
+    wheelWorld,
+    dropInRoll: foundation.rider.presentationState.dropInRoll,
+    carrierRoll: foundation.rider.trickCarrier.rotation.z,
+  };
+});
+
 await page.evaluate(() => {
   const foundation = window.__HALFPIPE_FOUNDATION__;
   foundation.presentationDebug.select(0);
@@ -72,6 +96,8 @@ const state = await page.evaluate(() => {
     wheelSpinSafe: foundation.rider.skateboard.wheelSpinSafe,
     measuredWheelDiameter: foundation.rider.skateboard.measuredWheelDiameter,
     surfaceSupportPointCount: foundation.rider.skateboard.surfaceSupportPoints.length,
+    chimpionTargetHeight: foundation.rider.chimpion.root.userData.targetHeight,
+    skateboardSourceScale: foundation.rider.skateboard.root.userData.sourceScale,
     rigCapabilities: foundation.rider.chimpion.rigAdapter.capabilities,
     groundMaterial: foundation.ground.ground.material.type,
     groundDepthWrite: foundation.ground.ground.material.depthWrite,
@@ -213,6 +239,107 @@ const airTransition = await page.evaluate(() => {
   return { launch, landing };
 });
 
+const backFacingPoseProbe = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  const simulation = foundation.simulation;
+  const profile = foundation.profile;
+  const wallX = (side, fraction) => side * (
+    profile.flatHalfWidth + profile.transitionWidth * fraction
+  );
+
+  simulation.reset({
+    pipeX: wallX(1, 0.58),
+    tangentVelocity: 8,
+  });
+  simulation.state.facingTurns = 1;
+  simulation.setPumpIntent(0);
+  simulation.setTurnIntent(0);
+  simulation.setHandPlantHeld(false);
+  foundation.physics.applyCurrentState();
+
+  const rig = foundation.rider.chimpion.rigAdapter.rig;
+  const world = (bone) => {
+    if (!bone) return null;
+    const point = bone.position.clone();
+    bone.getWorldPosition(point);
+    return point.toArray();
+  };
+
+  return {
+    facingYaw: foundation.rider.presentationState.facingYaw,
+    ascending: foundation.rider.presentationState.ascending,
+    rampAscending: foundation.rider.presentationState.rampAscending,
+    bodyY: foundation.rider.chimpion.root.position.y,
+    baseBodyY: foundation.rider.baseChimpionY,
+    leftTargetY: foundation.rider.footIK.targets.left.position.y,
+    rightTargetY: foundation.rider.footIK.targets.right.position.y,
+    leftTargetBaseY: foundation.rider.footIK.targets.left.userData.baseY,
+    rightTargetBaseY: foundation.rider.footIK.targets.right.userData.baseY,
+    footIK: { ...foundation.rider.footIK.result },
+    leftHand: world(rig.leftHand),
+    rightHand: world(rig.rightHand),
+    leftKnee: world(rig.leftShin),
+    rightKnee: world(rig.rightShin),
+    leftFoot: world(rig.leftFoot),
+    rightFoot: world(rig.rightFoot),
+  };
+});
+
+const trickPresentationProbe = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  const simulation = foundation.simulation;
+  const profile = foundation.profile;
+  const wallX = (side, fraction) => side * (
+    profile.flatHalfWidth + profile.transitionWidth * fraction
+  );
+
+  simulation.reset({
+    pipeX: wallX(-1, 0.84),
+    tangentVelocity: -7,
+  });
+  simulation.setTurnIntent(1);
+  simulation.stepFixed();
+  simulation.setTurnIntent(0);
+  const kickHalfSteps = Math.max(
+    1,
+    Math.round(simulation.snapshot().surfaceTrickDuration / simulation.fixedDt / 2),
+  );
+  for (let index = 0; index < kickHalfSteps; index += 1) simulation.stepFixed();
+  foundation.physics.applyCurrentState();
+  const kick = {
+    trick: simulation.snapshot().lastTrick,
+    yaw: foundation.rider.trickCarrier.rotation.y,
+    roll: foundation.rider.trickCarrier.rotation.z,
+    visualActive: foundation.rider.presentationState.trickVisualActive,
+  };
+
+  simulation.reset({
+    pipeX: wallX(-1, 0.999),
+    tangentVelocity: -7,
+  });
+  simulation.setHandPlantHeld(true);
+  simulation.stepFixed();
+  simulation.setHandPlantHeld(false);
+  const handPlantHalfSteps = Math.max(
+    1,
+    Math.round(simulation.snapshot().surfaceTrickDuration / simulation.fixedDt / 2),
+  );
+  for (let index = 0; index < handPlantHalfSteps; index += 1) simulation.stepFixed();
+  foundation.physics.applyCurrentState();
+  const handPlant = {
+    trick: simulation.snapshot().lastTrick,
+    pipeX: simulation.snapshot().pipeX,
+    leftLip: profile.leftLip,
+    lipInset: simulation.lipInset,
+    yaw: foundation.rider.trickCarrier.rotation.y,
+    roll: foundation.rider.trickCarrier.rotation.z,
+    offsetY: foundation.rider.trickCarrier.position.y,
+    visualActive: foundation.rider.presentationState.trickVisualActive,
+  };
+
+  return { kick, handPlant };
+});
+
 await page.keyboard.press('F3');
 const profileDebugVisible = await page.evaluate(
   () => window.__HALFPIPE_FOUNDATION__.profileDebug.root.visible,
@@ -226,16 +353,18 @@ assert.equal(state.canvasOpacity, '1');
 assert.equal(state.loadingDisplay, 'none');
 assert.equal(state.score, '0');
 assert.equal(state.time, '1:15');
-assert.equal(state.backgroundAsset, '/images/backgrounds/halfpipe-hollywood-original.jpg');
-assert.ok(state.backgroundImage.includes('halfpipe-hollywood-original.jpg'));
+assert.equal(state.backgroundAsset, '/images/backgrounds/halfpipe-chimpions-merch.jpg');
+assert.ok(state.backgroundImage.includes('halfpipe-chimpions-merch.jpg'));
 assert.ok(state.backgroundDimensions[0] >= 1600);
 assert.ok(state.backgroundDimensions[1] >= 900);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] > 1.76);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] < 1.8);
 assert.equal(state.wheelCount, 4);
 assert.equal(state.wheelSpinSafe, false);
-assert.ok(state.measuredWheelDiameter > 0);
+assert.ok(state.measuredWheelDiameter > 0.075, `scaled skateboard wheel diameter is too small: ${state.measuredWheelDiameter}`);
 assert.ok(state.surfaceSupportPointCount >= 6);
+assert.ok(state.chimpionTargetHeight >= 2.3, `chimpion target height should be visibly larger: ${state.chimpionTargetHeight}`);
+assert.ok(state.skateboardSourceScale >= 0.11, `skateboard source scale should be visibly larger: ${state.skateboardSourceScale}`);
 assert.equal(state.rigCapabilities.gameplayFoundation, true);
 assert.equal(state.groundMaterial, 'ShadowMaterial');
 assert.equal(state.groundDepthWrite, false);
@@ -299,6 +428,71 @@ for (const station of stationStates) {
 assert.ok(stationStates[2].boardAngle < 0, 'left transition must slope down toward center');
 assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away from center');
 assert.equal(profileDebugVisible, true);
+assert.equal(backFacingPoseProbe.ascending, true);
+assert.equal(backFacingPoseProbe.rampAscending, true);
+assert.ok(
+  Math.cos(backFacingPoseProbe.facingYaw) < 0,
+  `back-facing probe should really be fakie: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
+  backFacingPoseProbe.footIK.enabled
+    && backFacingPoseProbe.footIK.maxError < 0.08,
+  `back-facing feet must stay planted on skateboard: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
+  backFacingPoseProbe.bodyY
+    <= backFacingPoseProbe.baseBodyY - 0.03,
+  `fakie body should be seated lower toward the deck: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
+  backFacingPoseProbe.leftTargetY
+    <= backFacingPoseProbe.leftTargetBaseY - 0.04
+    && backFacingPoseProbe.rightTargetY
+      <= backFacingPoseProbe.rightTargetBaseY - 0.04,
+  `fakie foot targets should be pulled down onto the deck: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
+  Math.abs(backFacingPoseProbe.leftHand[1] - backFacingPoseProbe.leftKnee[1]) < 0.35
+    && Math.abs(backFacingPoseProbe.rightHand[1] - backFacingPoseProbe.rightKnee[1]) < 0.35,
+  `ascending fakie hands should stay down near the knees, not raised: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
+  dropInProbe.pipeX > 0
+    && Math.abs(dropInProbe.pipeX - dropInProbe.rightLip) < 0.12,
+  `drop-in should start at the top of the RIGHT wall: ${JSON.stringify(dropInProbe)}`,
+);
+assert.ok(
+  dropInProbe.dropInRoll > 0.12 && dropInProbe.carrierRoll > 0.12,
+  `drop-in manual nose lift is not visible: ${JSON.stringify(dropInProbe)}`,
+);
+assert.ok(
+  Math.abs(dropInProbe.topWheelGap) < 0.05,
+  `drop-in upper wheel should begin at the coping/white bar, gap=${dropInProbe.topWheelGap}: ${JSON.stringify(dropInProbe)}`,
+);
+assert.equal(trickPresentationProbe.kick.trick, 'kick-turn');
+assert.equal(trickPresentationProbe.kick.visualActive, true);
+assert.ok(
+  Math.abs(trickPresentationProbe.kick.yaw) > 0.45,
+  `kick turn carrier yaw is not visible: ${trickPresentationProbe.kick.yaw}`,
+);
+assert.equal(trickPresentationProbe.handPlant.trick, 'hand-plant');
+assert.equal(trickPresentationProbe.handPlant.visualActive, true);
+assert.ok(
+  Math.abs(
+    trickPresentationProbe.handPlant.pipeX
+      - (trickPresentationProbe.handPlant.leftLip
+        + trickPresentationProbe.handPlant.lipInset)
+  ) < 1e-6,
+  `hand plant must be visually pinned to the white coping bar: ${JSON.stringify(trickPresentationProbe.handPlant)}`,
+);
+assert.ok(
+  Math.abs(trickPresentationProbe.handPlant.roll) > 0.6,
+  `hand plant carrier roll is not visible: ${trickPresentationProbe.handPlant.roll}`,
+);
+assert.ok(
+  trickPresentationProbe.handPlant.offsetY > 0.12,
+  `hand plant carrier lift is not visible: ${trickPresentationProbe.handPlant.offsetY}`,
+);
 assert.ok(airTransition.launch, 'air transition probe must reach airborne mode');
 assert.ok(
   airTransition.launch.lipDistance >= 0.004,
@@ -326,4 +520,7 @@ console.log(JSON.stringify({
   pageErrors,
   failedRequests,
   airTransition,
+  trickPresentationProbe,
+  dropInProbe,
+  backFacingPoseProbe,
 }, null, 2));

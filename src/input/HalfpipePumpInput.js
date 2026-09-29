@@ -15,6 +15,7 @@ const HORIZONTAL_KEYS = new Map([
 const GAMEPAD_BUTTON = Object.freeze({
   primary: 0,   // Xbox A / PlayStation Cross
   secondary: 1, // Xbox B / PlayStation Circle
+  tertiary: 2,  // Xbox X / PlayStation Square
   back: 8,      // Xbox View / PlayStation Share
   start: 9,     // Xbox Menu / PlayStation Options
   dpadUp: 12,
@@ -168,7 +169,11 @@ export class HalfpipePumpInput {
       this.gamepadTurnIntent = clampIntent(stickX);
     }
 
-    this.gamepadHandPlantHeld = buttonPressed(activePad, GAMEPAD_BUTTON.secondary);
+    this.gamepadHandPlantHeld = (
+      buttonPressed(activePad, GAMEPAD_BUTTON.primary)
+      || buttonPressed(activePad, GAMEPAD_BUTTON.secondary)
+      || buttonPressed(activePad, GAMEPAD_BUTTON.tertiary)
+    );
     this.handPlantHeld = this.keyboardHandPlantHeld || this.gamepadHandPlantHeld;
 
     this._queueEdge('primary', buttonPressed(activePad, GAMEPAD_BUTTON.primary));
