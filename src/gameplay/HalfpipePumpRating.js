@@ -19,13 +19,16 @@ export function evaluatePumpRating({
   if (intent !== desiredIntent) return PUMP_RATINGS.WRONG;
 
   const fraction = clamp01(wallFraction);
-  const idealCenter = desiredIntent < 0 ? 0.48 : 0.28;
+  const idealCenter = desiredIntent > 0 ? 0.62 : 0.38;
   const error = fraction - idealCenter;
   const absoluteError = Math.abs(error);
 
-  if (absoluteError <= 0.12) return PUMP_RATINGS.PERFECT;
-  if (absoluteError <= 0.24) return PUMP_RATINGS.GOOD;
-  if (absoluteError <= 0.40) return PUMP_RATINGS.WEAK;
+  // Wider windows intentionally favor keyboard taps/holds while preserving a
+  // clear perfect center. Controller analog input still benefits from the same
+  // forgiving timing without changing the authoritative pump direction rule.
+  if (absoluteError <= 0.16) return PUMP_RATINGS.PERFECT;
+  if (absoluteError <= 0.32) return PUMP_RATINGS.GOOD;
+  if (absoluteError <= 0.52) return PUMP_RATINGS.WEAK;
 
   return error < 0 ? PUMP_RATINGS.EARLY : PUMP_RATINGS.LATE;
 }
@@ -33,10 +36,10 @@ export function evaluatePumpRating({
 export function pumpAccuracyWeight(rating) {
   switch (rating) {
     case PUMP_RATINGS.PERFECT: return 1;
-    case PUMP_RATINGS.GOOD: return 0.8;
-    case PUMP_RATINGS.WEAK: return 0.55;
+    case PUMP_RATINGS.GOOD: return 0.84;
+    case PUMP_RATINGS.WEAK: return 0.62;
     case PUMP_RATINGS.EARLY:
-    case PUMP_RATINGS.LATE: return 0.25;
+    case PUMP_RATINGS.LATE: return 0.36;
     default: return 0;
   }
 }
