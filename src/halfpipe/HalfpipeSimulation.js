@@ -1081,16 +1081,32 @@ export class HalfpipeSimulation {
     if (this.state.mode === 'airborne') return this._stepAirborne();
 
     const dt = this.fixedDt;
+    this._advanceRecovery();
+
+    if (this.state.landingActive) {
+      this.state.landingRemaining = Math.max(
+        0,
+        this.state.landingRemaining - dt,
+      );
+      if (this.state.landingRemaining <= 0) {
+        this.state.landingActive = false;
+        this.state.landingQuality = null;
+      }
+    }
+
     if (!this.handPlantHeld && this.handPlantBufferRemaining > 0) {
       this.handPlantBufferRemaining = Math.max(
         0,
         this.handPlantBufferRemaining - dt,
       );
     }
+
     const previousX = this.state.pipeX;
     const previousVelocity = this.state.tangentVelocity;
     const sample = this._sampleIncreasingX(previousX);
     const desiredIntent = this._pumpPhase(previousX, previousVelocity);
+    const effectivePumpIntent = this.state.crashActive ? 0 : this.pumpIntent;
+    const effectiveTurnIntent = this.state.crashActive ? 0 : this.turnIntent;
 
     const gravityAlongTangent = -this.gravity * sample.tangent.y;
     const verticalVelocity = previousVelocity * sample.tangent.y;
@@ -1108,44 +1124,78 @@ export class HalfpipeSimulation {
       ? 1 - upperFactor * (1 - this.pumpUpperWallRetention)
       : 1;
     const speedEligible = Math.abs(previousVelocity) >= this.pumpMinimumSpeed;
-    const pumpMatched = (
-      speedEligible
-      && this.pumpIntent !== 0
-      && this.pumpIntent === desiredIntent
+
+    const pumpRating = evaluatePumpRating({
+      intent: effectivePumpIntent,
+      desiredIntent,
+      wallFraction,
+      speedEligible,
+    });
+    const shouldRecordPumpAttempt = (
+      effectivePumpIntent !== 0
+      && (
+        effectivePumpIntent !== this._lastPumpInput
+        || desiredIntent !== this._lastPumpDesiredIntent
+      )
     );
-    const pumpAcceleration = pumpMatched
-      ? this.pumpAcceleration
-        * pumpInfluence
-        * (signWithEpsilon(previousVelocity, this.velocityEpsilon) || 1)
+    if (shouldRecordPumpAttempt) this._updatePumpStats(pumpRating);
+
+    const ratingMultiplier = pumpRating
+      ? PHASE4_GAMEPLAY_CONFIG.pumping.ratingMultipliers[pumpRating]
       : 0;
+    const velocityDirection =
+      signWithEpsilon(previousVelocity, this.velocityEpsilon) || 1;
+    let pumpAcceleration = 0;
+    if (
+      pumpRating
+      && pumpRating !== PUMP_RATINGS.WRONG
+      && ratingMultiplier > 0
+    ) {
+      pumpAcceleration = this.pumpAcceleration
+        * pumpInfluence
+        * ratingMultiplier
+        * velocityDirection;
+    } else if (pumpRating === PUMP_RATINGS.WRONG) {
+      pumpAcceleration = -this.wrongPumpPenaltyAcceleration * velocityDirection;
+    }
 
     const acceleration = scaledGravity + dragAcceleration + pumpAcceleration;
     let velocity = previousVelocity + acceleration * dt;
 
-    const pumpWork = pumpMatched
-      ? Math.max(0, Math.abs(pumpAcceleration * previousVelocity) * dt)
-      : 0;
+    const pumpWork = pumpAcceleration * previousVelocity * dt;
     if (pumpWork > 0) this.state.pumpWorkTotal += pumpWork;
 
-    this.state.pumpIntent = this.pumpIntent;
+    this.state.pumpIntent = effectivePumpIntent;
     this.state.pumpDesiredIntent = desiredIntent;
     this.state.pumpWindowInfluence = pumpInfluence;
-    this.state.pumpTimingQuality = pumpMatched ? pumpInfluence : 0;
-    this.state.pumpActive = pumpMatched;
+    this.state.pumpTimingQuality = pumpRating === PUMP_RATINGS.PERFECT
+      ? 1
+      : pumpRating === PUMP_RATINGS.GOOD
+        ? 0.8
+        : pumpRating === PUMP_RATINGS.WEAK
+          ? 0.55
+          : pumpRating === PUMP_RATINGS.EARLY || pumpRating === PUMP_RATINGS.LATE
+            ? 0.25
+            : 0;
+    this.state.pumpActive = pumpAcceleration > 0;
+    this.state.pumpRating = pumpRating;
     this.state.lastPumpWork = pumpWork;
-    this.state.turnIntent = this.turnIntent;
-    this.state.handPlantHeld = this.handPlantHeld;
+    this.state.turnIntent = effectiveTurnIntent;
+    this.state.handPlantHeld = this.state.crashActive ? false : this.handPlantHeld;
     this.state.trickType = null;
     this.state.trickProgress = 0;
 
+    const originalTurnIntent = this.turnIntent;
+    if (this.state.crashActive) this.turnIntent = 0;
     const surfaceTurn = this._trySurfaceTurn(previousX, velocity, desiredIntent);
+    this.turnIntent = originalTurnIntent;
     velocity = surfaceTurn.velocity;
+
+    this._lastPumpInput = effectivePumpIntent;
+    this._lastPumpDesiredIntent = desiredIntent;
 
     if (surfaceTurn.frozen) {
       this.state.time += dt;
-      // _startSurfaceTrick may deliberately move the presentation/contact
-      // anchor (Hand Plant pins to the coping). Preserve that resolved anchor
-      // instead of snapping back to the pre-trigger wall position.
       this.state.tangentVelocity = 0;
       this.state.tangentialAcceleration = 0;
       this._refreshDerivedState();
@@ -1180,11 +1230,21 @@ export class HalfpipeSimulation {
       } else if (nextX <= minX && velocity < 0) {
         this.state.lipContacts += 1;
         nextX = minX;
-        velocity = 0;
+        const rebound = Math.max(
+          PHASE4_GAMEPLAY_CONFIG.crash.technicalBounceSpeed,
+          Math.abs(velocity) * 0.35,
+        );
+        velocity = rebound;
+        this._startCrash('TECHNICAL_CRASH');
       } else if (nextX >= maxX && velocity > 0) {
         this.state.lipContacts += 1;
         nextX = maxX;
-        velocity = 0;
+        const rebound = Math.max(
+          PHASE4_GAMEPLAY_CONFIG.crash.technicalBounceSpeed,
+          Math.abs(velocity) * 0.35,
+        );
+        velocity = -rebound;
+        this._startCrash('TECHNICAL_CRASH');
       }
     }
 
@@ -1210,6 +1270,11 @@ export class HalfpipeSimulation {
       this.state.lastBottomCrossingTime = crossingTime;
       this.state.lastCrossingSpeed = Math.abs(velocity);
       this.state.bottomCrossings += 1;
+      this._emit('BOTTOM_CROSSING', {
+        speed: this.state.lastCrossingSpeed,
+        interval: this.state.bottomCrossingInterval,
+        crossings: this.state.bottomCrossings,
+      });
     }
 
     const nextDirection = signWithEpsilon(velocity, this.velocityEpsilon);
