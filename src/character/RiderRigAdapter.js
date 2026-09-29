@@ -332,6 +332,26 @@ export class RiderRigAdapter {
     this.model.updateWorldMatrix(true, true);
   }
 
+  getModelSpacePoseSignature(slots = Object.keys(this.rig)) {
+    this.model.updateWorldMatrix(true, true);
+    const modelWorld = this.model.getWorldQuaternion(new THREE.Quaternion());
+    const inverseModelWorld = modelWorld.clone().invert();
+    const signature = {};
+
+    for (const slot of slots) {
+      const bone = this.rig[slot];
+      const rest = this.restModelRotations[slot];
+      if (!bone || !rest) continue;
+
+      const boneWorld = bone.getWorldQuaternion(new THREE.Quaternion());
+      const currentModel = inverseModelWorld.clone().multiply(boneWorld).normalize();
+      const delta = currentModel.multiply(rest.clone().invert()).normalize();
+      signature[slot] = delta.toArray();
+    }
+
+    return signature;
+  }
+
   applyFoundationPose(options = {}) {
     const crouch = options.crouch ?? 0.55;
     this.applySkatePose({
