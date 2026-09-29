@@ -49,11 +49,12 @@ export class TrickPoseController {
       // looking like one rigid spinning object.
       const tuck = Math.max(0.72, clamp01(state.airTuck));
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
-      output.boardRoll += side * -0.11 * envelope;
-      output.bodyRoll = side * 0.18 * envelope;
-      output.bodyY = -0.17 * tuck * (0.65 + 0.35 * envelope);
-      output.bodyX = -side * 0.075 * envelope;
-      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.22;
+      const flipDirection = Math.sign(Number(state.trickRoll) || 0) || side;
+      output.boardRoll += -flipDirection * 0.09 * envelope;
+      output.bodyRoll = flipDirection * 0.16 * envelope;
+      output.bodyY = -0.18 * tuck * (0.62 + 0.38 * envelope);
+      output.bodyX = -side * 0.065 * envelope;
+      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.18;
     } else if (state.airborne) {
       output.boardRoll += (this.stance === 'goofy' ? -1 : 1)
         * 0.035

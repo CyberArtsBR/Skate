@@ -40,10 +40,17 @@ const launch = new HalfpipeSimulation(profile);
 assert.equal(launch.computeLaunchVelocity(1.19), 0);
 const atThreshold = launch.computeLaunchVelocity(1.2);
 const justAbove = launch.computeLaunchVelocity(1.21);
-assert.ok(atThreshold > 0 && atThreshold < 2);
+assert.ok(atThreshold > 8 && atThreshold < 9);
 assert.ok(justAbove - atThreshold < 0.05);
-assert.ok(launch.computeLaunchVelocity(18) > 28);
-assert.ok(launch.computeLaunchVelocity(18) <= 38 + 1e-9);
+assert.ok(launch.computeLaunchVelocity(18) > 20);
+assert.ok(launch.computeLaunchVelocity(18) <= 27 + 1e-9);
+const maxLaunchVelocity = launch.computeLaunchVelocity(22);
+assert.ok(Math.abs(maxLaunchVelocity - 27) < 1e-9);
+const maxAirHeight = (maxLaunchVelocity * maxLaunchVelocity) / (2 * launch.airGravity);
+assert.ok(
+  maxAirHeight > 7 && maxAirHeight < 7.5,
+  `V7 maximum air height should be roughly half the previous ~14.4m: ${maxAirHeight}`,
+);
 
 launch._enterAir(-1, -12, profile.leftLip + launch.airTakeoffInset);
 launch.state.currentAirPeakY += 2;
@@ -58,25 +65,30 @@ assert.equal(launch.state.runMaxAirY, previousRunMax);
 const tap = new HalfpipeSimulation(profile);
 tap._enterAir(-1, -14, profile.leftLip + tap.airTakeoffInset);
 const beforeY = tap.state.airY;
-tap.setTurnIntent(1);
+tap.setTurnIntent(-1);
 for (let i=0;i<5;i++) tap.stepFixed();
 const duringY = tap.state.airY;
 assert.notEqual(duringY, beforeY);
+assert.ok(tap.state.airRotationSignedDegrees > 0, 'front-facing LEFT must rotate counter-clockwise');
 tap.setTurnIntent(0);
 tap.stepFixed();
 assert.equal(tap.state.airTurnCompleted, false);
-assert.equal(tap.state.airTurnFailedReason, 'UNDER_ROTATED');
+assert.equal(tap.state.airTurnFailedReason, null, 'releasing in air must pause, not fail the trick');
+assert.equal(tap.state.airTurnActive, false);
 
 const clean = new HalfpipeSimulation(profile);
 clean._enterAir(-1, -16, profile.leftLip + clean.airTakeoffInset);
-clean.setTurnIntent(1);
+clean.setTurnIntent(-1);
 for (let i=0;i<36;i++) clean.stepFixed();
 clean.setTurnIntent(0);
 clean.stepFixed();
+assert.equal(clean.state.airTurnCompleted, false);
+clean._finishAirTurnFromInput();
 assert.equal(clean.state.airTurnCompleted, true);
 assert.equal(clean.state.airTurnFailedReason, null);
 assert.ok(clean.state.airRotationDegrees >= 170 && clean.state.airRotationDegrees <= 190);
 assert.equal(clean.state.airRotationTargetDegrees, 180);
+assert.equal(clean.state.airTurnDirection, 1);
 
 const spin360 = new HalfpipeSimulation(profile);
 spin360._enterAir(1, 22, profile.rightLip - spin360.airTakeoffInset);
@@ -84,17 +96,28 @@ spin360.setTurnIntent(-1);
 for (let i=0;i<72;i++) spin360.stepFixed();
 spin360.setTurnIntent(0);
 spin360.stepFixed();
+spin360._finishAirTurnFromInput();
 assert.equal(spin360.state.airTurnCompleted, true);
 assert.equal(spin360.state.airRotationTargetDegrees, 360);
 
 const over = new HalfpipeSimulation(profile);
 over._enterAir(-1, -30, profile.leftLip + over.airTakeoffInset);
-over.setTurnIntent(1);
+over.setTurnIntent(-1);
 for (let i=0;i<50;i++) over.stepFixed();
+assert.ok(over.state.airRotationDegrees > 240);
+
+// Correct the over-turn before landing by steering in the opposite direction.
+over.setTurnIntent(1);
+for (let i=0;i<14;i++) over.stepFixed();
+assert.ok(
+  over.state.airRotationDegrees >= 175 && over.state.airRotationDegrees <= 185,
+  `opposite in-air input should rewind rotation toward 180: ${over.state.airRotationDegrees}`,
+);
 over.setTurnIntent(0);
 over.stepFixed();
-assert.equal(over.state.airTurnOverturned, true);
-assert.equal(over.state.airTurnFailedReason, 'OVER_ROTATED');
+over._finishAirTurnFromInput();
+assert.equal(over.state.airTurnCompleted, true);
+assert.equal(over.state.airTurnFailedReason, null);
 
 const backflip = new HalfpipeSimulation(profile);
 backflip._enterAir(-1, -24, profile.leftLip + backflip.airTakeoffInset);
@@ -131,6 +154,38 @@ assert.equal(
   oppositeWallSurface.state.surfaceTrickActive,
   true,
   'turns must work on either wall regardless of facing',
+);
+assert.equal(
+  oppositeWallSurface.state.lastTrickTurnDirection,
+  -1,
+  'front-facing RIGHT input must rotate clockwise',
+);
+
+const frontFacingLeftTurn = new HalfpipeSimulation(profile);
+frontFacingLeftTurn.reset({
+  pipeX: -(profile.flatHalfWidth + profile.transitionWidth * 0.85),
+  tangentVelocity: -8,
+});
+frontFacingLeftTurn.setTurnIntent(-1);
+frontFacingLeftTurn.stepFixed();
+assert.equal(
+  frontFacingLeftTurn.state.lastTrickTurnDirection,
+  1,
+  'front-facing LEFT input must rotate counter-clockwise',
+);
+
+const backFacingControls = new HalfpipeSimulation(profile);
+backFacingControls.reset({
+  pipeX: -(profile.flatHalfWidth + profile.transitionWidth * 0.85),
+  tangentVelocity: -8,
+});
+backFacingControls.state.facingTurns = 1;
+backFacingControls.setTurnIntent(-1);
+backFacingControls.stepFixed();
+assert.equal(
+  backFacingControls.state.lastTrickTurnDirection,
+  -1,
+  'back-facing LEFT input must invert to clockwise',
 );
 
 const failedHandPlant = new HalfpipeSimulation(profile);

@@ -1,30 +1,30 @@
 export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   launch: Object.freeze({
     thresholdSpeed: 1.2,
-    visiblePopVelocity: 0.8,
+    visiblePopVelocity: 8.5,
     speedForMaximumVelocity: 22,
-    maximumVerticalVelocity: 38,
+    maximumVerticalVelocity: 27,
   }),
   gravity: Object.freeze({
     downhillScale: 1.08,
     uphillScale: 1.35,
   }),
   pumping: Object.freeze({
-    acceleration: 10.2,
-    wrongPenaltyAcceleration: 0.6,
+    acceleration: 8.0,
+    wrongPenaltyAcceleration: 1.25,
     ratingMultipliers: Object.freeze({
-      PERFECT: 1.2,
-      GOOD: 1.05,
-      WEAK: 0.82,
-      EARLY: 0.68,
-      LATE: 0.68,
+      PERFECT: 1.0,
+      GOOD: 0.82,
+      WEAK: 0.52,
+      EARLY: 0.16,
+      LATE: 0.16,
       WRONG: -0.35,
     }),
-    rhythmBoostPerfect: 0.04,
-    rhythmBoostGood: 0.026,
-    rhythmBoostWeak: 0.012,
-    rhythmBoostPenalty: 0.018,
-    rhythmBoostMax: 0.18,
+    rhythmBoostPerfect: 0.025,
+    rhythmBoostGood: 0.014,
+    rhythmBoostWeak: 0.005,
+    rhythmBoostPenalty: 0.025,
+    rhythmBoostMax: 0.08,
   }),
   aerial: Object.freeze({
     rotationDegreesPerSecond: 600,
@@ -45,13 +45,13 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     doubleDegrees: 720,
     validErrorDegrees: 42,
     hardOverrunDegrees: 66,
-    doubleMinimumLaunchVelocity: 30,
+    doubleMinimumLaunchVelocity: 22,
   }),
   landing: Object.freeze({
     activeSeconds: 0.28,
-    // High-air landings can carry ~38 units/s vertically. A correctly timed
-    // return should remain landable; rotation/flip timing is the primary bail
-    // criterion for the new 540/720/900 and backflip system.
+    // The reduced-height V7 air model caps around 27 units/s vertically.
+    // Correctly timed returns remain landable; rotation/flip timing stays the
+    // primary bail criterion for 540/720/900 and backflip attempts.
     impactPerfectMax: 24,
     impactCleanMax: 40,
     impactSketchyMax: 46,

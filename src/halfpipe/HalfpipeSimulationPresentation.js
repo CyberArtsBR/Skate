@@ -161,14 +161,13 @@ export function simulationToPresentationState(profile, simulationState) {
     const segment = (flipDegrees % 360) / 360;
     const invertEnvelope = Math.sin(Math.PI * segment);
 
-    // Reference-video match: the requested move is visually a BACKSIDE INVERT.
-    // Rotate in the camera plane (Z / visible roll) instead of pitching the
-    // entire rider rigidly through depth. Mirror it by wall so both sides read
-    // as the same backside inversion, then bias the presentation-only carrier
-    // slightly toward the pipe center at maximum inversion.
-    const invertDirection = -currentSide;
+    // V7 keeps the reference's readable camera-plane inversion, but reverses
+    // the rotation direction so the rider travels BACK over the shoulders
+    // instead of reading as a front flip. Mirroring by wall keeps the same
+    // backward body-relative rotation on both sides of the halfpipe.
+    const invertDirection = currentSide;
     trickRoll = invertDirection * flipRadians;
-    trickPitch = invertDirection * 0.08 * invertEnvelope;
+    trickPitch = invertDirection * 0.055 * invertEnvelope;
     trickOffsetX = -currentSide * 0.22 * invertEnvelope;
     trickOffsetY = -0.07 * invertEnvelope;
     trickProgress = segment;
@@ -182,14 +181,25 @@ export function simulationToPresentationState(profile, simulationState) {
       || trickType === 'aerial-turn'
     )
   ) {
+    const signedRotation = Number(simulationState.airRotationSignedDegrees);
+    const hasSignedRotation = Number.isFinite(signedRotation);
     const explicitRotation = Math.max(0, Number(simulationState.airRotationDegrees) || 0);
-    const rotationDegrees = explicitRotation > 0
-      ? explicitRotation
-      : clamp01(simulationState.trickProgress) * 180;
+    const rotationDegrees = hasSignedRotation
+      ? Math.abs(signedRotation)
+      : (explicitRotation > 0
+        ? explicitRotation
+        : clamp01(simulationState.trickProgress) * 180);
+    const rotationDirection = hasSignedRotation && Math.abs(signedRotation) > 1e-6
+      ? Math.sign(signedRotation)
+      : turnDirection;
+    const visualRotationDegrees = hasSignedRotation
+      ? signedRotation
+      : rotationDirection * rotationDegrees;
     const segment = (rotationDegrees % 180) / 180;
     facingYaw = finalFacingYaw
-      + turnDirection * THREE.MathUtils.degToRad(rotationDegrees);
+      + THREE.MathUtils.degToRad(visualRotationDegrees);
     trickRoll = -currentSide
+      * rotationDirection
       * trickConfig.aerialRoll
       * Math.sin(Math.PI * segment);
     trickProgress = segment;

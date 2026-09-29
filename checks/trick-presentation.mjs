@@ -88,7 +88,7 @@ frontLeft.reset({
   pipeX: wallX(profile, -1, 0.86),
   tangentVelocity: -7,
 });
-frontLeft.setTurnIntent(1);
+frontLeft.setTurnIntent(-1);
 frontLeft.stepFixed();
 frontLeft.setTurnIntent(0);
 assert.equal(frontLeft.snapshot().lastTrick, 'kick-turn');
@@ -137,7 +137,7 @@ backRight.reset({
   tangentVelocity: 7,
 });
 backRight.state.facingTurns = 1;
-backRight.setTurnIntent(-1);
+backRight.setTurnIntent(1);
 backRight.stepFixed();
 backRight.setTurnIntent(0);
 assert.equal(backRight.snapshot().lastTrick, 'kick-turn');
@@ -262,7 +262,7 @@ assert.equal(
 const aerial = launchFromSide(profile, -1, 0);
 for (let index = 0; index < 10; index += 1) aerial.stepFixed();
 const turnStartY = aerial.snapshot().airY;
-aerial.setTurnIntent(1);
+aerial.setTurnIntent(-1);
 const cleanTurnSteps = Math.round(0.3 / aerial.fixedDt);
 const airHalfSteps = Math.round(cleanTurnSteps * 0.5);
 for (let index = 0; index < airHalfSteps; index += 1) aerial.stepFixed();
@@ -288,10 +288,16 @@ aerial.setTurnIntent(0);
 aerial.stepFixed();
 assert.equal(
   aerial.snapshot().airTurnCompleted,
-  true,
-  'aerial 180 must complete from sufficient held rotation input',
+  false,
+  'releasing rotation in air should pause without prematurely validating',
 );
 assert.equal(aerial.snapshot().airTurnActive, false);
+aerial._finishAirTurnFromInput();
+assert.equal(
+  aerial.snapshot().airTurnCompleted,
+  true,
+  'aerial 180 should validate at landing/finalization',
+);
 assert.ok(
   aerial.snapshot().airRotationDegrees >= 176
     && aerial.snapshot().airRotationDegrees <= 188,
@@ -316,8 +322,8 @@ assert.ok(
   `backside invert midpoint should be near 180 degrees: ${backsideInvertState.backflipRotationDegrees}`,
 );
 assert.ok(
-  Math.abs(backsideInvertPresentation.trickRoll) > 2.8,
-  `backside invert must rotate strongly in the visible camera plane: ${backsideInvertPresentation.trickRoll}`,
+  backsideInvertPresentation.trickRoll < -2.8,
+  `LEFT-wall backflip must rotate backward, not forward: ${backsideInvertPresentation.trickRoll}`,
 );
 assert.ok(
   Math.abs(backsideInvertPresentation.trickPitch) < 0.12,
@@ -328,21 +334,50 @@ assert.ok(
   `LEFT-wall backside invert should arc toward pipe center: ${backsideInvertPresentation.trickOffsetX}`,
 );
 
-// BACK-facing aerial: RIGHT side + LEFT input.
+// BACK-facing controls invert the FRONT-facing mapping.
 const backAir = launchFromSide(profile, 1, 1);
 backAir.setTurnIntent(-1);
 for (let index = 0; index < airHalfSteps; index += 1) backAir.stepFixed();
 const backAirPresentation = simulationToPresentationState(profile, backAir.snapshot());
 assert.equal(backAir.snapshot().airTurnActive, true);
 assert.ok(
-  backAir.snapshot().airRotationDegrees > 70
-    && backAir.snapshot().airRotationDegrees < 110,
-  `back-facing half-held aerial should be near 90 degrees: ${backAir.snapshot().airRotationDegrees}`,
+  backAir.snapshot().airRotationSignedDegrees < -70
+    && backAir.snapshot().airRotationSignedDegrees > -110,
+  `back-facing LEFT input should produce clockwise rotation near -90 degrees: ${backAir.snapshot().airRotationSignedDegrees}`,
 );
 assert.ok(
   backAirPresentation.facingYaw < Math.PI - 1.2,
-  `back-facing RIGHT aerial must follow LEFT input clockwise on camera, yaw=${backAirPresentation.facingYaw}`,
+  `back-facing LEFT input must rotate clockwise on camera, yaw=${backAirPresentation.facingYaw}`,
 );
+
+const backAirOpposite = launchFromSide(profile, 1, 1);
+backAirOpposite.setTurnIntent(1);
+for (let index = 0; index < airHalfSteps; index += 1) backAirOpposite.stepFixed();
+const backAirOppositePresentation = simulationToPresentationState(
+  profile,
+  backAirOpposite.snapshot(),
+);
+assert.ok(
+  backAirOpposite.snapshot().airRotationSignedDegrees > 70
+    && backAirOpposite.snapshot().airRotationSignedDegrees < 110,
+  'back-facing RIGHT input should produce counter-clockwise rotation',
+);
+assert.ok(
+  backAirOppositePresentation.facingYaw > Math.PI + 1.2,
+  'back-facing RIGHT input must rotate counter-clockwise on camera',
+);
+
+// Mid-air reversal must visibly unwind the same trick rather than fail/reset it.
+const correctedAir = launchFromSide(profile, -1, 0);
+correctedAir.setTurnIntent(-1);
+for (let index = 0; index < 44; index += 1) correctedAir.stepFixed();
+const beforeCorrection = correctedAir.snapshot().airRotationSignedDegrees;
+correctedAir.setTurnIntent(1);
+for (let index = 0; index < 10; index += 1) correctedAir.stepFixed();
+const afterCorrection = correctedAir.snapshot().airRotationSignedDegrees;
+assert.ok(beforeCorrection > 200);
+assert.ok(afterCorrection < beforeCorrection - 40);
+assert.equal(correctedAir.snapshot().airTurnFailedReason, null);
 
 // Pose mirroring contract when riding with back to camera.
 const poseController = new SkatePoseController();
@@ -440,7 +475,7 @@ linearTurn.reset({
   pipeX: wallX(profile, -1, 0.86),
   tangentVelocity: -7,
 });
-linearTurn.setTurnIntent(1);
+linearTurn.setTurnIntent(-1);
 linearTurn.stepFixed();
 linearTurn.setTurnIntent(0);
 assert.ok(
