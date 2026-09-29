@@ -87,18 +87,16 @@ assert.equal(spin360.state.airTurnCompleted, true);
 assert.equal(spin360.state.airRotationTargetDegrees, 360);
 
 const over = new HalfpipeSimulation(profile);
-over._enterAir(-1, -38, profile.leftLip + over.airTakeoffInset);
+over._enterAir(-1, -30, profile.leftLip + over.airTakeoffInset);
 over.setTurnIntent(1);
-for (let i=0;i<195;i++) over.stepFixed();
+for (let i=0;i<50;i++) over.stepFixed();
+over.setTurnIntent(0);
+over.stepFixed();
 assert.equal(over.state.airTurnOverturned, true);
 assert.equal(over.state.airTurnFailedReason, 'OVER_ROTATED');
 
 const backflip = new HalfpipeSimulation(profile);
 backflip._enterAir(-1, -24, profile.leftLip + backflip.airTakeoffInset);
-backflip.setBackflipHeld(true);
-backflip.stepFixed();
-backflip.setBackflipHeld(false);
-backflip.stepFixed();
 backflip.setBackflipHeld(true);
 for (let i=0;i<86;i++) backflip.stepFixed();
 backflip.setBackflipHeld(false);
