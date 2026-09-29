@@ -37,7 +37,7 @@ export const GAME_CONFIG = Object.freeze({
     maxSubSteps: 20,
     lipInset: 0.002,
     velocityEpsilon: 0.0001,
-    startTransitionFraction: 0.985,
+    startTransitionFraction: 0.9985,
     initialVelocity: 0,
     presentationSpeedReference: 17,
     presentationVerticalEpsilon: 0.02,
