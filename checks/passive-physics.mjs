@@ -233,7 +233,7 @@ assert.equal(kickTurnState.score, kickTurnState.lastTrickPoints);
 
 const handPlantSim = new HalfpipeSimulation(trickProfile);
 handPlantSim.reset({
-  pipeX: wallX(trickProfile, -1, 0.997),
+  pipeX: wallX(trickProfile, -1, 0.999),
   tangentVelocity: -7,
 });
 handPlantSim.setHandPlantHeld(true);
@@ -241,6 +241,10 @@ const handPlantStart = handPlantSim.stepFixed();
 assert.equal(handPlantStart.lastTrick, 'hand-plant');
 assert.equal(handPlantStart.surfaceTrickActive, true);
 assert.equal(handPlantStart.tangentVelocity, 0);
+assert.ok(
+  Math.abs(handPlantStart.pipeX - (trickProfile.leftLip + handPlantSim.lipInset)) < 1e-9,
+  `hand plant must be pinned to the physical coping/lip: ${handPlantStart.pipeX}`,
+);
 handPlantSim.setHandPlantHeld(false);
 for (let index = 0; index < 180 && handPlantSim.snapshot().surfaceTrickActive; index += 1) {
   handPlantSim.stepFixed();
