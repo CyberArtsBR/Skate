@@ -58,13 +58,23 @@ function assertFullscreenLayout(probe, label) {
   for (const [name, box] of [
     ['stage', probe.stage],
     ['canvas', probe.canvas],
-    ['background', probe.background],
   ]) {
     assert.ok(box, label + ': missing ' + name);
     assert.ok(Math.abs(box.x) < 1 && Math.abs(box.y) < 1, label + ': ' + name + ' must start at viewport origin');
     assert.ok(Math.abs(box.width - width) < 1, label + ': ' + name + ' width must fill viewport');
     assert.ok(Math.abs(box.height - height) < 1, label + ': ' + name + ' height must fill viewport');
   }
+
+  const background = probe.background;
+  assert.ok(background, label + ': missing background');
+  assert.ok(
+    background.x <= 0.5
+      && background.y <= 0.5
+      && background.x + background.width >= width - 0.5
+      && background.y + background.height >= height - 0.5,
+    label + ': background must cover the full viewport without exposing side bars',
+  );
+
   assert.ok(probe.canvas.opacity > 0.99, label + ': canvas must be visible');
   assert.notEqual(probe.hud?.display, 'none', label + ': HUD must be visible');
   assert.notEqual(probe.hud?.visibility, 'hidden', label + ': HUD must be visible');

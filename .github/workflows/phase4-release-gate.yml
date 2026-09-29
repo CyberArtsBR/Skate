@@ -48,10 +48,20 @@ jobs:
           done
           cat /tmp/halfpipe-preview.log
           exit 1
-      - name: Run browser release gate
+      - name: Run production browser smoke
         env:
           HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
-        run: npm run check:release:browser
+        run: npm run check:browser:release
+      - name: Run deep browser smoke
+        if: always()
+        env:
+          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
+        run: npm run check:browser
+      - name: Run visual contact regression
+        if: always()
+        env:
+          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
+        run: npm run check:visual-contact
 
   security:
     name: Dependency audit
