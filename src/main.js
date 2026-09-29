@@ -2,6 +2,7 @@ import './style.css';
 import { GAME_CONFIG } from './config/gameConfig.js';
 import { createScene } from './scene/createScene.js';
 import { createLighting } from './scene/createLighting.js';
+import { createPostProcessing } from './scene/createPostProcessing.js';
 import { createGround } from './scene/createGround.js';
 import { createBackground } from './scene/createBackground.js';
 import { HalfpipeVisual } from './halfpipe/HalfpipeVisual.js';
@@ -23,8 +24,13 @@ const stage = document.querySelector('#game-stage');
 const canvas = document.querySelector('#game-canvas');
 const loadingState = document.querySelector('#loading-state');
 
-const { scene, renderer } = createScene(canvas);
+const { scene, renderer, disposeEnvironment } = createScene(canvas);
 const cameraController = new HalfpipeCamera();
+const postProcessing = createPostProcessing(
+  renderer,
+  scene,
+  cameraController.camera,
+);
 const background = createBackground(stage, {
   imageUrl: GAME_CONFIG.assets.background,
   position: 'center center',
@@ -56,6 +62,7 @@ function resize() {
   const pixelRatio = Math.min(window.devicePixelRatio || 1, GAME_CONFIG.renderer.maxPixelRatio);
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(width, height, false);
+  postProcessing.setSize(width, height);
   cameraController.resize(width, height);
 }
 
@@ -211,7 +218,7 @@ function render(timestamp = 0) {
     }
   }
 
-  renderer.render(scene, cameraController.camera);
+  postProcessing.render();
   animationFrame = requestAnimationFrame(render);
 }
 
@@ -314,6 +321,7 @@ async function bootstrap() {
     background,
     ground,
     lighting,
+    postProcessing,
   };
 }
 
@@ -327,6 +335,8 @@ function dispose() {
   presentationDebug?.dispose();
   ground.dispose();
   lighting.dispose();
+  postProcessing.dispose();
+  disposeEnvironment();
   background.dispose();
   pumpInput?.dispose();
   hud.dispose();
