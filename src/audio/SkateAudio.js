@@ -1,0 +1,136 @@
+function clamp01(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(1, number));
+}
+
+function smoothstep(value) {
+  const t = clamp01(value);
+  return t * t * (3 - 2 * t);
+}
+
+function createNoiseBuffer(context, seconds = 2) {
+  const length = Math.max(1, Math.floor(context.sampleRate * seconds));
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  let previous = 0;
+  for (let i = 0; i < length; i += 1) {
+    const white = Math.random() * 2 - 1;
+    previous = previous * 0.72 + white * 0.28;
+    data[i] = previous;
+  }
+  return buffer;
+}
+
+export class SkateAudio {
+  constructor(context, destination, { speedReference = 18 } = {}) {
+    if (!context) throw new TypeError('SkateAudio requires an AudioContext');
+    if (!destination) throw new TypeError('SkateAudio requires a destination AudioNode');
+
+    this.context = context;
+    this.destination = destination;
+    this.speedReference = Math.max(1, Number(speedReference) || 18);
+    this.disposed = false;
+
+    this.noiseBuffer = createNoiseBuffer(context);
+
+    this.rollSource = context.createBufferSource();
+    this.rollSource.buffer = this.noiseBuffer;
+    this.rollSource.loop = true;
+    this.rollFilter = context.createBiquadFilter();
+    this.rollFilter.type = 'bandpass';
+    this.rollFilter.Q.value = 0.75;
+    this.rollGain = context.createGain();
+    this.rollGain.gain.value = 0;
+    this.rollSource.connect(this.rollFilter).connect(this.rollGain).connect(destination);
+
+    this.rampSource = context.createBufferSource();
+    this.rampSource.buffer = this.noiseBuffer;
+    this.rampSource.loop = true;
+    this.rampFilter = context.createBiquadFilter();
+    this.rampFilter.type = 'highpass';
+    this.rampFilter.frequency.value = 380;
+    this.rampGain = context.createGain();
+    this.rampGain.gain.value = 0;
+    this.rampSource.connect(this.rampFilter).connect(this.rampGain).connect(destination);
+
+    this.windSource = context.createBufferSource();
+    this.windSource.buffer = this.noiseBuffer;
+    this.windSource.loop = true;
+    this.windFilter = context.createBiquadFilter();
+    this.windFilter.type = 'lowpass';
+    this.windFilter.frequency.value = 900;
+    this.windGain = context.createGain();
+    this.windGain.gain.value = 0;
+    this.windSource.connect(this.windFilter).connect(this.windGain).connect(destination);
+
+    const now = context.currentTime;
+    this.rollSource.start(now);
+    this.rampSource.start(now);
+    this.windSource.start(now);
+  }
+
+  update(state = {}, dt = 1 / 60) {
+    if (this.disposed) return;
+
+    const now = this.context.currentTime;
+    const smoothing = Math.max(0.025, Math.min(0.18, (Number(dt) || 0.016) * 5));
+    const mode = state.mode || 'contact';
+    const speed = Math.abs(Number(
+      state.speed ?? state.tangentVelocity ?? state.velocity ?? 0,
+    ) || 0);
+    const normalizedSpeed = clamp01(speed / this.speedReference);
+    const fastSpeed = smoothstep((normalizedSpeed - 0.45) / 0.55);
+    const region = String(state.region || 'flat').toLowerCase();
+    const airborne = mode === 'airborne' || state.airborne === true;
+
+    const transition = region.includes('transition') || region.includes('wall');
+    const flat = !transition && !airborne;
+    const rollIntensity = airborne ? 0 : (0.035 + 0.34 * smoothstep(normalizedSpeed));
+    const transitionBoost = transition ? 1.16 : flat ? 0.9 : 1;
+    const rollTarget = rollIntensity * transitionBoost;
+
+    const rollFrequency = 170 + normalizedSpeed * 520;
+    const rollQ = 0.58 + fastSpeed * 0.62;
+    this.rollGain.gain.setTargetAtTime(rollTarget, now, smoothing);
+    this.rollFilter.frequency.setTargetAtTime(rollFrequency, now, smoothing);
+    this.rollFilter.Q.setTargetAtTime(rollQ, now, smoothing);
+
+    const rampTarget = airborne ? 0 : (transition ? 0.02 + 0.16 * fastSpeed : 0.012 * normalizedSpeed);
+    this.rampGain.gain.setTargetAtTime(rampTarget, now, smoothing * 1.2);
+    this.rampFilter.frequency.setTargetAtTime(330 + normalizedSpeed * 640, now, smoothing);
+
+    const baseY = Number(state.airBaseY ?? state.baseY ?? 0) || 0;
+    const airY = Number(state.airY ?? state.height ?? baseY) || baseY;
+    const height = Math.max(0, airY - baseY);
+    const verticalSpeed = Math.abs(Number(state.airVerticalVelocity ?? state.verticalSpeed ?? 0) || 0);
+    const windByHeight = clamp01(height / 5.5);
+    const windByVelocity = clamp01(verticalSpeed / 18);
+    const windTarget = airborne
+      ? 0.015 + 0.13 * smoothstep(Math.max(windByHeight, windByVelocity))
+      : 0;
+    this.windGain.gain.setTargetAtTime(windTarget, now, smoothing * 1.5);
+    this.windFilter.frequency.setTargetAtTime(
+      520 + 760 * Math.max(windByHeight, windByVelocity),
+      now,
+      smoothing,
+    );
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+
+    for (const source of [this.rollSource, this.rampSource, this.windSource]) {
+      try { source.stop(); } catch {}
+      try { source.disconnect(); } catch {}
+    }
+    for (const node of [
+      this.rollFilter, this.rollGain,
+      this.rampFilter, this.rampGain,
+      this.windFilter, this.windGain,
+    ]) {
+      try { node.disconnect(); } catch {}
+    }
+  }
+}
