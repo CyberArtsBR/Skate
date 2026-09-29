@@ -257,7 +257,16 @@ export class HalfpipeSimulation {
     );
   }
 
-  _startSurfaceTrick(type, quality, expectedTurn, velocity, duration, retention) {
+  _startSurfaceTrick(
+    type,
+    quality,
+    expectedTurn,
+    velocity,
+    duration,
+    retention,
+    anchorX = null,
+  ) {
+    if (Number.isFinite(anchorX)) this.state.pipeX = anchorX;
     this._recordTrick(type, quality, expectedTurn);
     this.state.surfaceTrickActive = true;
     this.state.surfaceTrickType = type;
@@ -319,16 +328,29 @@ export class HalfpipeSimulation {
       return { velocity, turned: false, frozen: false };
     }
 
+    const sample = this._sampleIncreasingX(previousX);
+    const predictedX = previousX
+      + velocity * sample.tangent.x * this.fixedDt;
     const wallFraction = this._wallFraction(previousX);
+    const predictedWallFraction = this._wallFraction(predictedX);
     const expectedTurn = previousX < 0 ? 1 : previousX > 0 ? -1 : 0;
 
+    // Hand Plant is a coping-only action. If B/Circle is already held while
+    // ascending, catch the frame that crosses the tiny valid lip zone and pin
+    // the rider exactly to that anchor instead of allowing an early/lower plant.
     if (
       this.handPlantHeld
       && expectedTurn !== 0
-      && wallFraction >= this.handPlantMinFraction
+      && Math.max(wallFraction, predictedWallFraction) >= this.handPlantMinFraction
     ) {
-      const quality = (wallFraction - this.handPlantMinFraction)
-        / Math.max(1e-4, 1 - this.handPlantMinFraction);
+      const side = previousX < 0 ? -1 : 1;
+      const handPlantAnchor = side * (
+        this.profile.flatHalfWidth
+        + this.profile.transitionWidth * this.handPlantMinFraction
+      );
+      const quality = (
+        Math.max(wallFraction, predictedWallFraction) - this.handPlantMinFraction
+      ) / Math.max(1e-4, 1 - this.handPlantMinFraction);
       return this._startSurfaceTrick(
         'hand-plant',
         quality,
@@ -336,6 +358,7 @@ export class HalfpipeSimulation {
         velocity,
         this.trickPresentation.handPlantDuration,
         this.handPlantRetention,
+        handPlantAnchor,
       );
     }
 
@@ -459,9 +482,25 @@ export class HalfpipeSimulation {
       }
 
       if (this.state.airTurnElapsed >= duration) {
-        this.state.airTurnActive = false;
-        this.state.airVerticalVelocity =
+        const storedVerticalVelocity =
           this.state.airTurnStoredVerticalVelocity;
+        this.state.airTurnActive = false;
+
+        // Bullet-time turn consumes the remaining upward phase. If the trick
+        // started before the natural apex, the held trick height becomes the
+        // new apex; gravity resumes downward from here instead of restoring
+        // positive velocity and creating a second, bugged height gain.
+        this.state.airVerticalVelocity = Math.min(
+          0,
+          storedVerticalVelocity,
+        );
+        if (storedVerticalVelocity > 0) {
+          this.state.lastAirPeakY = this.state.airY;
+          this.state.maxAirY = this.state.maxAirY === null
+            ? this.state.airY
+            : Math.max(this.state.maxAirY, this.state.airY);
+        }
+
         this.state.airTurnFrozenY = null;
         this.state.airTurnStoredVerticalVelocity = 0;
         this.state.trickProgress = 1;
