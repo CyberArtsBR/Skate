@@ -86,6 +86,7 @@ export class CountdownOverlay {
     this.root.append(this.label);
     stage.append(this.root);
 
+    this.onComplete = options.onComplete;
     this.timer = new CountdownTimer({
       ...options,
       onTick: (value) => {
@@ -98,17 +99,45 @@ export class CountdownOverlay {
       },
       onComplete: (snapshot) => {
         this.hide();
-        options.onComplete?.(snapshot);
+        this.onComplete?.(snapshot);
       },
     });
   }
 
   start() {
     this.root.hidden = false;
-    this.root.classList.remove('is-go');
+    this.root.classList.remove('is-go', 'is-prompt');
     const snapshot = this.timer.start();
     this._showLabel(snapshot.label || '3');
     return snapshot;
+  }
+
+  showPrompt(label = 'PRESS ANY BUTTON TO START') {
+    this.timer.reset();
+    this.root.hidden = false;
+    this.root.classList.remove('is-go');
+    this.root.classList.add('is-prompt');
+    this._showLabel(label);
+    return {
+      running: false,
+      elapsed: 0,
+      label,
+      complete: false,
+      prompt: true,
+    };
+  }
+
+  completePrompt() {
+    if (this.root.hidden || !this.root.classList.contains('is-prompt')) return false;
+    const snapshot = {
+      ...this.timer.snapshot(),
+      label: this.label.textContent,
+      complete: true,
+      prompt: true,
+    };
+    this.hide();
+    this.onComplete?.(snapshot);
+    return true;
   }
 
   step(dt) {
@@ -119,7 +148,7 @@ export class CountdownOverlay {
 
   hide() {
     this.root.hidden = true;
-    this.root.classList.remove('is-go');
+    this.root.classList.remove('is-go', 'is-prompt');
   }
 
   dispose() {
