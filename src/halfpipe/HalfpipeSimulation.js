@@ -240,7 +240,7 @@ export class HalfpipeSimulation {
     return this._isFacingBack() ? -1 : 1;
   }
 
-  _recordTrick(type, quality = 1, turnDirection = -1) {
+  _recordTrick(type, quality = 1, turnDirection = 1) {
     const clampedQuality = Math.max(0, Math.min(1, quality));
     const range = type === 'kick-turn'
       ? this.scoring.kickTurn
@@ -258,8 +258,8 @@ export class HalfpipeSimulation {
     // All 180° maneuver animations rotate counterclockwise from the camera's
     // point of view. Input direction only determines whether the maneuver is
     // legal; it does not choose the visual spin direction.
-    const normalizedTurnDirection = -1;
-    this.state.facingTurns -= 1;
+    const normalizedTurnDirection = 1;
+    this.state.facingTurns += 1;
     this.state.lastTrick = type;
     this.state.lastTrickTime = this.state.time;
     this.state.lastTrickPoints = points;
@@ -370,7 +370,7 @@ export class HalfpipeSimulation {
       return this._startSurfaceTrick(
         'hand-plant',
         quality,
-        -1,
+        1,
         velocity,
         this.trickPresentation.handPlantDuration,
         this.handPlantRetention,
@@ -387,7 +387,7 @@ export class HalfpipeSimulation {
       return this._startSurfaceTrick(
         'kick-turn',
         quality,
-        -1,
+        1,
         velocity,
         this.trickPresentation.kickTurnDuration,
         this.kickTurnRetention,
@@ -465,7 +465,7 @@ export class HalfpipeSimulation {
       && this.turnIntent === expectedTurn
     ) {
       this.state.airTurnActive = true;
-      this.state.airTurnDirection = -1;
+      this.state.airTurnDirection = 1;
       this.state.airTurnElapsed = 0;
       this.state.airTurnHold = 0;
       this.state.airTurnFrozenY = this.state.airY ?? baseY;
@@ -573,7 +573,7 @@ export class HalfpipeSimulation {
         this._recordTrick(
           'aerial-turn',
           heightQuality * 0.6 + holdQuality * 0.4,
-          -1,
+          1,
         );
       } else if (this.state.airTurnOverturned) {
         this.state.lastTrick = 'aerial-turn-overrotated';
