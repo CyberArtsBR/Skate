@@ -639,6 +639,7 @@ export class HalfpipeSimulation {
       this.state.surfaceTrickPhase = 'FAIL';
       if (this.state.surfaceTrickFacingCommitted) this.state.facingTurns -= 1;
       this._failTrick(type, failReason);
+      if (type === 'hand-plant') this._startCrash(failReason || 'HAND_PLANT_FAILED');
     }
 
     this.state.surfaceTrickActive = false;
