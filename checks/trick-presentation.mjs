@@ -266,7 +266,7 @@ assert.ok(
 
 // Pose mirroring contract when riding with back to camera.
 const poseController = new SkatePoseController();
-const forwardPose = poseController.evaluate({
+const forwardPose = { ...poseController.evaluate({
   pumpCompression: 0.35,
   landing: 0,
   speedNormalized: 0.5,
@@ -278,8 +278,8 @@ const forwardPose = poseController.evaluate({
   trickVisualActive: false,
   trickType: null,
   landingQuality: 'none',
-});
-const backwardPose = poseController.evaluate({
+}) };
+const backwardPose = { ...poseController.evaluate({
   pumpCompression: 0.35,
   landing: 0,
   speedNormalized: 0.5,
@@ -291,7 +291,7 @@ const backwardPose = poseController.evaluate({
   trickVisualActive: false,
   trickType: null,
   landingQuality: 'none',
-});
+}) };
 assert.equal(forwardPose.facingSign, 1);
 assert.equal(backwardPose.facingSign, -1);
 assert.ok(forwardPose.torsoBalanceZ * backwardPose.torsoBalanceZ < 0);
