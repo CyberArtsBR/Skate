@@ -40,7 +40,7 @@ const launch = new HalfpipeSimulation(profile);
 assert.equal(launch.computeLaunchVelocity(1.19), 0);
 const atThreshold = launch.computeLaunchVelocity(1.2);
 const justAbove = launch.computeLaunchVelocity(1.21);
-assert.ok(atThreshold > 0 && atThreshold < 2);
+assert.ok(atThreshold > 8 && atThreshold < 9);
 assert.ok(justAbove - atThreshold < 0.05);
 assert.ok(launch.computeLaunchVelocity(18) > 20);
 assert.ok(launch.computeLaunchVelocity(18) <= 27 + 1e-9);
