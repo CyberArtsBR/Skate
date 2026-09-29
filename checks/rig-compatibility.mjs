@@ -45,6 +45,39 @@ function normalizeName(name = '') {
     .replace(/[^a-z0-9]/g, '');
 }
 
+function semanticName(name = '') {
+  const source = String(name)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .replace(/mixamorig\d*[:_ ]*/g, '')
+    .replace(/cc[_ ]*base[_ ]*/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  const words = source.split(/\s+/).filter(Boolean);
+  let side = words.includes('left') || words.includes('l')
+    ? 'left'
+    : words.includes('right') || words.includes('r')
+      ? 'right'
+      : '';
+  let core = words
+    .filter((word) => ![
+      'left', 'right', 'l', 'r', 'bone', 'def', 'bip', 'bip001',
+    ].includes(word))
+    .join('');
+
+  if (!side && /^(left|right)/.test(core)) {
+    side = core.startsWith('left') ? 'left' : 'right';
+    core = core.slice(side.length);
+  }
+  if (!side && /(left|right)$/.test(core)) {
+    side = core.endsWith('left') ? 'left' : 'right';
+    core = core.slice(0, -side.length);
+  }
+
+  return side + core;
+}
+
 function findNode(nodes, aliases = []) {
   for (const alias of aliases) {
     const exact = nodes.find((node) => normalizeName(node.getName()) === alias);
@@ -58,6 +91,13 @@ function findNode(nodes, aliases = []) {
         && name.endsWith(alias);
     });
     if (suffix) return suffix;
+  }
+
+  // Match the runtime adapter's semantic fallback so generic rigs such as
+  // L_Upperarm / R_Forearm are tested under the same rules as production.
+  for (const alias of aliases) {
+    const semantic = nodes.find((node) => semanticName(node.getName()) === alias);
+    if (semantic) return semantic;
   }
 
   return null;
