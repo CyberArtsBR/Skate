@@ -130,8 +130,8 @@ const pumped = runPumped();
 assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
 assert.ok(pumped.maxAbsX > pumped.initialAmplitude, 'correct pumping should increase amplitude from a lower transition start');
 assert.ok(
-  pumped.timeToHighAmplitude === null || pumped.timeToHighAmplitude >= 6,
-  `V7 pumping should no longer rocket to 90% lip amplitude before 6s, got ${pumped.timeToHighAmplitude}`,
+  pumped.timeToHighAmplitude === null || pumped.timeToHighAmplitude >= 4.5,
+  `V8 pumping should recover faster without rocketing to 90% lip amplitude too early, got ${pumped.timeToHighAmplitude}`,
 );
 assert.ok(
   ['contact', 'airborne'].includes(pumped.final.mode),
