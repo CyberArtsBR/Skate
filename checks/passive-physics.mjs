@@ -173,8 +173,8 @@ const airborne = runUntilAirborne();
 const lipY = airborne.profile.sample(airborne.profile.rightLip).y;
 assert.ok(airborne.firstAirTime !== null, 'strong pumping should launch vertically above a lip');
 assert.ok(
-  airborne.firstAirTime <= 6,
-  `vertical air launch should be reachable within 6s, got ${airborne.firstAirTime}`,
+  airborne.firstAirTime <= 7.5,
+  `slower-tuned vertical air launch should be reachable within 7.5s, got ${airborne.firstAirTime}`,
 );
 assert.ok(
   airborne.peakY !== null && airborne.peakY > lipY + 0.7,
