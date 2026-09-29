@@ -115,18 +115,34 @@ export class SkateAnimationController {
       )
       : 0;
 
-    const targetFootIK = rawState.airborne
-      ? 0.2 + landingAnticipation * 0.68
-      : 1;
-    // Release the board lock aggressively on the takeoff edge. A slow first
-    // airborne blend visually pins the feet for one frame and fights the air pose.
-    const footIKResponse = rawState.airborne && !this.wasAirborne ? 48 : 10;
+    const bailFootLock = !rawState.airborne
+      && (
+        landingQuality === LANDING_QUALITY.BAIL
+        || this.activeLandingQuality === LANDING_QUALITY.BAIL
+      );
+    const targetFootIK = bailFootLock
+      ? 1
+      : rawState.airborne
+        ? 0.2 + landingAnticipation * 0.68
+        : 1;
+
+    // Release the board lock aggressively on takeoff, but snap both feet back
+    // to the deck on a bail. A failed landing should look unstable through
+    // knees/torso/arms, never because one foot is visually left behind.
+    const footIKResponse = bailFootLock
+      ? 54
+      : rawState.airborne && !this.wasAirborne
+        ? 48
+        : 10;
     this.smoothedFootIK = damp(
       this.smoothedFootIK,
       targetFootIK,
       footIKResponse,
       dt,
     );
+    if (bailFootLock && this.smoothedFootIK > 0.985) {
+      this.smoothedFootIK = 1;
+    }
     this.smoothedPreload = damp(
       this.smoothedPreload,
       clamp01(rawState.preloadCompression),
