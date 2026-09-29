@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "node --check src/main.js && node checks/foundation-invariants.mjs && node checks/passive-physics.mjs && node checks/contact-clearance.mjs && node checks/session.mjs && node checks/controller-input.mjs && node checks/camera-framing.mjs && node checks/trick-presentation.mjs",
+    "check": "node --check src/main.js && node checks/foundation-invariants.mjs && node checks/passive-physics.mjs && node checks/contact-clearance.mjs && node checks/session.mjs && node checks/controller-input.mjs && node checks/camera-framing.mjs && node checks/trick-presentation.mjs && node checks/phase4-gameplay-core.mjs",
     "check:browser": "node checks/browser-smoke.mjs",
     "audit:assets": "node tools/inspect-glb.mjs",
     "check:physics": "node checks/passive-physics.mjs",
@@ -17,7 +17,8 @@
     "check:session": "node checks/session.mjs",
     "check:controller": "node checks/controller-input.mjs",
     "check:camera": "node checks/camera-framing.mjs",
-    "check:tricks": "node checks/trick-presentation.mjs"
+    "check:tricks": "node checks/trick-presentation.mjs",
+    "check:gameplay": "node checks/phase4-gameplay-core.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
