@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 
 export function createScene(canvas) {
@@ -19,5 +20,23 @@ export function createScene(canvas) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  return { scene, renderer };
+  // The photographic background remains a DOM layer. Give authored metallic
+  // GLB materials something neutral to reflect without changing their PBR
+  // parameters and without post-processing the rider or the background.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const room = new RoomEnvironment();
+  const environmentTarget = pmrem.fromScene(room, 0.04);
+  scene.environment = environmentTarget.texture;
+  scene.environmentIntensity = GAME_CONFIG.renderer.environmentIntensity;
+  room.dispose?.();
+  pmrem.dispose();
+
+  return {
+    scene,
+    renderer,
+    disposeEnvironment() {
+      if (scene.environment === environmentTarget.texture) scene.environment = null;
+      environmentTarget.dispose();
+    },
+  };
 }

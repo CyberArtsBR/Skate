@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GAME_CONFIG } from '../config/gameConfig.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
+
+const COPING_MATERIAL_NAME = 'Rail_Metal';
 
 const RIDING_SURFACE_NAMES = Object.freeze([
   'Object_4',
@@ -22,7 +25,12 @@ function worldBounds(object) {
   const transformed = new THREE.Box3();
 
   object.traverse((child) => {
-    if (!child.isMesh || !child.geometry || !isVisibleInHierarchy(child)) return;
+    if (
+      !child.isMesh
+      || !child.geometry
+      || child.userData?.visualGlowOnly
+      || !isVisibleInHierarchy(child)
+    ) return;
     if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
     transformed.copy(child.geometry.boundingBox).applyMatrix4(child.matrixWorld);
     box.union(transformed);
@@ -39,9 +47,76 @@ function hasVisibleMesh(object) {
   let found = false;
   object.traverse((child) => {
     if (found) return;
-    if (child.isMesh && child.geometry && isVisibleInHierarchy(child)) found = true;
+    if (
+      child.isMesh
+      && child.geometry
+      && !child.userData?.visualGlowOnly
+      && isVisibleInHierarchy(child)
+    ) found = true;
   });
   return found;
+}
+
+function createGlowMaterial(expansion, opacity) {
+  return new THREE.ShaderMaterial({
+    name: 'coping-selective-glow',
+    uniforms: {
+      uExpansion: { value: expansion },
+      uOpacity: { value: opacity },
+    },
+    vertexShader: `
+      uniform float uExpansion;
+      void main() {
+        vec3 expanded = position + normalize(normal) * uExpansion;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(expanded, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uOpacity;
+      void main() {
+        gl_FragColor = vec4(vec3(1.0), uOpacity);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: true,
+    toneMapped: false,
+  });
+}
+
+function createSilentMaterial() {
+  const material = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+  });
+  material.colorWrite = false;
+  return material;
+}
+
+function createCopingGlowShell(mesh, sourceMaterials, expansion, opacity) {
+  if (mesh.isSkinnedMesh || !mesh.geometry?.getAttribute('normal')) return null;
+
+  const glowMaterials = sourceMaterials.map((material) => (
+    material?.name === COPING_MATERIAL_NAME
+      ? createGlowMaterial(expansion, opacity)
+      : createSilentMaterial()
+  ));
+  const shell = new THREE.Mesh(
+    mesh.geometry,
+    Array.isArray(mesh.material) ? glowMaterials : glowMaterials[0],
+  );
+  shell.name = `${mesh.name || 'coping'}-selective-glow`;
+  shell.userData.visualGlowOnly = true;
+  shell.castShadow = false;
+  shell.receiveShadow = false;
+  shell.frustumCulled = mesh.frustumCulled;
+  shell.renderOrder = mesh.renderOrder + 1;
+  shell.raycast = () => {};
+  mesh.add(shell);
+  return shell;
 }
 
 function findRidingSurface(root) {
@@ -55,7 +130,12 @@ function findRidingSurface(root) {
 
   const namedCandidates = [];
   root.traverse((object) => {
-    if (!object.isMesh || !object.geometry || !isVisibleInHierarchy(object)) return;
+    if (
+      !object.isMesh
+      || !object.geometry
+      || object.userData?.visualGlowOnly
+      || !isVisibleInHierarchy(object)
+    ) return;
     if (/ground/i.test(object.name)) return;
     if (/(half.?pipe|riding|ride|ramp|surface)/i.test(object.name)) namedCandidates.push(object);
   });
@@ -73,7 +153,12 @@ function findRidingSurface(root) {
   // establishes visual alignment for replacement art assets.
   const candidates = [];
   root.traverse((object) => {
-    if (!object.isMesh || !object.geometry || !isVisibleInHierarchy(object)) return;
+    if (
+      !object.isMesh
+      || !object.geometry
+      || object.userData?.visualGlowOnly
+      || !isVisibleInHierarchy(object)
+    ) return;
     if (/ground/i.test(object.name)) return;
     const box = worldBounds(object);
     const size = box.getSize(new THREE.Vector3());
@@ -110,9 +195,52 @@ export class HalfpipeVisual {
         object.visible = false;
         this.hiddenGroundNodes.push(object.name);
       }
-      if (object.isMesh) {
+      if (object.isMesh && !object.userData?.visualGlowOnly) {
         object.castShadow = true;
         object.receiveShadow = true;
+
+        const sourceMaterials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+        const hasCopingMaterial = sourceMaterials.some(
+          (material) => material?.name === COPING_MATERIAL_NAME,
+        );
+
+        if (hasCopingMaterial) {
+          const preparedMaterials = sourceMaterials.map((material) => {
+            if (material?.name !== COPING_MATERIAL_NAME) return material;
+
+            // Preserve the authored GLB material exactly except for a restrained
+            // emissive lift on the white coping. In particular, do not touch
+            // roughness, metalness, maps, or shell materials.
+            const coping = material.clone();
+            coping.name = `${material.name}-soft-emissive`;
+            if (coping.emissive?.set) {
+              coping.emissive.set(0xffffff);
+              coping.emissiveIntensity = GAME_CONFIG.renderer.copingGlow.emissiveIntensity;
+            }
+            coping.needsUpdate = true;
+            return coping;
+          });
+
+          object.material = Array.isArray(object.material)
+            ? preparedMaterials
+            : preparedMaterials[0];
+
+          const glow = GAME_CONFIG.renderer.copingGlow;
+          createCopingGlowShell(
+            object,
+            sourceMaterials,
+            glow.innerExpansion,
+            glow.innerOpacity,
+          );
+          createCopingGlowShell(
+            object,
+            sourceMaterials,
+            glow.outerExpansion,
+            glow.outerOpacity,
+          );
+        }
       }
     });
 

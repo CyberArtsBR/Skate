@@ -23,7 +23,7 @@ const stage = document.querySelector('#game-stage');
 const canvas = document.querySelector('#game-canvas');
 const loadingState = document.querySelector('#loading-state');
 
-const { scene, renderer } = createScene(canvas);
+const { scene, renderer, disposeEnvironment } = createScene(canvas);
 const cameraController = new HalfpipeCamera();
 const background = createBackground(stage, {
   imageUrl: GAME_CONFIG.assets.background,
@@ -327,6 +327,7 @@ function dispose() {
   presentationDebug?.dispose();
   ground.dispose();
   lighting.dispose();
+  disposeEnvironment();
   background.dispose();
   pumpInput?.dispose();
   hud.dispose();
