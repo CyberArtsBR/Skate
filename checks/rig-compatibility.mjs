@@ -109,6 +109,12 @@ for(const [id,file] of FILES){
     bones:Object.fromEntries(Object.entries(rig).map(([slot,node])=>[
       slot,node?{
         name:node.getName(),
+        parent: node.getParentNode?.()?.getName?.() || null,
+        ancestors: (() => {
+          const names = [];
+          for (let p = node.getParentNode?.(); p; p = p.getParentNode?.()) names.push(p.getName());
+          return names;
+        })(),
         localRotation:node.getRotation().map(x=>Number(x.toFixed(4))),
         worldQ:worldQuaternion(node).toArray().map(x=>Number(x.toFixed(4))),
       }:null
