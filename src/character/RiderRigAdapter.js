@@ -35,7 +35,7 @@ export const HERETIC_REFERENCE_MODEL_ROTATIONS = Object.freeze({
   rightForearm: Object.freeze([0.056681921007333436, 0.0535537059129087, 0.7270552776802951, 0.6821361919244147]),
 });
 
-const SLOT_ALIASES = Object.freeze({
+export const SLOT_ALIASES = Object.freeze({
   hips: ['ccbasehip', 'hips', 'hip', 'pelvis'],
   spine: ['ccbasespine01', 'spine01', 'spine1', 'spine'],
   chest: ['ccbasespine02', 'spine02', 'spine2', 'chest', 'upperchest'],
