@@ -69,25 +69,48 @@ assert.equal(tap.state.airTurnFailedReason, 'UNDER_ROTATED');
 const clean = new HalfpipeSimulation(profile);
 clean._enterAir(-1, -16, profile.leftLip + clean.airTakeoffInset);
 clean.setTurnIntent(1);
-for (let i=0;i<60;i++) clean.stepFixed();
+for (let i=0;i<36;i++) clean.stepFixed();
 clean.setTurnIntent(0);
 clean.stepFixed();
 assert.equal(clean.state.airTurnCompleted, true);
 assert.equal(clean.state.airTurnFailedReason, null);
-assert.ok(clean.state.airRotationDegrees >= 176 && clean.state.airRotationDegrees <= 188);
+assert.ok(clean.state.airRotationDegrees >= 170 && clean.state.airRotationDegrees <= 190);
+assert.equal(clean.state.airRotationTargetDegrees, 180);
+
+const spin360 = new HalfpipeSimulation(profile);
+spin360._enterAir(1, 22, profile.rightLip - spin360.airTakeoffInset);
+spin360.setTurnIntent(-1);
+for (let i=0;i<72;i++) spin360.stepFixed();
+spin360.setTurnIntent(0);
+spin360.stepFixed();
+assert.equal(spin360.state.airTurnCompleted, true);
+assert.equal(spin360.state.airRotationTargetDegrees, 360);
 
 const over = new HalfpipeSimulation(profile);
-over._enterAir(-1, -18, profile.leftLip + over.airTakeoffInset);
+over._enterAir(-1, -38, profile.leftLip + over.airTakeoffInset);
 over.setTurnIntent(1);
-for (let i=0;i<90;i++) over.stepFixed();
+for (let i=0;i<195;i++) over.stepFixed();
 assert.equal(over.state.airTurnOverturned, true);
 assert.equal(over.state.airTurnFailedReason, 'OVER_ROTATED');
 
+const backflip = new HalfpipeSimulation(profile);
+backflip._enterAir(-1, -24, profile.leftLip + backflip.airTakeoffInset);
+backflip.setBackflipHeld(true);
+backflip.stepFixed();
+backflip.setBackflipHeld(false);
+backflip.stepFixed();
+backflip.setBackflipHeld(true);
+for (let i=0;i<86;i++) backflip.stepFixed();
+backflip.setBackflipHeld(false);
+backflip.stepFixed();
+assert.equal(backflip.state.backflipCompleted, true);
+assert.equal(backflip.state.backflipTargetDegrees, 360);
+
 assert.equal(evaluateLanding({impactSpeed:8}).quality, LANDING_QUALITIES.PERFECT);
-assert.equal(evaluateLanding({impactSpeed:15}).quality, LANDING_QUALITIES.CLEAN);
-assert.equal(evaluateLanding({impactSpeed:18}).quality, LANDING_QUALITIES.SKETCHY);
-assert.equal(evaluateLanding({impactSpeed:20}).quality, LANDING_QUALITIES.HEAVY);
-assert.equal(evaluateLanding({impactSpeed:23}).quality, LANDING_QUALITIES.BAIL);
+assert.equal(evaluateLanding({impactSpeed:16}).quality, LANDING_QUALITIES.CLEAN);
+assert.equal(evaluateLanding({impactSpeed:20}).quality, LANDING_QUALITIES.SKETCHY);
+assert.equal(evaluateLanding({impactSpeed:24}).quality, LANDING_QUALITIES.HEAVY);
+assert.equal(evaluateLanding({impactSpeed:27}).quality, LANDING_QUALITIES.BAIL);
 
 const surface = new HalfpipeSimulation(profile);
 surface.reset({ pipeX: -(profile.flatHalfWidth + profile.transitionWidth*0.85), tangentVelocity:-8 });
@@ -97,6 +120,19 @@ assert.equal(surface.state.surfaceTrickActive, true);
 assert.equal(surface.state.score, 0);
 while (surface.state.surfaceTrickActive) surface.stepFixed();
 assert.ok(surface.state.score > 0);
+
+const oppositeWallSurface = new HalfpipeSimulation(profile);
+oppositeWallSurface.reset({
+  pipeX: profile.flatHalfWidth + profile.transitionWidth * 0.85,
+  tangentVelocity: 8,
+});
+oppositeWallSurface.setTurnIntent(1);
+oppositeWallSurface.stepFixed();
+assert.equal(
+  oppositeWallSurface.state.surfaceTrickActive,
+  true,
+  'turns must work on either wall regardless of facing',
+);
 
 const failedHandPlant = new HalfpipeSimulation(profile);
 failedHandPlant.reset({
