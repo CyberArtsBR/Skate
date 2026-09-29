@@ -26,6 +26,20 @@ export function simulationToPresentationState(profile, simulationState) {
     : simulationState.tangentVelocity * tangent.y;
   const surfaceAngle = Math.atan2(tangent.y, tangent.x);
   const threshold = GAME_CONFIG.passivePhysics.presentationVerticalEpsilon;
+  const wallFraction = Math.max(
+    0,
+    Math.min(
+      1,
+      (Math.abs(simulationState.pipeX) - profile.flatHalfWidth)
+        / profile.transitionWidth,
+    ),
+  );
+  const rampAscending = Boolean(
+    !airborne
+    && wallFraction > 0.02
+    && simulationState.pipeX * simulationState.tangentVelocity > threshold
+    && !simulationState.surfaceTrickActive
+  );
   const speedReference = GAME_CONFIG.passivePhysics.presentationSpeedReference;
   const trickConfig = GAME_CONFIG.trickPresentation;
 
@@ -59,8 +73,8 @@ export function simulationToPresentationState(profile, simulationState) {
     && (simulationState.airTurnActive || trickType === 'aerial-turn')
   ) {
     const direction = Number(simulationState.airTurnDirection) || 1;
-    const eased = easeInOut(trickProgress);
-    facingYaw = finalFacingYaw + direction * Math.PI * eased;
+    // Constant angular velocity: no easing/speed-up in the middle.
+    facingYaw = finalFacingYaw + direction * Math.PI * trickProgress;
     trickRoll = -currentSide
       * trickConfig.aerialRoll
       * Math.sin(Math.PI * trickProgress);
@@ -74,12 +88,13 @@ export function simulationToPresentationState(profile, simulationState) {
     const isHandPlant = simulationState.surfaceTrickType === 'hand-plant';
     const direction = Number(simulationState.lastTrickTurnDirection) || 0;
     const side = Number(simulationState.lastTrickSide) || currentSide;
-    const eased = easeInOut(trickProgress);
     const envelope = Math.sin(Math.PI * trickProgress);
 
     trickType = simulationState.surfaceTrickType;
+    // finalFacingYaw already contains the completed 180°. Interpolate from
+    // the previous facing to it with a strictly linear progress value.
     facingYaw = finalFacingYaw
-      - direction * Math.PI * (1 - eased);
+      - direction * Math.PI * (1 - trickProgress);
 
     if (isHandPlant) {
       trickRoll = -side * trickConfig.handPlantRoll * envelope;
@@ -100,6 +115,7 @@ export function simulationToPresentationState(profile, simulationState) {
     tangentVelocity: simulationState.tangentVelocity,
     ascending: verticalVelocity > threshold,
     descending: verticalVelocity < -threshold,
+    rampAscending,
     pumpCompression: simulationState.pumpIntent < 0
       ? simulationState.pumpWindowInfluence
       : 0,
