@@ -14,10 +14,13 @@ const HORIZONTAL_KEYS = new Map([
   ['KeyD', 1],
 ]);
 
+const BACKFLIP_KEYS = new Set(['Space', 'KeyJ', 'KeyK', 'KeyL']);
+
 const GAMEPAD_BUTTON = Object.freeze({
   primary: 0,
   secondary: 1,
   tertiary: 2,
+  quaternary: 3,
   back: 8,
   start: 9,
   dpadUp: 12,
@@ -81,6 +84,9 @@ export class HalfpipePumpInput {
     this.keyboardHandPlantHeld = false;
     this.gamepadHandPlantHeld = false;
     this.handPlantHeld = false;
+    this.keyboardBackflipHeld = false;
+    this.gamepadBackflipHeld = false;
+    this.backflipHeld = false;
 
     this.gamepadConnected = false;
     this.gamepadId = '';
@@ -124,7 +130,8 @@ export class HalfpipePumpInput {
     this._onKeyDown = (event) => {
       const gameplayKey = VERTICAL_KEYS.has(event.code)
         || HORIZONTAL_KEYS.has(event.code)
-        || event.code === 'KeyK';
+        || event.code === 'KeyK'
+        || BACKFLIP_KEYS.has(event.code);
       if (!gameplayKey) return;
 
       this.keys.add(event.code);
@@ -135,7 +142,8 @@ export class HalfpipePumpInput {
     this._onKeyUp = (event) => {
       const gameplayKey = VERTICAL_KEYS.has(event.code)
         || HORIZONTAL_KEYS.has(event.code)
-        || event.code === 'KeyK';
+        || event.code === 'KeyK'
+        || BACKFLIP_KEYS.has(event.code);
       if (!gameplayKey) return;
 
       this.keys.delete(event.code);
@@ -169,7 +177,9 @@ export class HalfpipePumpInput {
     this.keyboardIntent = this._axisFromKeys(VERTICAL_KEYS);
     this.keyboardTurnIntent = this._axisFromKeys(HORIZONTAL_KEYS);
     this.keyboardHandPlantHeld = this.keys.has('KeyK');
+    this.keyboardBackflipHeld = Array.from(BACKFLIP_KEYS).some((code) => this.keys.has(code));
     this.handPlantHeld = this.keyboardHandPlantHeld || this.gamepadHandPlantHeld;
+    this.backflipHeld = this.keyboardBackflipHeld || this.gamepadBackflipHeld;
     this._refreshIntent();
   }
 
@@ -325,7 +335,14 @@ export class HalfpipePumpInput {
       || buttonPressed(activePad, GAMEPAD_BUTTON.secondary)
       || buttonPressed(activePad, GAMEPAD_BUTTON.tertiary)
     );
+    this.gamepadBackflipHeld = (
+      buttonPressed(activePad, GAMEPAD_BUTTON.primary)
+      || buttonPressed(activePad, GAMEPAD_BUTTON.secondary)
+      || buttonPressed(activePad, GAMEPAD_BUTTON.tertiary)
+      || buttonPressed(activePad, GAMEPAD_BUTTON.quaternary)
+    );
     this.handPlantHeld = this.keyboardHandPlantHeld || this.gamepadHandPlantHeld;
+    this.backflipHeld = this.keyboardBackflipHeld || this.gamepadBackflipHeld;
 
     this._queueEdge('primary', buttonPressed(activePad, GAMEPAD_BUTTON.primary));
     this._queueEdge('start', buttonPressed(activePad, GAMEPAD_BUTTON.start));
@@ -360,10 +377,13 @@ export class HalfpipePumpInput {
     this.keyboardIntent = 0;
     this.keyboardTurnIntent = 0;
     this.keyboardHandPlantHeld = false;
+    this.keyboardBackflipHeld = false;
     this.gamepadIntent = 0;
     this.gamepadTurnIntent = 0;
     this.gamepadHandPlantHeld = false;
+    this.gamepadBackflipHeld = false;
     this.handPlantHeld = false;
+    this.backflipHeld = false;
     this.intent = 0;
     this.turnIntent = 0;
     this._viewHoldElapsed = 0;
@@ -379,6 +399,9 @@ export class HalfpipePumpInput {
       handPlantHeld: this.handPlantHeld,
       keyboardHandPlantHeld: this.keyboardHandPlantHeld,
       gamepadHandPlantHeld: this.gamepadHandPlantHeld,
+      backflipHeld: this.backflipHeld,
+      keyboardBackflipHeld: this.keyboardBackflipHeld,
+      gamepadBackflipHeld: this.gamepadBackflipHeld,
       keyboardIntent: this.keyboardIntent,
       keyboardTurnIntent: this.keyboardTurnIntent,
       gamepadIntent: this.gamepadIntent,
@@ -431,7 +454,9 @@ export class HalfpipePumpInput {
     this.gamepadIntent = 0;
     this.gamepadTurnIntent = 0;
     this.gamepadHandPlantHeld = false;
+    this.gamepadBackflipHeld = false;
     this.handPlantHeld = this.keyboardHandPlantHeld;
+    this.backflipHeld = this.keyboardBackflipHeld;
     this._previousGamepadButtons.primary = false;
     this._previousGamepadButtons.start = false;
     for (const key of Object.keys(this._previousUiButtons)) {
