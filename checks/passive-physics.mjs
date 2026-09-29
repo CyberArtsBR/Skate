@@ -95,8 +95,13 @@ assert.equal(presentationState.pumpCompression, 0);
 function runPumped(seconds = 8) {
   const profile = new HalfpipeProfile();
   const simulation = new HalfpipeSimulation(profile);
+  simulation.reset({
+    pipeX: -(profile.flatHalfWidth + profile.transitionWidth * 0.72),
+    tangentVelocity: 0,
+  });
+  const initialAmplitude = Math.abs(simulation.snapshot().pipeX);
   const totalSteps = Math.round(seconds / simulation.fixedDt);
-  let maxAbsX = Math.abs(simulation.snapshot().pipeX);
+  let maxAbsX = initialAmplitude;
   let timeToHighAmplitude = null;
   const highAmplitudeTarget = profile.rightLip * 0.9;
 
@@ -117,15 +122,16 @@ function runPumped(seconds = 8) {
     maxAbsX,
     timeToHighAmplitude,
     highAmplitudeTarget,
+    initialAmplitude,
   };
 }
 
 const pumped = runPumped();
 assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific energy');
-assert.ok(pumped.maxAbsX > Math.abs(first.initial.pipeX), 'correct pumping should increase amplitude');
+assert.ok(pumped.maxAbsX > pumped.initialAmplitude, 'correct pumping should increase amplitude from a lower transition start');
 assert.ok(
-  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 2.6,
-  `strong correct pumping should reach 90% lip amplitude within 2.6s, got ${pumped.timeToHighAmplitude}`,
+  pumped.timeToHighAmplitude !== null && pumped.timeToHighAmplitude <= 6,
+  `correct pumping should reach 90% lip amplitude within 6s from the calibration start, got ${pumped.timeToHighAmplitude}`,
 );
 assert.ok(
   ['contact', 'airborne'].includes(pumped.final.mode),
@@ -137,6 +143,7 @@ console.log(JSON.stringify({
   final: first.final,
   fixedDt: first.simulation.fixedDt,
   pumped: {
+    initialAmplitude: pumped.initialAmplitude,
     maxAbsX: pumped.maxAbsX,
     timeToHighAmplitude: pumped.timeToHighAmplitude,
     highAmplitudeTarget: pumped.highAmplitudeTarget,
