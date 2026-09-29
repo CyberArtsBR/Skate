@@ -16,6 +16,7 @@ function fitModel(model, targetHeight) {
   model.position.z -= center.z;
   model.position.y -= box.min.y;
 }
+
 export class ChimpionLoader {
   constructor(url) {
     this.url = url;
@@ -38,12 +39,9 @@ export class ChimpionLoader {
       object.castShadow = true;
       object.receiveShadow = true;
       object.frustumCulled = false;
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) {
-        if (!material?.isMeshStandardMaterial) continue;
-        material.metalness = Math.min(material.metalness, 0.08);
-        material.roughness = Math.max(material.roughness, 0.58);
-      }
+      // Preserve every authored material value and texture map from the GLB.
+      // Visibility belongs to lighting/environment, never destructive loader
+      // overrides (roughness/metalness/emissive/recolor).
     });
 
     fitModel(this.model, GAME_CONFIG.rider.targetHeight);
@@ -62,6 +60,7 @@ export class ChimpionLoader {
     this.root.userData.poseMode = 'skateboard-side-stance';
     this.root.userData.modelForwardAxis = '+Z';
     this.root.userData.targetHeight = GAME_CONFIG.rider.targetHeight;
+    this.root.userData.authoredMaterialsPreserved = true;
     return this;
   }
 

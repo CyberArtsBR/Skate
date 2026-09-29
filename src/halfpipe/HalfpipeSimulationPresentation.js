@@ -1,4 +1,8 @@
 import { GAME_CONFIG } from '../config/gameConfig.js';
+import {
+  normalizeLandingQuality,
+  resolveSkateAnimationState,
+} from '../character/SkateAnimationState.js';
 
 function orientedTangent(sample) {
   const tangent = sample.tangent.clone();
@@ -10,11 +14,49 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
 }
 
+function smoothstep01(value) {
+  const t = clamp01(value);
+  return t * t * (3 - 2 * t);
+}
+
 function easeInOut(value) {
   const t = clamp01(value);
   return t < 0.5
     ? 4 * t * t * t
     : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function explicitLanding(simulationState) {
+  return clamp01(
+    simulationState.landing
+    ?? simulationState.landingImpact
+    ?? simulationState.landingProgress
+    ?? 0,
+  );
+}
+
+function explicitLandingQuality(simulationState) {
+  return normalizeLandingQuality(
+    simulationState.landingQuality
+    ?? simulationState.lastLandingQuality
+    ?? simulationState.landingResult
+    ?? 'none',
+  );
+}
+
+function visualTurnDirection(simulationState, side, finalFacingYaw) {
+  const provided = Number(
+    simulationState.airTurnDirection
+    || simulationState.lastTrickTurnDirection,
+  );
+  if (provided) return Math.sign(provided);
+
+  // Fallback for future/alternate gameplay cores that do not provide an
+  // explicit turn direction. Mirror from wall, facing and stance rather than
+  // assuming every maneuver rotates the same way.
+  const stanceSign = GAME_CONFIG.rider.stance === 'goofy' ? -1 : 1;
+  const facingSign = Math.cos(finalFacingYaw) < 0 ? -1 : 1;
+  return Math.sign((side || 1) * stanceSign * facingSign) || 1;
 }
 
 export function simulationToPresentationState(profile, simulationState) {
@@ -34,6 +76,7 @@ export function simulationToPresentationState(profile, simulationState) {
         / profile.transitionWidth,
     ),
   );
+  const distanceFromCoping = 1 - wallFraction;
   const rampAscending = Boolean(
     !airborne
     && wallFraction > 0.02
@@ -42,6 +85,36 @@ export function simulationToPresentationState(profile, simulationState) {
   );
   const speedReference = GAME_CONFIG.passivePhysics.presentationSpeedReference;
   const trickConfig = GAME_CONFIG.trickPresentation;
+  const speedNormalized = Math.min(
+    1,
+    Math.abs(airborne ? simulationState.airVerticalVelocity : simulationState.tangentVelocity)
+      / Math.max(0.001, speedReference),
+  );
+
+  // Continuous ramp preload: neutral at the flat, progressive through the
+  // transition, strongest only near coping. Speed, upward phase and pump timing
+  // all contribute without an upright -> deep-crouch binary snap.
+  const wallCurve = smoothstep01((wallFraction - 0.04) / 0.96);
+  const upperCurve = smoothstep01((wallFraction - 0.5) / 0.5);
+  const copingCurve = smoothstep01((wallFraction - 0.82) / 0.18);
+  const pumpCompression = simulationState.pumpIntent < 0
+    ? clamp01(simulationState.pumpWindowInfluence)
+    : 0;
+  const upwardFactor = rampAscending
+    ? clamp01(0.45 + Math.abs(verticalVelocity) / Math.max(0.001, speedReference))
+    : 0;
+  const preloadCompression = clamp01(
+    0.28
+    + (rampAscending ? 1 : 0) * (
+      wallCurve * 0.16
+      + upperCurve * 0.24
+      + copingCurve * 0.12
+      + speedNormalized * 0.08
+      + pumpCompression * 0.08
+      + upwardFactor * 0.05
+    )
+    + (!airborne && verticalVelocity < -threshold ? (1 - wallFraction) * 0.06 : 0),
+  );
 
   const finalFacingYaw = (Number(simulationState.facingTurns) || 0) * Math.PI;
   let facingYaw = finalFacingYaw;
@@ -67,14 +140,17 @@ export function simulationToPresentationState(profile, simulationState) {
     || Number(simulationState.lastTrickSide)
     || Math.sign(simulationState.pipeX)
     || 1;
+  const turnDirection = visualTurnDirection(
+    simulationState,
+    currentSide,
+    finalFacingYaw,
+  );
 
   if (
     airborne
     && (simulationState.airTurnActive || trickType === 'aerial-turn')
   ) {
-    const direction = Number(simulationState.airTurnDirection) || 1;
-    // Constant angular velocity: no easing/speed-up in the middle.
-    facingYaw = finalFacingYaw + direction * Math.PI * trickProgress;
+    facingYaw = finalFacingYaw + turnDirection * Math.PI * trickProgress;
     trickRoll = -currentSide
       * trickConfig.aerialRoll
       * Math.sin(Math.PI * trickProgress);
@@ -86,15 +162,14 @@ export function simulationToPresentationState(profile, simulationState) {
     && simulationState.surfaceTrickType
   ) {
     const isHandPlant = simulationState.surfaceTrickType === 'hand-plant';
-    const direction = Number(simulationState.lastTrickTurnDirection) || 0;
     const side = Number(simulationState.lastTrickSide) || currentSide;
     const envelope = Math.sin(Math.PI * trickProgress);
 
     trickType = simulationState.surfaceTrickType;
-    // finalFacingYaw already contains the completed 180°. Interpolate from
-    // the previous facing to it with a strictly linear progress value.
+    // finalFacingYaw contains the completed 180. Start from the previous facing
+    // and honor the gameplay-provided direction when present.
     facingYaw = finalFacingYaw
-      - direction * Math.PI * (1 - trickProgress);
+      - turnDirection * Math.PI * (1 - trickProgress);
 
     if (isHandPlant) {
       trickRoll = -side * trickConfig.handPlantRoll * envelope;
@@ -110,35 +185,66 @@ export function simulationToPresentationState(profile, simulationState) {
     trickProgress = 0;
   }
 
-  return {
+  const copingX = currentSide < 0 ? profile.leftLip : profile.rightLip;
+  const copingSample = profile.sample(copingX);
+  const lipY = Number(copingSample?.y) || 0;
+  const worldY = airborne ? Number(simulationState.airY) : null;
+  const airHeight = airborne && Number.isFinite(worldY)
+    ? Math.max(0, worldY - lipY)
+    : 0;
+  const landingAnticipation = airborne && verticalVelocity < 0
+    ? clamp01(1 - airHeight / 2.2)
+    : 0;
+  const airTuck = airborne
+    ? clamp01(smoothstep01(airHeight / 3.2) * (1 - landingAnticipation * 0.45))
+    : 0;
+  const landing = explicitLanding(simulationState);
+  const landingQuality = explicitLandingQuality(simulationState);
+
+  const presentation = {
+    time: dropTime,
     pipeX: simulationState.pipeX,
     tangentVelocity: simulationState.tangentVelocity,
     ascending: verticalVelocity > threshold,
     descending: verticalVelocity < -threshold,
     rampAscending,
-    pumpCompression: simulationState.pumpIntent < 0
-      ? simulationState.pumpWindowInfluence
-      : 0,
+    pumpCompression,
     airborne,
     verticalVelocity,
-    worldY: airborne ? simulationState.airY : null,
+    worldY,
     surfaceAngle,
+    wallFraction,
+    distanceFromCoping,
+    wallSide: currentSide,
     rotation: 0,
     facingYaw,
+    turnDirection,
     trickRoll,
     trickOffsetX,
     trickOffsetY,
     trickVisualActive,
     dropInRoll,
     dropInProgress,
-    landing: 0,
-    landingQuality: 'none',
+    landing,
+    landingQuality,
+    landingAnticipation,
+    recovery: 0,
     trickType,
     trickProgress,
-    speedNormalized: Math.min(
-      1,
-      Math.abs(airborne ? simulationState.airVerticalVelocity : simulationState.tangentVelocity)
-        / Math.max(0.001, speedReference),
-    ),
+    speedNormalized,
+    preloadCompression,
+    airHeight,
+    airTuck,
+    footIKWeight: airborne ? 0.3 + landingAnticipation * 0.6 : 1,
+    secondaryLag: 0,
+    copingWorldPoint: {
+      x: Number(copingSample?.x ?? copingX),
+      y: lipY,
+      z: 0,
+    },
   };
+  presentation.animationState = resolveSkateAnimationState(presentation);
+  presentation.animationBlend = 1;
+  presentation.stateTime = 0;
+  return presentation;
 }

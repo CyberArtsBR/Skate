@@ -1,0 +1,58 @@
+export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
+  launch: Object.freeze({
+    thresholdSpeed: 1.2,
+    visiblePopVelocity: 0.8,
+    speedForMaximumVelocity: 18,
+    maximumVerticalVelocity: 19.5,
+  }),
+  gravity: Object.freeze({
+    downhillScale: 1.08,
+    uphillScale: 1.35,
+  }),
+  pumping: Object.freeze({
+    acceleration: 9.0,
+    wrongPenaltyAcceleration: 1.75,
+    ratingMultipliers: Object.freeze({
+      PERFECT: 1.18,
+      GOOD: 1.0,
+      WEAK: 0.72,
+      EARLY: 0.48,
+      LATE: 0.48,
+      WRONG: -1,
+    }),
+    rhythmBoostPerfect: 0.035,
+    rhythmBoostGood: 0.02,
+    rhythmBoostWeak: 0.008,
+    rhythmBoostPenalty: 0.04,
+    rhythmBoostMax: 0.15,
+  }),
+  aerial: Object.freeze({
+    rotationDegreesPerSecond: 360,
+    validMinDegrees: 165,
+    idealMinDegrees: 176,
+    idealMaxDegrees: 188,
+    validMaxDegrees: 210,
+    overturnDegrees: 225,
+  }),
+  landing: Object.freeze({
+    activeSeconds: 0.28,
+    impactPerfectMax: 13.5,
+    impactCleanMax: 17,
+    impactSketchyMax: 19.5,
+    impactHeavyMax: 22,
+    rotationPerfectError: 9,
+    rotationCleanError: 20,
+    rotationSketchyError: 35,
+    rotationHeavyError: 55,
+  }),
+  crash: Object.freeze({
+    recoverySeconds: 0.7,
+    bailMomentumRetention: 0.35,
+    technicalBounceSpeed: 2.4,
+  }),
+  surfaceTricks: Object.freeze({
+    handPlantMinimumHoldSeconds: 1 / 120,
+    handPlantIdealHoldSeconds: 0.28,
+    handPlantMaximumQualityHoldSeconds: 0.52,
+  }),
+});

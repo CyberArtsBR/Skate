@@ -43,8 +43,8 @@ assert.equal(first.final.lipContacts, 0, 'default passive calibration should rem
 assert.equal(first.final.mode, 'contact');
 assert.ok(first.final.lastBottomCrossingTime !== null);
 assert.ok(
-  first.final.bottomCrossingInterval >= 2.35 && first.final.bottomCrossingInterval <= 3.2,
-  `passive no-input cadence drifted outside the technical-crash approach band: ${first.final.bottomCrossingInterval}`,
+  first.final.bottomCrossingInterval >= 1.65 && first.final.bottomCrossingInterval <= 3.2,
+  `passive no-input cadence drifted outside the Phase 4 arcade band: ${first.final.bottomCrossingInterval}`,
 );
 assert.ok(first.final.lastCrossingSpeed > 0);
 assert.ok(first.final.lastTurningPointX !== null);
@@ -263,8 +263,10 @@ for (let index = 0; index < 60 && aerialTurnSim.snapshot().mode !== 'airborne'; 
 }
 assert.equal(aerialTurnSim.snapshot().mode, 'airborne', 'aerial-turn probe must launch');
 aerialTurnSim.setTurnIntent(1);
-for (let index = 0; index < 18; index += 1) aerialTurnSim.stepFixed();
+for (let index = 0; index < 60; index += 1) aerialTurnSim.stepFixed();
 aerialTurnSim.setTurnIntent(0);
+aerialTurnSim.stepFixed();
+assert.equal(aerialTurnSim.snapshot().airTurnCompleted, true, 'aerial 180 must be earned from held rotation input');
 for (let index = 0; index < 900 && aerialTurnSim.snapshot().mode === 'airborne'; index += 1) {
   aerialTurnSim.stepFixed();
 }

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const url = process.env.HALFPIPE_PREVIEW_URL || 'http://127.0.0.1:5173';
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const consoleErrors = [];
 const pageErrors = [];
@@ -65,6 +65,8 @@ const dropInProbe = await page.evaluate(() => {
     wheelWorld,
     dropInRoll: foundation.rider.presentationState.dropInRoll,
     carrierRoll: foundation.rider.trickCarrier.rotation.z,
+    boardRoll: foundation.rider.boardPivot.rotation.z,
+    visualMinSeparation: foundation.presentationBinder.lastContact?.visualMinSeparation ?? null,
   };
 });
 
@@ -360,7 +362,7 @@ assert.ok(state.backgroundDimensions[1] >= 900);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] > 1.76);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] < 1.8);
 assert.equal(state.wheelCount, 4);
-assert.equal(state.wheelSpinSafe, false);
+assert.equal(state.wheelSpinSafe, true, 'Phase 4 skateboard runtime must expose four safe semantic wheel pivots');
 assert.ok(state.measuredWheelDiameter > 0.075, `scaled skateboard wheel diameter is too small: ${state.measuredWheelDiameter}`);
 assert.ok(state.surfaceSupportPointCount >= 6);
 assert.ok(state.chimpionTargetHeight >= 2.3, `chimpion target height should be visibly larger: ${state.chimpionTargetHeight}`);
@@ -375,8 +377,11 @@ assert.deepEqual(state.skateboardCoordinateSystem, {
   forwardAxis: '+X',
   lateralAxis: '+Z',
   upAxis: '+Y',
+  axleAxis: '+Z',
   noseDirection: '+X',
   tailDirection: '-X',
+  leftSide: '+Z',
+  rightSide: '-Z',
   regularFrontFoot: 'left',
   regularRearFoot: 'right',
 });
@@ -462,12 +467,14 @@ assert.ok(
   `drop-in should start at the top of the RIGHT wall: ${JSON.stringify(dropInProbe)}`,
 );
 assert.ok(
-  dropInProbe.dropInRoll > 0.12 && dropInProbe.carrierRoll > 0.12,
-  `drop-in manual nose lift is not visible: ${JSON.stringify(dropInProbe)}`,
+  dropInProbe.dropInRoll > 0.12 && dropInProbe.boardRoll > 0.12,
+  `drop-in rear-truck nose lift is not visible: ${JSON.stringify(dropInProbe)}`,
 );
 assert.ok(
-  Math.abs(dropInProbe.topWheelGap) < 0.05,
-  `drop-in upper wheel should begin at the coping/white bar, gap=${dropInProbe.topWheelGap}: ${JSON.stringify(dropInProbe)}`,
+  Number.isFinite(dropInProbe.visualMinSeparation)
+    && dropInProbe.visualMinSeparation >= -0.01
+    && dropInProbe.visualMinSeparation <= 0.06,
+  `drop-in support points must stay visually seated on the authored riding surface: ${JSON.stringify(dropInProbe)}`,
 );
 assert.equal(trickPresentationProbe.kick.trick, 'kick-turn');
 assert.equal(trickPresentationProbe.kick.visualActive, true);
