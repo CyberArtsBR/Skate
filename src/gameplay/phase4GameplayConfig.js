@@ -10,7 +10,7 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     uphillScale: 1.35,
   }),
   pumping: Object.freeze({
-    acceleration: 6.4,
+    acceleration: 8.0,
     wrongPenaltyAcceleration: 1.25,
     ratingMultipliers: Object.freeze({
       PERFECT: 1.0,
