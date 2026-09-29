@@ -1,4 +1,20 @@
 import { GAME_CONFIG } from '../config/gameConfig.js';
+import { PHASE4_GAMEPLAY_CONFIG } from '../gameplay/phase4GameplayConfig.js';
+import { HalfpipeGameplayEvents } from '../gameplay/HalfpipeGameplayEvents.js';
+import {
+  PUMP_RATINGS,
+  evaluatePumpRating,
+  pumpAccuracyWeight,
+} from '../gameplay/HalfpipePumpRating.js';
+import {
+  LANDING_QUALITIES,
+  evaluateLanding,
+} from '../gameplay/HalfpipeLandingSystem.js';
+import {
+  comboMultiplierForCount,
+  repetitionMultiplier,
+  scoreRangeForTrick,
+} from '../scoring/HalfpipeScoreSystem.js';
 
 function signWithEpsilon(value, epsilon) {
   if (value > epsilon) return 1;
@@ -6,9 +22,18 @@ function signWithEpsilon(value, epsilon) {
   return 0;
 }
 
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
+}
+
 function smoothstep01(value) {
-  const t = Math.max(0, Math.min(1, value));
+  const t = clamp01(value);
   return t * t * (3 - 2 * t);
+}
+
+function rotationQualityFromDegrees(rotationDegrees) {
+  const error = Math.abs((Number(rotationDegrees) || 0) - 180);
+  return clamp01(1 - error / 55);
 }
 
 export class HalfpipeSimulation {
@@ -28,16 +53,22 @@ export class HalfpipeSimulation {
     this.initialVelocity = options.initialVelocity ?? defaults.initialVelocity;
 
     const arcadeDefaults = GAME_CONFIG.arcadeMotion;
-    this.downhillGravityScale =
-      options.downhillGravityScale ?? arcadeDefaults.downhillGravityScale;
-    this.uphillGravityScale =
-      options.uphillGravityScale ?? arcadeDefaults.uphillGravityScale;
+    this.downhillGravityScale = options.downhillGravityScale
+      ?? PHASE4_GAMEPLAY_CONFIG.gravity.downhillScale
+      ?? arcadeDefaults.downhillGravityScale;
+    this.uphillGravityScale = options.uphillGravityScale
+      ?? PHASE4_GAMEPLAY_CONFIG.gravity.uphillScale
+      ?? arcadeDefaults.uphillGravityScale;
 
     const pumpDefaults = GAME_CONFIG.pumping;
-    this.pumpAcceleration = options.pumpAcceleration ?? pumpDefaults.acceleration;
+    this.pumpAcceleration = options.pumpAcceleration
+      ?? PHASE4_GAMEPLAY_CONFIG.pumping.acceleration
+      ?? pumpDefaults.acceleration;
     this.pumpUpperWallRetention =
       options.pumpUpperWallRetention ?? pumpDefaults.upperWallRetention;
     this.pumpMinimumSpeed = options.pumpMinimumSpeed ?? pumpDefaults.minimumSpeed;
+    this.wrongPumpPenaltyAcceleration = options.wrongPumpPenaltyAcceleration
+      ?? PHASE4_GAMEPLAY_CONFIG.pumping.wrongPenaltyAcceleration;
 
     const turningDefaults = GAME_CONFIG.turning;
     this.kickTurnMinFraction =
@@ -52,25 +83,19 @@ export class HalfpipeSimulation {
       options.handPlantBufferSeconds ?? turningDefaults.handPlantBufferSeconds;
     this.aerialIdealHoldSeconds =
       options.aerialIdealHoldSeconds ?? turningDefaults.aerialIdealHoldSeconds;
-    this.aerialCompleteSeconds =
-      options.aerialCompleteSeconds ?? turningDefaults.aerialCompleteSeconds;
-    this.aerialOverturnSeconds =
-      options.aerialOverturnSeconds ?? turningDefaults.aerialOverturnSeconds;
 
     this.scoring = GAME_CONFIG.scoring;
     this.trickPresentation = GAME_CONFIG.trickPresentation;
 
     const airDefaults = GAME_CONFIG.air;
     this.airTakeoffInset = options.airTakeoffInset ?? airDefaults.takeoffInset;
-    this.airLaunchMinimumSpeed =
-      options.airLaunchMinimumSpeed ?? airDefaults.launchMinimumSpeed;
-    this.airMinimumVerticalVelocity =
-      options.airMinimumVerticalVelocity ?? airDefaults.minimumVerticalVelocity;
-    this.airMaximumVerticalVelocity =
-      options.airMaximumVerticalVelocity ?? airDefaults.maximumVerticalVelocity;
+    this.airLaunchMinimumSpeed = options.airLaunchMinimumSpeed
+      ?? PHASE4_GAMEPLAY_CONFIG.launch.thresholdSpeed
+      ?? airDefaults.launchMinimumSpeed;
+    this.airMaximumVerticalVelocity = options.airMaximumVerticalVelocity
+      ?? PHASE4_GAMEPLAY_CONFIG.launch.maximumVerticalVelocity
+      ?? airDefaults.maximumVerticalVelocity;
     this.airGravity = options.airGravity ?? airDefaults.gravity;
-    this.airLaunchVelocityScale =
-      options.airLaunchVelocityScale ?? airDefaults.launchVelocityScale;
     this.airLandingVelocityRetention =
       options.airLandingVelocityRetention ?? airDefaults.landingVelocityRetention;
 
@@ -80,8 +105,10 @@ export class HalfpipeSimulation {
     this.handPlantBufferRemaining = 0;
 
     this.accumulator = 0;
-    this.handPlantBufferRemaining = 0;
     this._lastDirection = 0;
+    this._lastPumpInput = 0;
+    this._lastPumpDesiredIntent = 0;
+    this.events = new HalfpipeGameplayEvents();
     this.reset(options.initialState);
   }
 
@@ -115,8 +142,18 @@ export class HalfpipeSimulation {
       pumpWindowInfluence: 0,
       pumpTimingQuality: 0,
       pumpActive: false,
+      pumpRating: null,
       lastPumpWork: 0,
       pumpWorkTotal: 0,
+      pumpAttempts: 0,
+      perfectPumps: 0,
+      goodPumps: 0,
+      weakPumps: 0,
+      earlyPumps: 0,
+      latePumps: 0,
+      wrongPumps: 0,
+      pumpAccuracy: 0,
+      pumpAccuracyScore: 0,
 
       turnIntent: 0,
       handPlantHeld: false,
@@ -130,35 +167,125 @@ export class HalfpipeSimulation {
       facingTurns: 0,
       lastTrickTurnDirection: 0,
       lastTrickSide: 0,
+      lastCompletedTrickSide: 0,
+      bestTrick: null,
+      bestTrickPoints: 0,
+      tricksAttempted: 0,
+      tricksLanded: 0,
 
       surfaceTrickActive: false,
       surfaceTrickType: null,
+      surfaceTrickPhase: null,
       surfaceTrickElapsed: 0,
       surfaceTrickDuration: 0,
       surfaceTrickExitVelocity: 0,
+      surfaceTrickEntrySpeed: 0,
+      surfaceTrickQuality: 0,
+      surfaceTrickHold: 0,
+      surfaceTrickReleased: false,
+      surfaceTrickFacingCommitted: false,
 
       airSide: 0,
       airAnchorX: null,
       airBaseY: null,
+      currentAirBaseY: null,
       airY: null,
       airVerticalVelocity: 0,
       airLaunches: 0,
+      currentAirPeakY: null,
+      runMaxAirY: null,
       maxAirY: null,
+      highestAir: 0,
       lastAirPeakY: null,
       airTurnHold: 0,
       airTurnDirection: 0,
       airTurnElapsed: 0,
       airTurnActive: false,
-      airTurnFrozenY: null,
-      airTurnStoredVerticalVelocity: 0,
+      airTurnAttempted: false,
       airTurnCompleted: false,
       airTurnOverturned: false,
+      airTurnFailedReason: null,
+      airRotationDegrees: 0,
+
+      landingActive: false,
+      landingQuality: null,
+      landingImpact: 0,
+      landingScoreMultiplier: 1,
+      landingMomentumRetention: 1,
+      landingTime: null,
+      landingRemaining: 0,
+      lastLandingQuality: null,
+      perfectLandings: 0,
+      cleanLandings: 0,
+
+      crashActive: false,
+      crashReason: null,
+      crashCount: 0,
+      crashes: 0,
+      recoveryRemaining: 0,
+
+      comboMultiplier: 1,
+      comboCount: 0,
+      bestCombo: 1,
+      comboScoreContribution: 0,
+      comboPumpBoost: 0,
+      lastComboTrick: null,
+      repeatedTrickCount: 0,
     };
 
     this.accumulator = 0;
+    this.handPlantBufferRemaining = 0;
+    this.pumpIntent = 0;
+    this.turnIntent = 0;
+    this.handPlantHeld = false;
+    this._lastPumpInput = 0;
+    this._lastPumpDesiredIntent = 0;
     this._lastDirection = signWithEpsilon(this.state.tangentVelocity, this.velocityEpsilon);
+    this.events.clear();
     this._refreshDerivedState();
     return this.snapshot();
+  }
+
+  drainEvents() {
+    return this.events.drain();
+  }
+
+  getRunStats() {
+    return {
+      score: this.state.score,
+      bestTrick: this.state.bestTrick,
+      bestTrickPoints: this.state.bestTrickPoints,
+      runMaxAirY: this.state.runMaxAirY,
+      highestAir: this.state.highestAir,
+      bestCombo: this.state.bestCombo,
+      tricksAttempted: this.state.tricksAttempted,
+      tricksLanded: this.state.tricksLanded,
+      perfectLandings: this.state.perfectLandings,
+      cleanLandings: this.state.cleanLandings,
+      crashes: this.state.crashes,
+      pumpAccuracy: this.state.pumpAccuracy,
+    };
+  }
+
+  computeLaunchVelocity(incomingSpeed) {
+    const speed = Math.max(0, Math.abs(Number(incomingSpeed) || 0));
+    const cfg = PHASE4_GAMEPLAY_CONFIG.launch;
+    if (speed < this.airLaunchMinimumSpeed) return 0;
+
+    const normalized = clamp01(
+      (speed - this.airLaunchMinimumSpeed)
+      / Math.max(1e-4, cfg.speedForMaximumVelocity - this.airLaunchMinimumSpeed),
+    );
+    const curved = smoothstep01(normalized);
+    return Math.min(
+      this.airMaximumVerticalVelocity,
+      cfg.visiblePopVelocity
+        + (this.airMaximumVerticalVelocity - cfg.visiblePopVelocity) * curved,
+    );
+  }
+
+  _emit(type, payload = {}) {
+    this.events.emit(type, this.state.time, payload);
   }
 
   _sampleIncreasingX(x) {
