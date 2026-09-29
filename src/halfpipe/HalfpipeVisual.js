@@ -240,15 +240,14 @@ export class HalfpipeVisual {
 
         if (hasCopingMaterial) {
           object.userData.copingContactZone = true;
-          preparedMaterials = preparedMaterials.map((material, index) => {
-            const sourceMaterial = sourceMaterials[index];
-            if (sourceMaterial?.name !== COPING_MATERIAL_NAME) return material;
+          preparedMaterials = preparedMaterials.map((material) => {
+            if (material?.name !== COPING_MATERIAL_NAME) return material;
 
             // Preserve the authored GLB material exactly except for a restrained
             // emissive lift on the white coping. In particular, do not touch
             // roughness, metalness, maps, or shell materials.
-            const coping = sourceMaterial.clone();
-            coping.name = `${sourceMaterial.name}-soft-emissive`;
+            const coping = material.clone();
+            coping.name = `${material.name}-soft-emissive`;
             if (coping.emissive?.set) {
               coping.emissive.set(0xffffff);
               coping.emissiveIntensity = GAME_CONFIG.renderer.copingGlow.emissiveIntensity;
