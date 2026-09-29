@@ -105,11 +105,11 @@ backflip.stepFixed();
 assert.equal(backflip.state.backflipCompleted, true);
 assert.equal(backflip.state.backflipTargetDegrees, 360);
 
-assert.equal(evaluateLanding({impactSpeed:8}).quality, LANDING_QUALITIES.PERFECT);
-assert.equal(evaluateLanding({impactSpeed:16}).quality, LANDING_QUALITIES.CLEAN);
-assert.equal(evaluateLanding({impactSpeed:20}).quality, LANDING_QUALITIES.SKETCHY);
-assert.equal(evaluateLanding({impactSpeed:24}).quality, LANDING_QUALITIES.HEAVY);
-assert.equal(evaluateLanding({impactSpeed:27}).quality, LANDING_QUALITIES.BAIL);
+assert.equal(evaluateLanding({impactSpeed:20}).quality, LANDING_QUALITIES.PERFECT);
+assert.equal(evaluateLanding({impactSpeed:32}).quality, LANDING_QUALITIES.CLEAN);
+assert.equal(evaluateLanding({impactSpeed:43}).quality, LANDING_QUALITIES.SKETCHY);
+assert.equal(evaluateLanding({impactSpeed:49}).quality, LANDING_QUALITIES.HEAVY);
+assert.equal(evaluateLanding({impactSpeed:54}).quality, LANDING_QUALITIES.BAIL);
 
 const surface = new HalfpipeSimulation(profile);
 surface.reset({ pipeX: -(profile.flatHalfWidth + profile.transitionWidth*0.85), tangentVelocity:-8 });
