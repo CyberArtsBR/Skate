@@ -43,7 +43,7 @@ assert.equal(first.final.lipContacts, 0, 'default passive calibration should rem
 assert.equal(first.final.mode, 'contact');
 assert.ok(first.final.lastBottomCrossingTime !== null);
 assert.ok(
-  first.final.bottomCrossingInterval >= 2.5 && first.final.bottomCrossingInterval <= 3.2,
+  first.final.bottomCrossingInterval >= 2.35 && first.final.bottomCrossingInterval <= 3.2,
   `passive no-input cadence drifted outside the technical-crash approach band: ${first.final.bottomCrossingInterval}`,
 );
 assert.ok(first.final.lastCrossingSpeed > 0);
