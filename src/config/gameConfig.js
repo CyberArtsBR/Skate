@@ -59,7 +59,8 @@ export const GAME_CONFIG = Object.freeze({
   turning: Object.freeze({
     kickTurnMinFraction: 0.78,
     kickTurnRetention: 0.93,
-    handPlantMinFraction: 0.9985,
+    handPlantMinFraction: 0.99,
+    handPlantBufferSeconds: 0.25,
     handPlantRetention: 0.9,
     aerialIdealHoldSeconds: 0.55,
     aerialCompleteSeconds: 0.14,
