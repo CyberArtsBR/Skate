@@ -417,6 +417,11 @@ assert.ok(
   `back-facing feet must stay planted on skateboard: ${JSON.stringify(backFacingPoseProbe)}`,
 );
 assert.ok(
+  Math.abs(backFacingPoseProbe.leftHand[1] - backFacingPoseProbe.leftKnee[1]) < 0.35
+    && Math.abs(backFacingPoseProbe.rightHand[1] - backFacingPoseProbe.rightKnee[1]) < 0.35,
+  `ascending fakie hands should stay down near the knees, not raised: ${JSON.stringify(backFacingPoseProbe)}`,
+);
+assert.ok(
   dropInProbe.pipeX > 0
     && Math.abs(dropInProbe.pipeX - dropInProbe.rightLip) < 0.12,
   `drop-in should start at the top of the RIGHT wall: ${JSON.stringify(dropInProbe)}`,
