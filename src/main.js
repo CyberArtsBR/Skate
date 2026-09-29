@@ -365,17 +365,33 @@ function handleControlsExit() {
 
 function startCountdown() {
   if (!simulation) return false;
+
+  // Validate the flow transition before resetting session/simulation state.
+  // This prevents split states such as flow=PAUSE + session=COUNTDOWN, which
+  // previously made Restart Run followed by Resume appear frozen.
+  if (!gameFlow.canTransitionTo(HALFPIPE_FLOW_STATE.COUNTDOWN)) return false;
+
   resetSimulation({ keepFlow: true });
-  session.beginCountdown();
+  if (!session.beginCountdown()) return false;
+
   simulationRunning = false;
   pumpInput?.clearHeldState();
+
   // Discard the same confirm/button edge that opened this prompt. A short
   // debounce plus gamepad edge tracking guarantees the player performs a new
   // input to begin the run instead of accidentally skipping this screen.
   pumpInput?.consumeActions();
   pumpInput?.consumeUIActions();
   startPromptArmedAt = (globalThis.performance?.now?.() ?? Date.now()) + 160;
-  gameFlow.transitionTo(HALFPIPE_FLOW_STATE.COUNTDOWN);
+
+  if (!gameFlow.transitionTo(HALFPIPE_FLOW_STATE.COUNTDOWN)) {
+    // Fail closed instead of leaving session and flow in incompatible phases.
+    session.reset();
+    simulationRunning = false;
+    audio.setPaused(true);
+    return false;
+  }
+
   countdown.showPrompt('PRESS ANY BUTTON TO START');
   hud.setStatus('', 'ready');
   audio.resetSessionAudioState();
@@ -406,12 +422,23 @@ function pauseRun() {
 }
 
 function resumeRun() {
-  if (gameFlow.state !== HALFPIPE_FLOW_STATE.PAUSE) return false;
-  session.resume();
+  if (
+    gameFlow.state !== HALFPIPE_FLOW_STATE.PAUSE
+    || session.phase !== 'paused'
+  ) return false;
+
+  if (!session.resume()) return false;
+
+  if (!gameFlow.transitionTo(HALFPIPE_FLOW_STATE.RUN)) {
+    session.pause();
+    simulationRunning = false;
+    audio.setPaused(true);
+    return false;
+  }
+
   simulationRunning = true;
   audio.setPaused(false);
   lastFrameTime = null;
-  gameFlow.transitionTo(HALFPIPE_FLOW_STATE.RUN);
   hud.setStatus('', 'running');
   return true;
 }

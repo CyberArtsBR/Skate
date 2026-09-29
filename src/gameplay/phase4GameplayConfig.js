@@ -64,6 +64,16 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   crash: Object.freeze({
     recoverySeconds: 1.1,
     bailMomentumRetention: 0.90,
+
+    // A bail should interrupt the rider briefly, not disable pumping for the
+    // entire recovery animation. Re-enable pump input quickly and give it a
+    // temporary recovery assist so the player can rebuild amplitude.
+    pumpLockSeconds: 0.18,
+    recoveryPumpAccelerationMultiplier: 1.5,
+    recoveryMinimumPumpMultiplier: 0.55,
+    recoveryWrongPumpPenaltyMultiplier: 0.35,
+    recoveryPumpMinimumSpeed: 0.20,
+
     technicalBounceSpeed: 2.4,
   }),
   surfaceTricks: Object.freeze({

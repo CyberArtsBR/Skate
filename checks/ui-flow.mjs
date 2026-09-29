@@ -96,6 +96,19 @@ assert.deepEqual(transitions, [
   'results',
 ]);
 
+const restartFlow = new HalfpipeGameFlow();
+assert.equal(restartFlow.transitionTo(HALFPIPE_FLOW_STATE.COUNTDOWN), true);
+assert.equal(restartFlow.transitionTo(HALFPIPE_FLOW_STATE.RUN), true);
+assert.equal(restartFlow.transitionTo(HALFPIPE_FLOW_STATE.PAUSE), true);
+assert.equal(
+  restartFlow.transitionTo(HALFPIPE_FLOW_STATE.COUNTDOWN),
+  true,
+  'Restart Run must allow PAUSE -> COUNTDOWN without splitting flow/session state',
+);
+assert.equal(restartFlow.transitionTo(HALFPIPE_FLOW_STATE.RUN), true);
+assert.equal(restartFlow.transitionTo(HALFPIPE_FLOW_STATE.PAUSE), true);
+assert.equal(restartFlow.transitionTo(HALFPIPE_FLOW_STATE.RUN), true);
+
 const desktopOnlyFiles = [
   'src/input/HalfpipePumpInput.js',
   'src/ui/HalfpipeHUD.js',

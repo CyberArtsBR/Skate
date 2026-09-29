@@ -252,6 +252,57 @@ await page.waitForFunction(
 const resumed = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining);
 assert.ok(resumed < pausedLater, 'timer must resume without immediately re-pausing');
 
+// Regression: Pause -> Restart Run -> press-any-button -> Pause -> Resume must
+// never leave flow and session in incompatible states or freeze simulation.
+await page.keyboard.press('KeyP');
+await page.waitForFunction(
+  () => window.__HALFPIPE_FOUNDATION__.flow.state === 'pause'
+    && window.__HALFPIPE_FOUNDATION__.session.phase === 'paused',
+);
+await page.locator('.pause-menu [data-action="restart"]').click();
+await page.waitForFunction(
+  () => window.__HALFPIPE_FOUNDATION__.flow.state === 'countdown'
+    && window.__HALFPIPE_FOUNDATION__.session.phase === 'countdown',
+);
+assert.equal(await page.locator('.countdown-label').textContent(), 'PRESS ANY BUTTON TO START');
+await page.waitForTimeout(200);
+await page.keyboard.press('Space');
+await page.waitForFunction(
+  () => window.__HALFPIPE_FOUNDATION__.flow.state === 'run'
+    && window.__HALFPIPE_FOUNDATION__.session.phase === 'running',
+  null,
+  { timeout: 3000 },
+);
+const restartedStart = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining);
+await page.waitForFunction(
+  (remaining) => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining < remaining,
+  restartedStart,
+  { timeout: 2500 },
+);
+await page.keyboard.press('KeyP');
+await page.waitForFunction(
+  () => window.__HALFPIPE_FOUNDATION__.flow.state === 'pause'
+    && window.__HALFPIPE_FOUNDATION__.session.phase === 'paused',
+);
+const restartedPaused = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining);
+await page.keyboard.press('KeyP');
+await page.waitForFunction(
+  () => window.__HALFPIPE_FOUNDATION__.flow.state === 'run'
+    && window.__HALFPIPE_FOUNDATION__.session.phase === 'running',
+);
+await page.waitForFunction(
+  (remaining) => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining < remaining,
+  restartedPaused,
+  { timeout: 2500 },
+);
+const restartedResumed = await page.evaluate(
+  () => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining,
+);
+assert.ok(
+  restartedResumed < restartedPaused,
+  'restarted run must continue advancing after pause/resume',
+);
+
 await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.physics.reset());
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'title');
 const reset = await page.evaluate(() => {
@@ -301,6 +352,7 @@ console.log(JSON.stringify({
   initial,
   runningStart,
   runningLater,
+  restartedResumed,
   customization,
   heroThumbs,
   reset,

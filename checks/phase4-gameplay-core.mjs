@@ -181,6 +181,34 @@ assert.ok(
   bailRecovery.state.tangentVelocity > 50 && bailRecovery.state.tangentVelocity < 51.5,
   `bail should retain about 90% of landing momentum, got ${bailRecovery.state.tangentVelocity}`,
 );
+assert.equal(PHASE4_GAMEPLAY_CONFIG.crash.pumpLockSeconds, 0.18);
+assert.ok(PHASE4_GAMEPLAY_CONFIG.crash.recoveryPumpAccelerationMultiplier > 1);
+
+let firstRecoveryPumpTime = null;
+const pumpWorkBeforeRecovery = bailRecovery.state.pumpWorkTotal;
+for (let i = 0; i < Math.ceil(0.7 / bailRecovery.fixedDt); i += 1) {
+  const state = bailRecovery.snapshot();
+  const desiredIntent = state.pipeX * state.tangentVelocity >= 0 ? 1 : -1;
+  bailRecovery.setPumpIntent(desiredIntent);
+  const next = bailRecovery.stepFixed();
+  if (firstRecoveryPumpTime === null && next.pumpActive) {
+    firstRecoveryPumpTime = next.time;
+  }
+}
+assert.ok(
+  firstRecoveryPumpTime !== null
+    && firstRecoveryPumpTime <= PHASE4_GAMEPLAY_CONFIG.crash.pumpLockSeconds + 0.08,
+  `pump authority should return quickly after bail, first active at ${firstRecoveryPumpTime}`,
+);
+assert.ok(
+  bailRecovery.state.pumpWorkTotal > pumpWorkBeforeRecovery,
+  'post-bail recovery pumping should add energy before crash recovery finishes',
+);
+assert.equal(
+  bailRecovery.state.crashActive,
+  true,
+  'pump recovery should begin while the bail animation/recovery is still active',
+);
 
 const surface = new HalfpipeSimulation(profile);
 surface.reset({ pipeX: -(profile.flatHalfWidth + profile.transitionWidth*0.85), tangentVelocity:-8 });

@@ -14,7 +14,7 @@ const ALLOWED = Object.freeze({
   controls: new Set(['title', 'character-select', 'countdown', 'pause']),
   countdown: new Set(['run', 'title']),
   run: new Set(['pause', 'results', 'title']),
-  pause: new Set(['run', 'controls', 'title']),
+  pause: new Set(['run', 'controls', 'countdown', 'title']),
   results: new Set(['countdown', 'character-select', 'title']),
 });
 
