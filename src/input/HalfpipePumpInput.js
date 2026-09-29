@@ -472,6 +472,7 @@ export class HalfpipePumpInput {
     this.backflipHeld = this.keyboardBackflipHeld;
     this._previousGamepadButtons.primary = false;
     this._previousGamepadButtons.start = false;
+    this._previousAnyGamepadButton = false;
     for (const key of Object.keys(this._previousUiButtons)) {
       this._previousUiButtons[key] = false;
     }
