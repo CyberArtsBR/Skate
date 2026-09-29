@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { LANDING_QUALITY } from './SkateAnimationState.js';
 
 const clamp01 = (value) => THREE.MathUtils.clamp(Number(value) || 0, 0, 1);
 
@@ -13,8 +14,6 @@ export class SkatePoseController {
     const landing = clamp01(state.landing);
     const speed = clamp01(state.speedNormalized);
     const air = state.airborne ? 1 : 0;
-    const ascending = state.ascending ? 1 : 0;
-    const descending = state.descending ? 1 : 0;
     const surfaceAngle = THREE.MathUtils.clamp(
       Number(state.surfaceAngle) || 0,
       -1.25,
@@ -23,58 +22,111 @@ export class SkatePoseController {
     const facingBack = Math.cos(Number(state.facingYaw) || 0) < 0;
     const facingSign = facingBack ? -1 : 1;
     const handPlant = state.trickVisualActive && state.trickType === 'hand-plant';
-    const ascendingPrep = Boolean(
-      state.rampAscending
-      && !air
-      && !state.trickVisualActive
-      && !handPlant
+    const kickTurn = state.trickVisualActive && state.trickType === 'kick-turn';
+    const airTuck = clamp01(state.airTuck);
+    const anticipation = clamp01(state.landingAnticipation);
+    const recovery = clamp01(state.recovery);
+    const preload = clamp01(state.preloadCompression);
+    const secondaryLag = THREE.MathUtils.clamp(
+      Number(state.secondaryLag) || 0,
+      -0.3,
+      0.3,
     );
-    const landingScale = state.landingQuality === 'hard'
-      ? 1.2
-      : state.landingQuality === 'rough' ? 1.08 : 1;
+    const wallSide = Math.sign(Number(state.wallSide) || 0) || 1;
 
-    // Ascending the wall is now an immediate preload: knees compress and both
-    // arms come down near the knees, like preparing to pop off the coping.
-    const compression = ascendingPrep
-      ? clamp01(0.84 + pump * 0.10 + speed * 0.06)
-      : clamp01(
-        0.28
-        + pump * 0.42
-        + landing * 0.34 * landingScale
-        + descending * 0.08
-        + air * 0.05,
-      );
+    const quality = String(state.landingQuality || LANDING_QUALITY.NONE);
+    const landingScale = quality === LANDING_QUALITY.HEAVY
+      ? 1.42
+      : quality === LANDING_QUALITY.SKETCHY
+        ? 1.18
+        : quality === LANDING_QUALITY.PERFECT
+          ? 0.82
+          : 1;
+    const sketchy = quality === LANDING_QUALITY.SKETCHY ? landing : 0;
+    const heavy = quality === LANDING_QUALITY.HEAVY ? landing : 0;
+    const bail = quality === LANDING_QUALITY.BAIL ? landing : 0;
+
+    let compression = preload;
+    if (air) {
+      compression = clamp01(0.22 + airTuck * 0.48 + anticipation * 0.16);
+    }
+    compression = clamp01(
+      compression
+      + pump * 0.12
+      + landing * 0.38 * landingScale
+      + recovery * 0.06,
+    );
+    if (handPlant) compression = Math.max(0.36, compression * 0.72);
+
+    const asymmetry = sketchy * 0.18 * wallSide * facingSign;
+    const landingRecoil = heavy * 0.18 + bail * 0.28;
+    const airCounter = air
+      ? (Number(state.turnDirection) || 1) * (0.07 + airTuck * 0.09)
+      : 0;
+    const torsoCounter = handPlant
+      ? 0.18 + wallSide * 0.05
+      : kickTurn
+        ? 0.2 + secondaryLag
+        : 0.12 + speed * 0.05 + airCounter + secondaryLag;
+
+    const neutralArm = 0.58;
+    const airArm = neutralArm + 0.24 * (1 - anticipation) + 0.08 * airTuck;
+    const landArm = landing * (0.08 + heavy * 0.18);
+    const handPlantFreeArm = 1.0;
+    let leftArmBalance = air ? airArm : neutralArm + landArm;
+    let rightArmBalance = leftArmBalance;
+    if (sketchy > 0) {
+      leftArmBalance += asymmetry * 0.8;
+      rightArmBalance -= asymmetry * 0.8;
+    }
+    if (handPlant) {
+      leftArmBalance = handPlantFreeArm;
+      rightArmBalance = handPlantFreeArm;
+    }
+
+    const forearmDrop = handPlant
+      ? 0.04
+      : air
+        ? 0.05 + anticipation * 0.08
+        : 0.1 + landing * 0.12 + heavy * 0.08;
 
     Object.assign(this.pose, {
       stance: this.stance,
       facingSign,
-      ascendingPrep,
+      ascendingPrep: Boolean(state.rampAscending),
       compression,
       hipFlex: handPlant
-        ? 0.03
-        : ascendingPrep ? 0.28 + compression * 0.08 : 0.07 + compression * 0.16,
+        ? 0.08 + compression * 0.1
+        : 0.07 + compression * 0.18 + landingRecoil * 0.22,
       kneeFlex: handPlant
-        ? 0.22
-        : ascendingPrep ? 0.94 + compression * 0.20 : 0.38 + compression * 0.42,
+        ? 0.44 + compression * 0.25
+        : 0.36 + compression * 0.5 + landingRecoil * 0.22,
       ankleFlex: handPlant
-        ? -0.03
-        : ascendingPrep ? -0.19 : -0.08 - compression * 0.07,
-      torsoCounter: handPlant
-        ? 0.04
-        : ascendingPrep ? 0.025 : 0.12 + speed * 0.05 - landing * 0.04,
-      torsoBalanceZ: -surfaceAngle * 0.56 * facingSign,
-      headBalanceZ: -surfaceAngle * 0.045 * facingSign,
+        ? -0.05
+        : -0.08 - compression * 0.075 + anticipation * 0.035,
+      torsoCounter,
+      torsoBalanceZ:
+        -surfaceAngle * 0.52 * facingSign
+        + asymmetry
+        - wallSide * handPlant * 0.16,
+      headBalanceZ:
+        -surfaceAngle * 0.04 * facingSign
+        + asymmetry * 0.28,
+      // Airborne gaze opens toward the expected landing wall; on touchdown it
+      // returns toward travel instead of snapping with the torso.
       headLook: handPlant
-        ? 0.08
-        : ascendingPrep ? 0.10 : 0.18 + speed * 0.03,
-      // On CC-style rigs, larger signed Z rotation lowers the arms from the
-      // rest/T-pose. Keep the local side signs stable when fakie; the 180° root
-      // yaw already mirrors them on screen. This avoids the previous "both arms
-      // up" fakie pose.
-      armBalance: handPlant
-        ? 1.0
-        : ascendingPrep ? 1.22 : 0.58 + air * 0.08 + landing * 0.06,
-      forearmDrop: ascendingPrep ? 0.32 : 0.11,
+        ? 0.24
+        : air
+          ? 0.36 + anticipation * 0.18
+          : 0.18 + speed * 0.04 + recovery * 0.05,
+      armBalance: (leftArmBalance + rightArmBalance) * 0.5,
+      leftArmBalance,
+      rightArmBalance,
+      forearmDrop,
+      leftForearmDrop: forearmDrop + Math.max(0, asymmetry) * 0.3,
+      rightForearmDrop: forearmDrop + Math.max(0, -asymmetry) * 0.3,
+      armLag: secondaryLag,
+      torsoSettle: recovery * 0.08 - heavy * 0.11,
       airborne: Boolean(state.airborne),
     });
     return this.pose;
