@@ -32,18 +32,120 @@ const SLOT_ALIASES = Object.freeze({
   rightFoot: ['ccbaserfoot', 'rightfoot'],
 });
 
+const SEMANTIC_ALIASES = Object.freeze({
+  hips: ['hips', 'hip', 'pelvis'],
+  spine: ['spine', 'spine0', 'spine1', 'spine01'],
+  chest: ['chest', 'upperchest', 'spine2', 'spine02', 'spine3'],
+  neck: ['neck', 'neck1', 'necktwist01'],
+  head: ['head'],
+  Shoulder: ['shoulder', 'clavicle', 'collar'],
+  UpperArm: ['upperarm', 'arm', 'uparm'],
+  Forearm: ['forearm', 'lowerarm', 'elbow'],
+  Hand: ['hand', 'wrist'],
+  Thigh: ['thigh', 'upleg', 'upperleg'],
+  Shin: ['shin', 'calf', 'leg', 'lowerleg', 'knee'],
+  Foot: ['foot', 'ankle'],
+});
+
+function nameParts(name = '') {
+  let source = String(name)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .replace(/mixamorig\d*[:_ ]*/g, '')
+    .replace(/cc[_ ]*base[_ ]*/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  const words = source.split(/\s+/).filter(Boolean);
+  let side = words.includes('left') || words.includes('l')
+    ? 'left'
+    : words.includes('right') || words.includes('r')
+      ? 'right'
+      : '';
+  let core = words
+    .filter((word) => ![
+      'left', 'right', 'l', 'r', 'bone', 'def', 'bip', 'bip001',
+    ].includes(word))
+    .join('');
+
+  if (!side && /^(left|right)/.test(core)) {
+    side = core.startsWith('left') ? 'left' : 'right';
+    core = core.slice(side.length);
+  }
+
+  if (!side && /(left|right)$/.test(core)) {
+    side = core.endsWith('left') ? 'left' : 'right';
+    core = core.slice(0, -side.length);
+  }
+
+  return { side, core };
+}
+
+function isDescendant(child, ancestor) {
+  for (let parent = child?.parent; parent; parent = parent.parent) {
+    if (parent === ancestor) return true;
+  }
+  return false;
+}
+
+function semanticSlot(slot = '') {
+  if (slot.startsWith('left')) {
+    return { side: 'left', kind: slot.slice(4) };
+  }
+  if (slot.startsWith('right')) {
+    return { side: 'right', kind: slot.slice(5) };
+  }
+  return { side: '', kind: slot };
+}
+
+function findSemanticBone(bones, slot) {
+  const { side, kind } = semanticSlot(slot);
+  const aliases = SEMANTIC_ALIASES[kind] || [];
+  if (!aliases.length) return null;
+
+  let matches = bones.filter((bone) => {
+    const parts = nameParts(bone.name);
+    return parts.side === side && aliases.includes(parts.core);
+  });
+
+  if (matches.length > 1 && slot === 'hips') {
+    const hierarchical = matches.filter((candidate) => (
+      matches.every((other) => other === candidate || isDescendant(other, candidate))
+    ));
+    if (hierarchical.length === 1) matches = hierarchical;
+  }
+
+  if (matches.length > 1 && (slot === 'spine' || slot === 'chest')) {
+    const hierarchical = matches.filter((candidate) => (
+      matches.every((other) => (
+        other === candidate
+        || (slot === 'spine'
+          ? isDescendant(other, candidate)
+          : isDescendant(candidate, other))
+      ))
+    ));
+    if (hierarchical.length === 1) matches = hierarchical;
+  }
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function normalizeName(name = '') {
   return name.toLowerCase().replace(/mixamorig\d*/g, '').replace(/[^a-z0-9]/g, '');
 }
 
-function findBone(bones, aliases) {
+function findBone(bones, aliases, slot = '') {
   const exact = bones.find((bone) => aliases.includes(normalizeName(bone.name)));
   if (exact) return exact;
-  return bones.find((bone) => {
+
+  const suffix = bones.find((bone) => {
     const name = normalizeName(bone.name);
     return !/twist|share|toe|finger|eye|breast/.test(name)
       && aliases.some((alias) => name.endsWith(alias));
-  }) || null;
+  });
+  if (suffix) return suffix;
+
+  return findSemanticBone(bones, slot);
 }
 
 export class RiderRigAdapter {
@@ -56,7 +158,7 @@ export class RiderRigAdapter {
 
     this.rig = {};
     for (const [slot, aliases] of Object.entries(SLOT_ALIASES)) {
-      this.rig[slot] = findBone(this.bones, aliases);
+      this.rig[slot] = findBone(this.bones, aliases, slot);
     }
     this.missingRequired = REQUIRED_SLOTS.filter((slot) => !this.rig[slot]);
     this.restPose = new Map(
