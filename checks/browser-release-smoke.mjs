@@ -159,6 +159,36 @@ const rosterIds = await page.evaluate(() => (
 ));
 assert.equal(rosterIds.length, 10);
 
+const rigPoseSignatures = {};
+const rigSignatureSlots = [
+  'hips',
+  'spine',
+  'chest',
+  'neck',
+  'head',
+  'leftThigh',
+  'leftShin',
+  'rightThigh',
+  'rightShin',
+  'leftUpperArm',
+  'leftForearm',
+  'rightUpperArm',
+  'rightForearm',
+];
+
+function quaternionAngleDegrees(a, b) {
+  if (!a || !b) return Infinity;
+  const lenA = Math.hypot(...a) || 1;
+  const lenB = Math.hypot(...b) || 1;
+  const dot = Math.abs(
+    (a[0] / lenA) * (b[0] / lenB)
+    + (a[1] / lenA) * (b[1] / lenB)
+    + (a[2] / lenA) * (b[2] / lenB)
+    + (a[3] / lenA) * (b[3] / lenB)
+  );
+  return 2 * Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI;
+}
+
 for (const heroId of rosterIds) {
   await page.evaluate(() => {
     const foundation = window.__HALFPIPE_FOUNDATION__;
@@ -193,6 +223,48 @@ for (const heroId of rosterIds) {
     console.error('Roster diagnostic:', JSON.stringify(diagnostic));
     console.error('Roster console errors:', JSON.stringify(consoleErrors));
     throw error;
+  }
+
+  rigPoseSignatures[heroId] = await page.evaluate((slots) => {
+    const foundation = window.__HALFPIPE_FOUNDATION__;
+    const adapter = foundation.rider.chimpion.rigAdapter;
+    adapter.applySkatePose({
+      stance: 'regular',
+      facingSign: 1,
+      compression: 0.73,
+      hipFlex: 0.19,
+      kneeFlex: 0.81,
+      ankleFlex: -0.15,
+      torsoCounter: 0.21,
+      torsoBalanceZ: 0.17,
+      headBalanceZ: -0.06,
+      headLook: 0.39,
+      leftArmBalance: 0.92,
+      rightArmBalance: 0.68,
+      leftForearmDrop: 0.19,
+      rightForearmDrop: 0.13,
+      armLag: 0.07,
+      torsoSettle: -0.05,
+    });
+    const signature = adapter.getModelSpacePoseSignature(slots);
+    foundation.rider.setPresentationState(foundation.rider.presentationState);
+    return signature;
+  }, rigSignatureSlots);
+}
+
+const hereticSignature = rigPoseSignatures.heretic;
+assert.ok(hereticSignature, 'Heretic reference pose signature must be captured');
+
+for (const [heroId, signature] of Object.entries(rigPoseSignatures)) {
+  for (const slot of rigSignatureSlots) {
+    const reference = hereticSignature[slot];
+    const candidate = signature[slot];
+    if (!reference || !candidate) continue;
+    const delta = quaternionAngleDegrees(reference, candidate);
+    assert.ok(
+      delta <= 0.75,
+      `${heroId} ${slot} movement must match Heretic semantic axes; delta=${delta.toFixed(3)}°`,
+    );
   }
 }
 
@@ -355,6 +427,7 @@ console.log(JSON.stringify({
   restartedResumed,
   customization,
   heroThumbs,
+  rigRetargetVerified: Object.keys(rigPoseSignatures).length,
   reset,
   webglResilience,
   consoleErrors,
