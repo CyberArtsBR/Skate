@@ -42,12 +42,12 @@ class Profile {
 const profile = new Profile();
 
 assert.equal(PHASE4_GAMEPLAY_CONFIG.crash.bailMomentumRetention, 0.90);
-assert.equal(PHASE4_GAMEPLAY_CONFIG.pumping.acceleration, 9.0);
+assert.equal(PHASE4_GAMEPLAY_CONFIG.pumping.acceleration, 8.5);
 assert.equal(
   evaluatePumpRating({
     intent: 1,
     desiredIntent: 1,
-    wallFraction: 0.74,
+    wallFraction: 0.73,
     speedEligible: true,
   }),
   PUMP_RATINGS.PERFECT,
@@ -56,7 +56,7 @@ assert.equal(
   evaluatePumpRating({
     intent: 1,
     desiredIntent: 1,
-    wallFraction: 0.87,
+    wallFraction: 0.86,
     speedEligible: true,
   }),
   PUMP_RATINGS.GOOD,
@@ -65,7 +65,7 @@ assert.equal(
   evaluatePumpRating({
     intent: 1,
     desiredIntent: 1,
-    wallFraction: 0.24,
+    wallFraction: 0.25,
     speedEligible: true,
   }),
   PUMP_RATINGS.WEAK,
