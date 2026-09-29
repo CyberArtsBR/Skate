@@ -377,59 +377,287 @@ export class HalfpipeSimulation {
     return this._isFacingBack() ? -1 : 1;
   }
 
-  _recordTrick(type, quality = 1, turnDirection = 1) {
-    const clampedQuality = Math.max(0, Math.min(1, quality));
-    const range = type === 'kick-turn'
-      ? this.scoring.kickTurn
-      : type === 'hand-plant'
-        ? this.scoring.handPlant
-        : this.scoring.aerialTurn;
-    const points = Math.round(
+  _updatePumpStats(rating) {
+    if (!rating) return;
+
+    this.state.pumpAttempts += 1;
+    const weight = pumpAccuracyWeight(rating);
+    this.state.pumpAccuracyScore += weight;
+    this.state.pumpAccuracy = this.state.pumpAttempts > 0
+      ? this.state.pumpAccuracyScore / this.state.pumpAttempts
+      : 0;
+
+    if (rating === PUMP_RATINGS.PERFECT) this.state.perfectPumps += 1;
+    else if (rating === PUMP_RATINGS.GOOD) this.state.goodPumps += 1;
+    else if (rating === PUMP_RATINGS.WEAK) this.state.weakPumps += 1;
+    else if (rating === PUMP_RATINGS.EARLY) this.state.earlyPumps += 1;
+    else if (rating === PUMP_RATINGS.LATE) this.state.latePumps += 1;
+    else if (rating === PUMP_RATINGS.WRONG) this.state.wrongPumps += 1;
+
+    const pumpCfg = PHASE4_GAMEPLAY_CONFIG.pumping;
+    if (rating === PUMP_RATINGS.PERFECT) {
+      this.state.comboPumpBoost += pumpCfg.rhythmBoostPerfect;
+    } else if (rating === PUMP_RATINGS.GOOD) {
+      this.state.comboPumpBoost += pumpCfg.rhythmBoostGood;
+    } else if (rating === PUMP_RATINGS.WEAK) {
+      this.state.comboPumpBoost += pumpCfg.rhythmBoostWeak;
+    } else if (
+      rating === PUMP_RATINGS.WRONG
+      || rating === PUMP_RATINGS.EARLY
+      || rating === PUMP_RATINGS.LATE
+    ) {
+      this.state.comboPumpBoost -= pumpCfg.rhythmBoostPenalty;
+    }
+    this.state.comboPumpBoost = Math.max(
+      0,
+      Math.min(pumpCfg.rhythmBoostMax, this.state.comboPumpBoost),
+    );
+
+    this._emit('PUMP_RATING', {
+      rating,
+      attempts: this.state.pumpAttempts,
+      accuracy: this.state.pumpAccuracy,
+    });
+  }
+
+  _breakCombo(reason) {
+    const hadCombo = this.state.comboCount > 0 || this.state.comboMultiplier > 1;
+    this.state.comboCount = 0;
+    this.state.comboMultiplier = 1;
+    this.state.comboPumpBoost = 0;
+    this.state.lastComboTrick = null;
+    this.state.repeatedTrickCount = 0;
+    if (hadCombo) {
+      this._emit('COMBO_CHANGED', {
+        multiplier: 1,
+        count: 0,
+        reason,
+      });
+    }
+  }
+
+  _awardValidatedTrick(type, quality, landingScoreMultiplier = 1, side = 0) {
+    const clampedQuality = clamp01(quality);
+    const range = scoreRangeForTrick(this.scoring, type);
+    const basePoints = Math.round(
       range.min + (range.max - range.min) * clampedQuality,
     );
+
+    if (this.state.lastComboTrick === type) {
+      this.state.repeatedTrickCount += 1;
+    } else {
+      this.state.lastComboTrick = type;
+      this.state.repeatedTrickCount = 1;
+    }
+
+    const varietyMultiplier = repetitionMultiplier(this.state.repeatedTrickCount);
+    const previousSide = this.state.lastCompletedTrickSide;
+    const alternateWallBonus = previousSide && side && previousSide !== side ? 0.08 : 0;
+    this.state.comboCount += 1;
+    this.state.comboMultiplier = comboMultiplierForCount(this.state.comboCount);
+    this.state.bestCombo = Math.max(this.state.bestCombo, this.state.comboMultiplier);
+
+    const rhythmMultiplier = 1 + this.state.comboPumpBoost;
+    const flowMultiplier = 1 + alternateWallBonus;
+    const rawWithoutCombo = basePoints
+      * varietyMultiplier
+      * landingScoreMultiplier
+      * rhythmMultiplier
+      * flowMultiplier;
+    const points = Math.max(
+      0,
+      Math.round(rawWithoutCombo * this.state.comboMultiplier),
+    );
+    const comboContribution = Math.max(0, points - Math.round(rawWithoutCombo));
 
     this.state.trickType = type;
     this.state.trickProgress = clampedQuality;
     this.state.trickCount += 1;
     this.state.score += points;
-    // All 180° maneuver animations rotate counterclockwise from the camera's
-    // point of view. Input direction only determines whether the maneuver is
-    // legal; it does not choose the visual spin direction.
-    const normalizedTurnDirection = 1;
-    this.state.facingTurns += 1;
+    this.state.comboScoreContribution += comboContribution;
     this.state.lastTrick = type;
     this.state.lastTrickTime = this.state.time;
     this.state.lastTrickPoints = points;
-    this.state.lastTrickTurnDirection = normalizedTurnDirection;
-    this.state.lastTrickSide = signWithEpsilon(
-      this.state.pipeX,
-      this.velocityEpsilon,
+    this.state.lastTrickTurnDirection = 1;
+    if (side) {
+      this.state.lastTrickSide = side;
+      this.state.lastCompletedTrickSide = side;
+    }
+    if (points > this.state.bestTrickPoints) {
+      this.state.bestTrick = type;
+      this.state.bestTrickPoints = points;
+    }
+
+    this._emit('TRICK_COMPLETED', {
+      trick: type,
+      points,
+      quality: clampedQuality,
+      comboMultiplier: this.state.comboMultiplier,
+      varietyMultiplier,
+      landingScoreMultiplier,
+    });
+    this._emit('COMBO_CHANGED', {
+      multiplier: this.state.comboMultiplier,
+      count: this.state.comboCount,
+      reason: 'TRICK_LANDED',
+    });
+    return points;
+  }
+
+  _failTrick(type, reason) {
+    this.state.lastTrick = type + '-failed';
+    this.state.lastTrickTime = this.state.time;
+    this.state.lastTrickPoints = 0;
+    this._breakCombo(reason);
+    this._emit('TRICK_FAILED', {
+      trick: type,
+      reason,
+    });
+  }
+
+  _startCrash(reason) {
+    const cfg = PHASE4_GAMEPLAY_CONFIG.crash;
+    this.state.crashActive = true;
+    this.state.crashReason = reason;
+    this.state.crashCount += 1;
+    this.state.crashes = this.state.crashCount;
+    this.state.recoveryRemaining = cfg.recoverySeconds;
+    this._breakCombo(reason);
+    this._emit('BAIL', { reason });
+    this._emit('RECOVERY_STARTED', {
+      reason,
+      recoverySeconds: cfg.recoverySeconds,
+    });
+  }
+
+  _advanceRecovery() {
+    if (!this.state.crashActive) return;
+    this.state.recoveryRemaining = Math.max(
+      0,
+      this.state.recoveryRemaining - this.fixedDt,
     );
+    if (this.state.recoveryRemaining <= 0) {
+      const reason = this.state.crashReason;
+      this.state.crashActive = false;
+      this.state.crashReason = null;
+      this._emit('RECOVERY_FINISHED', { reason });
+    }
   }
 
   _startSurfaceTrick(
     type,
     quality,
-    expectedTurn,
     velocity,
     duration,
     retention,
     anchorX = null,
   ) {
     if (Number.isFinite(anchorX)) this.state.pipeX = anchorX;
-    this._recordTrick(type, quality, expectedTurn);
+    this.state.tricksAttempted += 1;
+    this.state.lastTrick = type;
+    this.state.lastTrickTime = this.state.time;
+    this.state.lastTrickPoints = 0;
     this.state.surfaceTrickActive = true;
     this.state.surfaceTrickType = type;
+    this.state.surfaceTrickPhase = 'EXECUTION';
     this.state.surfaceTrickElapsed = 0;
     this.state.surfaceTrickDuration = Math.max(this.fixedDt, duration);
     this.state.surfaceTrickExitVelocity = -velocity * retention;
+    this.state.surfaceTrickEntrySpeed = Math.abs(velocity);
+    this.state.surfaceTrickQuality = clamp01(quality);
+    this.state.surfaceTrickHold = this.handPlantHeld ? this.fixedDt : 0;
+    this.state.surfaceTrickReleased = false;
+    this.state.surfaceTrickFacingCommitted = true;
     this.state.tangentVelocity = 0;
     this.state.tangentialAcceleration = 0;
     this.state.trickType = type;
     this.state.trickProgress = 0;
     this.state.turningPoints += 1;
     this.state.lastTurningPointX = this.state.pipeX;
+    this.state.lastTrickTurnDirection = 1;
+    this.state.lastTrickSide = signWithEpsilon(
+      this.state.pipeX,
+      this.velocityEpsilon,
+    );
+    this.state.facingTurns += 1;
+    this._emit('TRICK_STARTED', {
+      trick: type,
+      side: this.state.lastTrickSide,
+      entrySpeed: this.state.surfaceTrickEntrySpeed,
+    });
     return { velocity: 0, turned: true, frozen: true };
+  }
+
+  _completeSurfaceTrick() {
+    const type = this.state.surfaceTrickType;
+    const duration = Math.max(this.fixedDt, this.state.surfaceTrickDuration);
+    let success = true;
+    let finalQuality = this.state.surfaceTrickQuality;
+    let failReason = null;
+
+    if (type === 'hand-plant') {
+      const cfg = PHASE4_GAMEPLAY_CONFIG.surfaceTricks;
+      const hold = this.state.surfaceTrickHold;
+      if (hold < cfg.handPlantMinimumHoldSeconds) {
+        success = false;
+        failReason = 'HAND_PLANT_TIMING';
+      } else {
+        const holdQuality = hold <= cfg.handPlantIdealHoldSeconds
+          ? clamp01(hold / cfg.handPlantIdealHoldSeconds)
+          : clamp01(
+            1 - (hold - cfg.handPlantIdealHoldSeconds)
+              / Math.max(
+                1e-4,
+                cfg.handPlantMaximumQualityHoldSeconds - cfg.handPlantIdealHoldSeconds,
+              ),
+          );
+        const entryQuality = clamp01(this.state.surfaceTrickEntrySpeed / 12);
+        const releaseQuality = this.state.surfaceTrickReleased ? 1 : 0.78;
+        finalQuality = clamp01(
+          finalQuality * 0.35
+          + entryQuality * 0.2
+          + holdQuality * 0.3
+          + releaseQuality * 0.15,
+        );
+      }
+    }
+
+    const exitVelocity = success
+      ? this.state.surfaceTrickExitVelocity
+      : this.state.surfaceTrickExitVelocity * 0.62;
+
+    if (success) {
+      this.state.surfaceTrickPhase = 'COMPLETE';
+      this.state.tricksLanded += 1;
+      this._awardValidatedTrick(
+        type,
+        finalQuality,
+        1,
+        this.state.lastTrickSide,
+      );
+    } else {
+      this.state.surfaceTrickPhase = 'FAIL';
+      if (this.state.surfaceTrickFacingCommitted) this.state.facingTurns -= 1;
+      this._failTrick(type, failReason);
+    }
+
+    this.state.surfaceTrickActive = false;
+    this.state.surfaceTrickType = null;
+    this.state.surfaceTrickElapsed = duration;
+    this.state.surfaceTrickDuration = 0;
+    this.state.surfaceTrickExitVelocity = 0;
+    this.state.surfaceTrickEntrySpeed = 0;
+    this.state.surfaceTrickQuality = 0;
+    this.state.surfaceTrickHold = 0;
+    this.state.surfaceTrickReleased = false;
+    this.state.surfaceTrickFacingCommitted = false;
+    this.state.trickType = null;
+    this.state.trickProgress = 0;
+    this.state.tangentVelocity = exitVelocity;
+    this._lastDirection = signWithEpsilon(
+      exitVelocity,
+      this.velocityEpsilon,
+    );
   }
 
   _stepSurfaceTrick() {
@@ -453,20 +681,17 @@ export class HalfpipeSimulation {
       this.state.surfaceTrickElapsed / duration,
     );
 
+    if (this.state.surfaceTrickType === 'hand-plant') {
+      if (this.handPlantHeld) {
+        this.state.surfaceTrickHold += dt;
+      } else if (this.state.surfaceTrickHold > 0) {
+        this.state.surfaceTrickReleased = true;
+      }
+    }
+
     if (this.state.surfaceTrickElapsed >= duration) {
-      const exitVelocity = this.state.surfaceTrickExitVelocity;
-      this.state.surfaceTrickActive = false;
-      this.state.surfaceTrickType = null;
-      this.state.surfaceTrickElapsed = duration;
-      this.state.surfaceTrickDuration = 0;
-      this.state.surfaceTrickExitVelocity = 0;
-      this.state.trickType = null;
-      this.state.trickProgress = 0;
-      this.state.tangentVelocity = exitVelocity;
-      this._lastDirection = signWithEpsilon(
-        exitVelocity,
-        this.velocityEpsilon,
-      );
+      this.state.surfaceTrickPhase = 'VALIDATION';
+      this._completeSurfaceTrick();
     }
 
     this._refreshDerivedState();
@@ -474,7 +699,11 @@ export class HalfpipeSimulation {
   }
 
   _trySurfaceTurn(previousX, velocity, desiredIntent) {
-    if (desiredIntent !== 1 || Math.abs(velocity) < this.velocityEpsilon) {
+    if (
+      desiredIntent !== 1
+      || Math.abs(velocity) < this.velocityEpsilon
+      || this.state.crashActive
+    ) {
       return { velocity, turned: false, frozen: false };
     }
 
@@ -491,10 +720,6 @@ export class HalfpipeSimulation {
     const predictedWallFraction = this._wallFraction(predictedX);
     const expectedTurnIntent = this._expectedTurnIntentForAllowedSide();
 
-    // Hand Plant is coping-only and is legal only on the facing-dependent side.
-    // Input may be buffered while entering the tiny activation band, but the
-    // animation itself is pinned to the actual lip/white coping bar.
-    // Front-facing: LEFT wall. Back-facing: RIGHT wall.
     const handPlantRequested = (
       this.handPlantHeld || this.handPlantBufferRemaining > 0
     );
@@ -506,14 +731,18 @@ export class HalfpipeSimulation {
       const handPlantAnchor = side < 0
         ? this.profile.leftLip + this.lipInset
         : this.profile.rightLip - this.lipInset;
-      const quality = (
+      const copingQuality = (
         Math.max(wallFraction, predictedWallFraction) - this.handPlantMinFraction
       ) / Math.max(1e-4, 1 - this.handPlantMinFraction);
       this.handPlantBufferRemaining = 0;
+      this._emit('COPING_HIT', {
+        side,
+        speed: Math.abs(velocity),
+        maneuver: 'hand-plant',
+      });
       return this._startSurfaceTrick(
         'hand-plant',
-        quality,
-        1,
+        copingQuality,
         velocity,
         this.trickPresentation.handPlantDuration,
         this.handPlantRetention,
@@ -530,7 +759,6 @@ export class HalfpipeSimulation {
       return this._startSurfaceTrick(
         'kick-turn',
         quality,
-        1,
         velocity,
         this.trickPresentation.kickTurnDuration,
         this.kickTurnRetention,
