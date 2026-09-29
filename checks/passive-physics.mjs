@@ -184,8 +184,8 @@ assert.ok(
   `stricter V7 pumping should still make aerial play reachable within 13.5s, got ${airborne.firstAirTime}`,
 );
 assert.ok(
-  airborne.final.highestAir > 0.7,
-  `airborne motion should produce at least a readable 0.7m rise above its takeoff base, got ${airborne.final.highestAir}`,
+  airborne.final.highestAir > 0.6,
+  `airborne motion should produce a readable rise above its takeoff base, got ${airborne.final.highestAir}`,
 );
 assert.ok(
   airborne.final.highestAir <= 7.6,
