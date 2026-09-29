@@ -6,16 +6,16 @@ const SOURCE_BASE = 'https://chimp-jump.onrender.com/model/characters';
 const TARGET_DIR = path.resolve('public/models/characters');
 
 const CHARACTERS = Object.freeze([
-  ['The_Archon.glb', 'The Archon.glb', '56acfcb00a5ae6a7c543f15face89dc5a05973b0'],
-  ['The_Angsty.glb', 'The Angsty.glb', 'fdfc5ba7fe6b1bcb9432120284f34097916060ae'],
-  ['The_Apologetic.glb', 'The Apologetic.glb', '2f6d5b8b148c7529b6d6370c54cc9cfdc8311d11'],
-  ['The_Bosun.glb', 'The Bosun.glb', '538ae4ab357a4f23ce20b600c0f43c5f7eb40e9d'],
-  ['The_Commodore.glb', 'The Commodore.glb', 'eb2f44b25d88420cc5196fe012027278abd2d9b0'],
-  ['The_Heretic.glb', 'The Heretic.glb', 'd6cf952128b625e52a6e109de80d0c7493020806'],
-  ['The_Pioneer.glb', 'The Pioneer.glb', '726bc406f0f7d965d5756483219d9138842c29c7'],
-  ['The_Punk.glb', 'The Punk.glb', '129200342b76c18473a193a745d70a3c3a134c7d'],
-  ['The_Street_Fighter.glb', 'The Street Fighter.glb', 'cf4ff7da5140239fd8278b54493d0ffb920ac374'],
-  ['The_Adolescent.glb', 'The Adolescent.glb', '45af19ba7ed7a3265e3b7079e3df1992f95025ef'],
+  ['The Archon.glb', 'The Archon.glb', '56acfcb00a5ae6a7c543f15face89dc5a05973b0'],
+  ['The Angsty.glb', 'The Angsty.glb', 'fdfc5ba7fe6b1bcb9432120284f34097916060ae'],
+  ['The Apologetic.glb', 'The Apologetic.glb', '2f6d5b8b148c7529b6d6370c54cc9cfdc8311d11'],
+  ['The Bosun.glb', 'The Bosun.glb', '538ae4ab357a4f23ce20b600c0f43c5f7eb40e9d'],
+  ['The Commodore.glb', 'The Commodore.glb', 'eb2f44b25d88420cc5196fe012027278abd2d9b0'],
+  ['The Heretic.glb', 'The Heretic.glb', 'd6cf952128b625e52a6e109de80d0c7493020806'],
+  ['The Pioneer.glb', 'The Pioneer.glb', '726bc406f0f7d965d5756483219d9138842c29c7'],
+  ['The Punk.glb', 'The Punk.glb', '129200342b76c18473a193a745d70a3c3a134c7d'],
+  ['The Street Fighter.glb', 'The Street Fighter.glb', 'cf4ff7da5140239fd8278b54493d0ffb920ac374'],
+  ['The Adolescent.glb', 'The Adolescent.glb', '45af19ba7ed7a3265e3b7079e3df1992f95025ef'],
 ]);
 
 function gitBlobSha(bytes) {
