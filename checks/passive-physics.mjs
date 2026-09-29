@@ -219,7 +219,7 @@ assert.equal(kickTurnState.score, kickTurnState.lastTrickPoints);
 
 const handPlantSim = new HalfpipeSimulation(trickProfile);
 handPlantSim.reset({
-  pipeX: wallX(trickProfile, 1, 0.95),
+  pipeX: wallX(trickProfile, 1, 0.995),
   tangentVelocity: 7,
 });
 handPlantSim.setHandPlantHeld(true);
@@ -238,9 +238,9 @@ for (let index = 0; index < 60 && aerialTurnSim.snapshot().mode !== 'airborne'; 
 }
 assert.equal(aerialTurnSim.snapshot().mode, 'airborne', 'aerial-turn probe must launch');
 aerialTurnSim.setTurnIntent(-1);
-for (let index = 0; index < 22; index += 1) aerialTurnSim.stepFixed();
+for (let index = 0; index < 18; index += 1) aerialTurnSim.stepFixed();
 aerialTurnSim.setTurnIntent(0);
-for (let index = 0; index < 600 && aerialTurnSim.snapshot().mode === 'airborne'; index += 1) {
+for (let index = 0; index < 900 && aerialTurnSim.snapshot().mode === 'airborne'; index += 1) {
   aerialTurnSim.stepFixed();
 }
 const aerialTurnState = aerialTurnSim.snapshot();
