@@ -44,6 +44,19 @@ const passiveProbe = await page.evaluate(() => {
       : null,
   };
 });
+const dropInProbe = await page.evaluate(() => {
+  const foundation = window.__HALFPIPE_FOUNDATION__;
+  foundation.physics.setRunning(false);
+  const state = foundation.simulation.reset();
+  foundation.physics.applyCurrentState();
+  return {
+    pipeX: state.pipeX,
+    leftLip: foundation.profile.leftLip,
+    dropInRoll: foundation.rider.presentationState.dropInRoll,
+    carrierRoll: foundation.rider.trickCarrier.rotation.z,
+  };
+});
+
 await page.evaluate(() => {
   const foundation = window.__HALFPIPE_FOUNDATION__;
   foundation.presentationDebug.select(0);
@@ -228,7 +241,7 @@ const trickPresentationProbe = await page.evaluate(() => {
   simulation.setTurnIntent(-1);
   simulation.stepFixed();
   simulation.setTurnIntent(0);
-  for (let index = 0; index < 20; index += 1) simulation.stepFixed();
+  for (let index = 0; index < 43; index += 1) simulation.stepFixed();
   foundation.physics.applyCurrentState();
   const kick = {
     trick: simulation.snapshot().lastTrick,
@@ -238,13 +251,13 @@ const trickPresentationProbe = await page.evaluate(() => {
   };
 
   simulation.reset({
-    pipeX: wallX(1, 0.95),
+    pipeX: wallX(1, 0.995),
     tangentVelocity: 7,
   });
   simulation.setHandPlantHeld(true);
   simulation.stepFixed();
   simulation.setHandPlantHeld(false);
-  for (let index = 0; index < 30; index += 1) simulation.stepFixed();
+  for (let index = 0; index < 60; index += 1) simulation.stepFixed();
   foundation.physics.applyCurrentState();
   const handPlant = {
     trick: simulation.snapshot().lastTrick,
@@ -343,6 +356,14 @@ for (const station of stationStates) {
 assert.ok(stationStates[2].boardAngle < 0, 'left transition must slope down toward center');
 assert.ok(stationStates[5].boardAngle > 0, 'right transition must slope up away from center');
 assert.equal(profileDebugVisible, true);
+assert.ok(
+  Math.abs(dropInProbe.pipeX - dropInProbe.leftLip) < 0.12,
+  `drop-in should start at the top of the left wall: ${JSON.stringify(dropInProbe)}`,
+);
+assert.ok(
+  dropInProbe.dropInRoll > 0.12 && dropInProbe.carrierRoll > 0.12,
+  `drop-in manual nose lift is not visible: ${JSON.stringify(dropInProbe)}`,
+);
 assert.equal(trickPresentationProbe.kick.trick, 'kick-turn');
 assert.equal(trickPresentationProbe.kick.visualActive, true);
 assert.ok(
@@ -387,4 +408,5 @@ console.log(JSON.stringify({
   failedRequests,
   airTransition,
   trickPresentationProbe,
+  dropInProbe,
 }, null, 2));
