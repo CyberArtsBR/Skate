@@ -263,7 +263,7 @@ for (let index = 0; index < 60 && aerialTurnSim.snapshot().mode !== 'airborne'; 
 }
 assert.equal(aerialTurnSim.snapshot().mode, 'airborne', 'aerial-turn probe must launch');
 aerialTurnSim.setTurnIntent(1);
-for (let index = 0; index < 60; index += 1) aerialTurnSim.stepFixed();
+for (let index = 0; index < 36; index += 1) aerialTurnSim.stepFixed();
 aerialTurnSim.setTurnIntent(0);
 aerialTurnSim.stepFixed();
 assert.equal(aerialTurnSim.snapshot().airTurnCompleted, true, 'aerial 180 must be earned from held rotation input');
@@ -272,7 +272,7 @@ for (let index = 0; index < 900 && aerialTurnSim.snapshot().mode === 'airborne';
 }
 const aerialTurnState = aerialTurnSim.snapshot();
 assert.equal(aerialTurnState.mode, 'contact');
-assert.equal(aerialTurnState.lastTrick, 'aerial-turn');
+assert.equal(aerialTurnState.lastTrick, 'aerial-180');
 assert.ok(aerialTurnState.trickCount >= 1);
 assert.ok(aerialTurnState.lastTrickPoints >= 400 && aerialTurnState.lastTrickPoints <= 999);
 
