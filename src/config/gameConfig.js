@@ -21,6 +21,8 @@ export const GAME_CONFIG = Object.freeze({
     stance: 'regular',
     stanceHalfLength: 0.24,
     footLateralOffset: 0.015,
+    fakieBodyDrop: 0.035,
+    fakieFootTargetDrop: 0.045,
   }),
   halfpipeProfile: Object.freeze({
     flatHalfWidth: 2.35,
