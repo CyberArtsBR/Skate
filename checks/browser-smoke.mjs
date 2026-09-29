@@ -96,6 +96,7 @@ const state = await page.evaluate(() => {
     wheelSpinSafe: foundation.rider.skateboard.wheelSpinSafe,
     measuredWheelDiameter: foundation.rider.skateboard.measuredWheelDiameter,
     surfaceSupportPointCount: foundation.rider.skateboard.surfaceSupportPoints.length,
+    chimpionScale: foundation.rider.chimpion.model.scale.x,
     rigCapabilities: foundation.rider.chimpion.rigAdapter.capabilities,
     groundMaterial: foundation.ground.ground.material.type,
     groundDepthWrite: foundation.ground.ground.material.depthWrite,
@@ -308,7 +309,7 @@ const trickPresentationProbe = await page.evaluate(() => {
   };
 
   simulation.reset({
-    pipeX: wallX(-1, 0.997),
+    pipeX: wallX(-1, 0.999),
     tangentVelocity: -7,
   });
   simulation.setHandPlantHeld(true);
@@ -318,6 +319,9 @@ const trickPresentationProbe = await page.evaluate(() => {
   foundation.physics.applyCurrentState();
   const handPlant = {
     trick: simulation.snapshot().lastTrick,
+    pipeX: simulation.snapshot().pipeX,
+    leftLip: profile.leftLip,
+    lipInset: simulation.lipInset,
     yaw: foundation.rider.trickCarrier.rotation.y,
     roll: foundation.rider.trickCarrier.rotation.z,
     offsetY: foundation.rider.trickCarrier.position.y,
@@ -348,8 +352,9 @@ assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] > 1.76);
 assert.ok(state.backgroundDimensions[0] / state.backgroundDimensions[1] < 1.8);
 assert.equal(state.wheelCount, 4);
 assert.equal(state.wheelSpinSafe, false);
-assert.ok(state.measuredWheelDiameter > 0);
+assert.ok(state.measuredWheelDiameter > 0.075, `scaled skateboard wheel diameter is too small: ${state.measuredWheelDiameter}`);
 assert.ok(state.surfaceSupportPointCount >= 6);
+assert.ok(state.chimpionScale > 1, `chimpion should be visibly scaled up: ${state.chimpionScale}`);
 assert.equal(state.rigCapabilities.gameplayFoundation, true);
 assert.equal(state.groundMaterial, 'ShadowMaterial');
 assert.equal(state.groundDepthWrite, false);
@@ -462,6 +467,14 @@ assert.ok(
 );
 assert.equal(trickPresentationProbe.handPlant.trick, 'hand-plant');
 assert.equal(trickPresentationProbe.handPlant.visualActive, true);
+assert.ok(
+  Math.abs(
+    trickPresentationProbe.handPlant.pipeX
+      - (trickPresentationProbe.handPlant.leftLip
+        + trickPresentationProbe.handPlant.lipInset)
+  ) < 1e-6,
+  `hand plant must be visually pinned to the white coping bar: ${JSON.stringify(trickPresentationProbe.handPlant)}`,
+);
 assert.ok(
   Math.abs(trickPresentationProbe.handPlant.roll) > 0.6,
   `hand plant carrier roll is not visible: ${trickPresentationProbe.handPlant.roll}`,
