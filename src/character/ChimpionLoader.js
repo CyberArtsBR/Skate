@@ -61,6 +61,7 @@ export class ChimpionLoader {
     this.root.userData.rigCapabilities = this.rigAdapter.capabilities;
     this.root.userData.poseMode = 'skateboard-side-stance';
     this.root.userData.modelForwardAxis = '+Z';
+    this.root.userData.targetHeight = GAME_CONFIG.rider.targetHeight;
     return this;
   }
 
