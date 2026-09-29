@@ -11,11 +11,18 @@ export const GAME_CONFIG = Object.freeze({
     shadowMapSize: 2048,
     environmentIntensity: 0.84,
     copingGlow: Object.freeze({
-      emissiveIntensity: 0.34,
+      // Keep the glow clearly visible but restrained so it never blooms over
+      // the rider or washes out the authored ramp materials.
+      emissiveIntensity: 0.42,
       innerExpansion: 0.012,
-      innerOpacity: 0.021,
+      innerOpacity: 0.024,
       outerExpansion: 0.026,
-      outerOpacity: 0.009,
+      outerOpacity: 0.01,
+    }),
+    frontMetal: Object.freeze({
+      materialName: 'Material',
+      metalness: 1,
+      envMapIntensity: 2.4,
     }),
   }),
   skateboard: Object.freeze({
@@ -100,7 +107,7 @@ export const GAME_CONFIG = Object.freeze({
     takeoffInset: 0.02,
     launchMinimumSpeed: 1.2,
     minimumVerticalVelocity: 10,
-    maximumVerticalVelocity: 20,
+    maximumVerticalVelocity: 38,
     gravity: 50,
     launchVelocityScale: 1.18,
     landingVelocityRetention: 0.94,
@@ -118,9 +125,9 @@ export const GAME_CONFIG = Object.freeze({
       // so pitch/angle never changes.
       enterHeight: 7.4,
       exitHeight: 6.8,
-      maxTrackedHeight: 11.5,
-      followRatio: 0.92,
-      maxVerticalShift: 3.6,
+      maxTrackedHeight: 22,
+      followRatio: 0.94,
+      maxVerticalShift: 12,
       riseResponse: 7.0,
       fallResponse: 6.0,
     }),
