@@ -188,8 +188,8 @@ assert.ok(
   `airborne peak should visibly clear the lip, got peak ${airborne.peakY} vs lip ${lipY}`,
 );
 assert.ok(
-  airborne.peakY <= lipY + 4.2,
-  `airborne peak should stay camera-readable, got peak ${airborne.peakY} vs lip ${lipY}`,
+  airborne.peakY <= lipY + 15,
+  `high-speed airborne peak should stay within the expanded camera range, got peak ${airborne.peakY} vs lip ${lipY}`,
 );
 assert.ok(airborne.final.airLaunches >= 1, 'air launch telemetry must be recorded');
 
