@@ -23,13 +23,13 @@ export class ControlsScreen {
         </header>
         <div class="controls-tutorial-layout" data-tutorial-layout>
           <figure class="controls-tutorial-poster" data-tutorial-poster>
-            <a href="/images/tutorials/halfpipe-how-to-play.webp" target="_blank" rel="noopener"
+            <a href="/images/tutorials/halfpipe-how-to-ride.jpg" target="_blank" rel="noopener"
               aria-label="Open the tutorial at full size">
-            <img src="/images/tutorials/halfpipe-how-to-play.webp"
+            <img src="/images/tutorials/halfpipe-how-to-ride.jpg"
               alt="Pump up while climbing, down while descending. Rotate with left or right, hold K at the coping for Hand Plant, or hold Space in the air for Backflip. A missed trick gives no points and loses 20 percent speed. Full controls are in the expandable guide below."
               decoding="async" fetchpriority="high" data-tutorial-image>
             </a>
-            <figcaption>BUILD SPEED. FIND YOUR LINE. STICK THE LANDING. · CLICK ART TO ENLARGE</figcaption>
+            <figcaption>CLICK ART TO ENLARGE · CURRENT RULE: MISSED TRICK = NO POINTS + 20% SPEED LOSS. THE RUN CONTINUES.</figcaption>
           </figure>
           <details class="controls-reference" aria-labelledby="halfpipe-controls-reference">
             <summary class="controls-reference-heading">

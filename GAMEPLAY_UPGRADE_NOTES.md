@@ -8,7 +8,9 @@ Selective, alpha-safe Unreal Bloom now runs in every graphics preset for tagged 
 
 Skate audio now uses distinct stereo urethane rumble, truck chatter and wind layers, wheel-circumference modulation, distance-triggered panel contacts and six dry resonant deck-impact variants. Rolling fades out in air and during Hand Plant; impacts follow landing intensity. Impact voices are capped at six. These are procedural sound layers, with optional recordings still supported.
 
-The illustrated HOW TO RIDE tutorial appears in the existing controls step before countdown. It includes an expandable current-controller guide. Its footer describes the no-points / 20% speed penalty.
+The supplied HOW TO RIDE tutorial (`halfpipe-how-to-ride.jpg`) appears in the existing controls step before countdown, with an expandable current-controller guide. A caption clarifies the current no-points / 20% speed penalty and continuing round, superseding the old head-impact warning printed in the supplied artwork.
+
+The bloom composite no longer redeclares Three.js-injected tone-mapping and color-space functions. A composite shader error or rendering exception restores direct scene rendering so the ramp and rider remain visible even when post-processing is unavailable.
 
 No tests, benchmarks or local build were run for this override; Render performs the production build during deployment.
 

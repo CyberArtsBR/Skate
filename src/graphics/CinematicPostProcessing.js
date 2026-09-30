@@ -43,9 +43,8 @@ function createCompositeMaterial() {
       }
     `,
     fragmentShader: `
-      #include <tonemapping_pars_fragment>
-      #include <colorspace_pars_fragment>
-
+      // ShaderMaterial receives these function declarations from Three.js.
+      // Only the executable tone/color chunks belong in this shader body.
       uniform sampler2D tBase;
       uniform sampler2D tBloom;
       uniform vec2 uTexelSize;
@@ -239,6 +238,10 @@ export class CinematicPostProcessing {
     this.bloomRenderPass.camera = camera;
     this._rendering = true;
     const shadowAutoUpdate = this.renderer.shadowMap.autoUpdate;
+    const autoClear = this.renderer.autoClear;
+    const previousShaderError = this.renderer.debug.onShaderError;
+    const previousShaderCheck = this.renderer.debug.checkShaderErrors;
+    let compositeFailed = false;
 
     try {
       this._prepareBloomMaterials();
@@ -257,11 +260,29 @@ export class CinematicPostProcessing {
       this.compositeMaterial.uniforms.tBloom.value = bloomTexture;
       this.renderer.setRenderTarget(null);
       this.renderer.clear(true, true, true);
+      // A failed post-process program must never hide the playable scene.
+      // Scope this handler to the composite draw, leaving scene shaders alone.
+      this.renderer.debug.checkShaderErrors = true;
+      this.renderer.debug.onShaderError = (...args) => {
+        compositeFailed = true;
+        previousShaderError?.(...args);
+      };
       this.compositeQuad.render(this.renderer);
+    } catch (error) {
+      compositeFailed = true;
+      console.warn('Halfpipe bloom unavailable; restoring direct scene rendering.', error);
     } finally {
       this._restoreMaterials();
       this.renderer.shadowMap.autoUpdate = shadowAutoUpdate;
+      this.renderer.autoClear = autoClear;
+      this.renderer.debug.onShaderError = previousShaderError;
+      this.renderer.debug.checkShaderErrors = previousShaderCheck;
       this._rendering = false;
+    }
+    if (compositeFailed) {
+      this.enabled = false;
+      this.renderer.setRenderTarget(null);
+      this._originalRender.call(this.renderer, this.scene, camera);
     }
   }
 
