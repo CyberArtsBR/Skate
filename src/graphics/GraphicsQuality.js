@@ -1,7 +1,9 @@
 const STANDARD_LIGHTING = Object.freeze({
-  hemisphere: 1.7,
-  key: 3.7,
-  fill: 0.95,
+  // V19: keep the outdoor key readable while reducing the broad ambient wash
+  // that made riders and pale ramp surfaces appear self-lit.
+  hemisphere: 1.22,
+  key: 3.05,
+  fill: 0.58,
   shadowRadius: 3.0,
 });
 
@@ -14,9 +16,9 @@ const PRESETS = Object.freeze({
     anisotropy: 2,
     environmentQuality: 'low',
     environmentSigma: 0.11,
-    environmentIntensity: 0.74,
+    environmentIntensity: 0.70,
     frontMetalEnvMapIntensity: 1.8,
-    toneMappingExposure: 0.98,
+    toneMappingExposure: 0.94,
     fogDensity: 0.0038,
     vfxScale: 0.65,
     lighting: STANDARD_LIGHTING,
@@ -28,9 +30,9 @@ const PRESETS = Object.freeze({
     anisotropy: 4,
     environmentQuality: 'medium',
     environmentSigma: 0.075,
-    environmentIntensity: 0.79,
+    environmentIntensity: 0.76,
     frontMetalEnvMapIntensity: 2.0,
-    toneMappingExposure: 0.99,
+    toneMappingExposure: 0.95,
     fogDensity: 0.0040,
     vfxScale: 0.82,
     lighting: STANDARD_LIGHTING,
@@ -42,10 +44,10 @@ const PRESETS = Object.freeze({
     anisotropy: 8,
     environmentQuality: 'high',
     environmentSigma: 0.05,
-    environmentIntensity: 0.84,
+    environmentIntensity: 0.82,
     frontMetalEnvMapIntensity: 2.4,
-    toneMappingExposure: 1.0,
-    fogDensity: 0.0042,
+    toneMappingExposure: 0.96,
+    fogDensity: 0.0040,
     vfxScale: 1.0,
     lighting: STANDARD_LIGHTING,
     postProcessing: NO_POST_PROCESSING,
@@ -58,9 +60,9 @@ const PRESETS = Object.freeze({
     environmentSigma: 0.035,
     environmentIntensity: 0.88,
     frontMetalEnvMapIntensity: 2.8,
-    toneMappingExposure: 1.02,
-    fogDensity: 0.0043,
-    vfxScale: 1.15,
+    toneMappingExposure: 0.98,
+    fogDensity: 0.0041,
+    vfxScale: 1.10,
     lighting: STANDARD_LIGHTING,
     postProcessing: NO_POST_PROCESSING,
   }),
@@ -70,21 +72,21 @@ const PRESETS = Object.freeze({
     anisotropy: 16,
     environmentQuality: 'cinematic',
     environmentSigma: 0.025,
-    environmentIntensity: 1.15,
-    frontMetalEnvMapIntensity: 3.4,
-    toneMappingExposure: 1.0,
-    fogDensity: 0.0032,
-    vfxScale: 1.25,
+    environmentIntensity: 0.95,
+    frontMetalEnvMapIntensity: 3.2,
+    toneMappingExposure: 0.96,
+    fogDensity: 0.0030,
+    vfxScale: 1.15,
     lighting: Object.freeze({
-      hemisphere: 1.25,
-      key: 3.3,
-      fill: 0.65,
+      hemisphere: 1.08,
+      key: 2.85,
+      fill: 0.48,
       shadowRadius: 2.0,
     }),
-    // Critical visibility hotfix: retain all CINEMATIC renderer/IBL/shadow/PBR
-    // quality while bypassing the experimental full-screen composer that can
-    // produce a transparent base pass on some WebGL/browser combinations.
-    // Existing restrained emissive/glow shells remain active without the stack.
+    // Keep the audited stable path: the experimental full-screen composer can
+    // still produce a transparent base pass on some WebGL/browser combinations.
+    // V19 gets its premium look from camera, IBL, materials, lighting, VFX and
+    // typography rather than an unstable global post stack.
     postProcessing: NO_POST_PROCESSING,
   }),
 });

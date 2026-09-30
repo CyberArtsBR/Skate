@@ -34,13 +34,13 @@ export class SpeedTrailVFX {
     this._emitVelocity = new THREE.Vector3();
 
     this.pool = new ParticlePool(scene, {
-      capacity: 24,
+      capacity: 20,
       name: 'halfpipe-vfx-speed-trails',
-      geometry: new THREE.PlaneGeometry(1, 0.045),
+      geometry: new THREE.PlaneGeometry(1, 0.04),
       material: new THREE.MeshBasicMaterial({
         color: 0xdde8ee,
         transparent: true,
-        opacity: 0.22,
+        opacity: 0.16,
         depthWrite: false,
         blending: THREE.NormalBlending,
         toneMapped: true,
@@ -72,16 +72,16 @@ export class SpeedTrailVFX {
     const vel = setVector(this._velocity, velocity);
     if (vel.lengthSq() < 0.01) vel.set(0, 1, 0);
     vel.normalize();
-    this._emitVelocity.copy(vel).multiplyScalar(-0.8);
+    this._emitVelocity.copy(vel).multiplyScalar(-0.72);
     this.pool.emit({
       position: pos,
       velocity: this._emitVelocity,
-      lifetime: 0.11,
-      startSize: (0.35 + THREE.MathUtils.clamp(Number(intensity) || 0, 0, 1) * 0.18)
-        * THREE.MathUtils.lerp(0.85, 1.06, this.scale / 1.25),
-      endSize: 0.05,
-      aspect: 3.2,
-      drag: 6,
+      lifetime: 0.095,
+      startSize: (0.30 + THREE.MathUtils.clamp(Number(intensity) || 0, 0, 1) * 0.14)
+        * THREE.MathUtils.lerp(0.84, 1.04, this.scale / 1.25),
+      endSize: 0.045,
+      aspect: 3.0,
+      drag: 6.5,
       color: 0xdce5e8,
     });
   }
@@ -97,14 +97,18 @@ export class SpeedTrailVFX {
     if (this.reducedMotion || !airborne || step <= 0) return;
 
     const speed = Math.abs(Number(verticalVelocity) || 0);
-    const verticalGate = THREE.MathUtils.smoothstep(speed, 7.5, 14);
-    const heightGate = THREE.MathUtils.smoothstep(Number(height) || 0, 7.4, 10.8);
+    const verticalGate = THREE.MathUtils.smoothstep(speed, 10.5, 18);
+    const heightGate = THREE.MathUtils.smoothstep(Number(height) || 0, 8.8, 12.5);
     const intensity = Math.max(verticalGate, heightGate) + this.comboBoost;
-    if (intensity < 0.35) return;
+
+    // V19 art direction: continuous trails are reserved for exceptional air
+    // or an active combo. Ordinary launches keep only the very short pulse.
+    const exceptionalAir = heightGate > 0.34 || verticalGate > 0.58 || this.comboBoost > 0.11;
+    if (!exceptionalAir || intensity < 0.52) return;
 
     const baseInterval = THREE.MathUtils.lerp(
-      0.105,
-      0.055,
+      0.13,
+      0.075,
       THREE.MathUtils.clamp(intensity, 0, 1),
     );
     const interval = baseInterval / THREE.MathUtils.clamp(this.scale, 0.55, 1.15);
@@ -114,15 +118,15 @@ export class SpeedTrailVFX {
 
     const pos = setVector(this._position, position);
     const sign = verticalVelocity >= 0 ? -1 : 1;
-    this._emitVelocity.set(0, sign * 0.45, 0);
+    this._emitVelocity.set(0, sign * 0.38, 0);
     this.pool.emit({
       position: pos,
       velocity: this._emitVelocity,
-      lifetime: 0.13,
-      startSize: THREE.MathUtils.lerp(0.34, 0.52, THREE.MathUtils.clamp(intensity, 0, 1)),
-      endSize: 0.06,
-      aspect: 3.6,
-      drag: 7,
+      lifetime: 0.11,
+      startSize: THREE.MathUtils.lerp(0.28, 0.43, THREE.MathUtils.clamp(intensity, 0, 1)),
+      endSize: 0.05,
+      aspect: 3.4,
+      drag: 7.5,
       color: 0xd8e2e5,
     });
   }
