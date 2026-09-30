@@ -91,8 +91,8 @@ function stepComparison({ wallFraction, velocity, intent, expectedRating }) {
   );
   assert.ok(perfect.pumpedState.lastPumpImpulse >= 0.9);
   assert.ok(perfect.pumpedState.pumpBoosts >= 1);
-  assert.equal(perfect.boost?.payload?.rating, 'PERFECT');
-  assert.ok(perfect.boost?.payload?.speedAfter > perfect.boost?.payload?.speedBefore);
+  assert.equal(perfect.boost?.rating, 'PERFECT');
+  assert.ok(perfect.boost?.speedAfter > perfect.boost?.speedBefore);
 }
 
 // GOOD timing must also accelerate the rider, but by less than PERFECT.
