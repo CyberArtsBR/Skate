@@ -27,12 +27,24 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     rhythmBoostPenalty: 0.02,
     rhythmBoostMax: 0.085,
     lowEnergyRecovery: Object.freeze({
-      // Low-energy pumping must remain playable instead of falling into a
-      // dead-zone below the normal cruising speed. Correctly timed pumping is
-      // still required; this only strengthens recovery while energy is low.
-      referenceSpeed: 4.8,
-      minimumSpeed: 0.05,
-      acceleration: 3.8,
+      // V15 makes a successful low-energy pump produce a real increase in
+      // kinetic energy instead of asking a tiny frame-by-frame assist to fight
+      // gravity and drag. Continuous assist still smooths the recovery between
+      // successful pump beats, while the per-attempt impulse guarantees that a
+      // PERFECT/GOOD timing event is felt on the very next passage.
+      referenceSpeed: 8.0,
+      minimumSpeed: 0.02,
+      acceleration: 6.0,
+      rewardTargetSpeed: 12.0,
+      minimumImpulseScale: 0.35,
+      attemptImpulseByRating: Object.freeze({
+        PERFECT: 1.4,
+        GOOD: 0.95,
+        WEAK: 0.35,
+        EARLY: 0,
+        LATE: 0,
+        WRONG: 0,
+      }),
       eligibleRatings: Object.freeze(['PERFECT', 'GOOD', 'WEAK']),
     }),
   }),
