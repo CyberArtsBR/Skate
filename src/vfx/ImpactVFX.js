@@ -28,9 +28,15 @@ function setVector(target, value, fallback) {
   return target.set(fallback[0], fallback[1], fallback[2]);
 }
 
+function scaledCount(base, scale, minimum = 1) {
+  if (base <= 0) return 0;
+  return Math.max(minimum, Math.round(base * THREE.MathUtils.clamp(scale, 0.35, 1.25)));
+}
+
 export class ImpactVFX {
-  constructor(scene, { reducedMotion = false } = {}) {
+  constructor(scene, { reducedMotion = false, scale = 1 } = {}) {
     this.reducedMotion = Boolean(reducedMotion);
+    this.scale = THREE.MathUtils.clamp(Number(scale) || 1, 0.35, 1.25);
     this._position = new THREE.Vector3();
     this._normal = new THREE.Vector3(0, 1, 0);
     this._velocity = new THREE.Vector3();
@@ -103,11 +109,16 @@ export class ImpactVFX {
     this.reducedMotion = Boolean(enabled);
   }
 
+  setScale(scale) {
+    this.scale = THREE.MathUtils.clamp(Number(scale) || 1, 0.35, 1.25);
+    return this.scale;
+  }
+
   pump({ position, velocity, rating = 'GOOD' } = {}) {
     const pos = setVector(this._position, position, DEFAULT_POSITION);
     const vel = setVector(this._velocity, velocity, DEFAULT_POSITION);
     const perfect = normalizedRating(rating) === 'PERFECT';
-    const count = this.reducedMotion ? 1 : perfect ? 3 : 2;
+    const count = this.reducedMotion ? 1 : scaledCount(perfect ? 3 : 2, this.scale);
     const baseSpeed = perfect ? 1.4 : 0.9;
 
     for (let index = 0; index < count; index += 1) {
@@ -134,7 +145,7 @@ export class ImpactVFX {
     const pos = setVector(this._position, position, DEFAULT_POSITION);
     const n = setVector(this._normal, normal, DEFAULT_NORMAL).normalize();
     const vel = setVector(this._velocity, velocity, DEFAULT_POSITION);
-    const sparkCount = this.reducedMotion ? 1 : 3;
+    const sparkCount = this.reducedMotion ? 1 : scaledCount(3, this.scale);
 
     this.flash.emit({
       position: pos,
@@ -167,7 +178,7 @@ export class ImpactVFX {
   takeoff({ position, velocity } = {}) {
     const pos = setVector(this._position, position, DEFAULT_POSITION);
     const vel = setVector(this._velocity, velocity, DEFAULT_POSITION);
-    const count = this.reducedMotion ? 2 : 5;
+    const count = this.reducedMotion ? 2 : scaledCount(5, this.scale, 2);
 
     for (let index = 0; index < count; index += 1) {
       const spread = index - (count - 1) * 0.5;
@@ -201,9 +212,9 @@ export class ImpactVFX {
       BAIL: { dust: 10, debris: 4, burst: 0.16, asymmetry: 0.6 },
     };
     const profile = profiles[type] || profiles.CLEAN;
-    const motionScale = this.reducedMotion ? 0.45 : 1;
+    const motionScale = this.reducedMotion ? 0.45 : this.scale;
     const dustCount = Math.max(1, Math.round(profile.dust * motionScale));
-    const debrisCount = Math.round(profile.debris * motionScale);
+    const debrisCount = Math.max(0, Math.round(profile.debris * motionScale));
 
     this.flash.emit({
       position: pos,
