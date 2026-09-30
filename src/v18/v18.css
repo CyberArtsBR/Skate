@@ -130,6 +130,14 @@
   opacity: .72;
 }
 
+/* Composition trial: make only the photographic map plate read 30% farther away.
+   The Three.js camera, halfpipe GLB, rider and HUD remain untouched. */
+#game-stage .background-plate {
+  background-size: 70% auto;
+  background-position: center center;
+  transform: none;
+}
+
 @media (max-width: 900px) {
   .map-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
