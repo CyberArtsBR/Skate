@@ -1,0 +1,51 @@
+@keyframes v19-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes v19-selection-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menu-screen:not([hidden]) .menu-card {
+  animation: v19-panel-in 260ms cubic-bezier(.2,.82,.2,1) both;
+}
+
+.hero-select-screen:not([hidden]) .hero-select-shell {
+  animation: v19-selection-in 260ms cubic-bezier(.2,.82,.2,1) both;
+}
+
+.results-screen:not([hidden]) .result-stat,
+.controls-screen:not([hidden]) .control-row {
+  animation: v19-selection-in 220ms cubic-bezier(.2,.82,.2,1) both;
+}
+
+.results-screen:not([hidden]) .result-stat:nth-child(2),
+.controls-screen:not([hidden]) .control-row:nth-child(2) { animation-delay: 24ms; }
+.results-screen:not([hidden]) .result-stat:nth-child(3),
+.controls-screen:not([hidden]) .control-row:nth-child(3) { animation-delay: 48ms; }
+.results-screen:not([hidden]) .result-stat:nth-child(4),
+.controls-screen:not([hidden]) .control-row:nth-child(4) { animation-delay: 72ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-screen:not([hidden]) .menu-card,
+  .hero-select-screen:not([hidden]) .hero-select-shell,
+  .results-screen:not([hidden]) .result-stat,
+  .controls-screen:not([hidden]) .control-row {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}
