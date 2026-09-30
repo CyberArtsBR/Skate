@@ -1,10 +1,11 @@
 import { HeroSelectScreen } from '../ui/HeroSelectScreen.js';
 import { TrickPoseController } from '../character/TrickPoseController.js';
 import { SkatePoseController } from '../character/SkatePoseController.js';
-import { TITLE_SCREEN_DATA_URL } from './titleImageData.js';
+import { SkateAnimationController } from '../character/SkateAnimationController.js';
 import './v16.css';
 
 let installed = false;
+const TITLE_SCREEN_URL = '/images/backgrounds/halfpipe-title.jpg';
 
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
 const smoothstep = (value) => {
@@ -117,16 +118,17 @@ function patchBackflipPresentation() {
       const open = smoothstep((progress - 0.68) / 0.32);
       const direction = Math.sign(Number(state.trickRoll) || Number(state.wallSide) || 1) || 1;
       const envelope = Math.sin(Math.PI * progress);
+      const side = Math.sign(Number(state.wallSide) || 0) || 1;
 
-      // Keep the rider compact around the board through the inverted phase.
-      // The old negative local-Y offset inverted with the trick carrier and
-      // pushed the body away from the deck at ~180 degrees.
-      output.bodyY = 0.035 + 0.085 * tuck - 0.025 * open;
-      output.bodyX = -(Math.sign(Number(state.wallSide) || 0) || 1)
-        * (0.012 * envelope + 0.01 * tuck);
-      output.bodyRoll = direction * (0.035 * envelope + 0.035 * tuck);
-      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.06;
-      output.boardRoll += -direction * (0.018 * envelope + 0.022 * tuck);
+      // Keep the body close to the deck while inverted. The previous negative
+      // local-Y offset inverted with the trick carrier and visually launched the
+      // rider away from the skateboard around 180 degrees.
+      output.bodyY = 0.11 * tuck - 0.01 * open;
+      output.bodyX = -side * (0.01 * envelope + 0.008 * tuck);
+      output.bodyRoll = direction * (0.025 * envelope + 0.025 * tuck);
+      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.05;
+      output.boardRoll = (Number(state.dropInRoll) || 0)
+        - direction * (0.014 * envelope + 0.018 * tuck);
       return output;
     };
   }
@@ -144,21 +146,38 @@ function patchBackflipPresentation() {
         * (1 - smoothstep((progress - 0.72) / 0.28));
       const open = smoothstep((progress - 0.68) / 0.32);
 
-      // Compact knees/hips and bring the arms close to the torso. The board
-      // remains the visual anchor while the rider opens before touchdown.
-      pose.compression = Math.max(pose.compression, 0.68 + tuck * 0.26 - open * 0.2);
-      pose.hipFlex = 0.28 + tuck * 0.24 - open * 0.1;
-      pose.kneeFlex = Math.min(1.18, 0.72 + tuck * 0.38 - open * 0.18);
-      pose.ankleFlex = -0.11 + open * 0.025;
-      pose.torsoCounter = 0.08 + tuck * 0.07;
-      pose.leftArmBalance = 0.43 - tuck * 0.12 + open * 0.12;
+      pose.compression = Math.max(pose.compression, 0.66 + tuck * 0.25 - open * 0.18);
+      pose.hipFlex = 0.24 + tuck * 0.22 - open * 0.08;
+      pose.kneeFlex = Math.min(1.08, 0.68 + tuck * 0.30 - open * 0.16);
+      pose.ankleFlex = -0.10 + open * 0.025;
+      pose.torsoCounter = 0.06 + tuck * 0.05;
+      pose.leftArmBalance = 0.42 - tuck * 0.10 + open * 0.12;
       pose.rightArmBalance = pose.leftArmBalance;
       pose.armBalance = pose.leftArmBalance;
-      pose.forearmDrop = 0.2 + tuck * 0.22 - open * 0.1;
+      pose.forearmDrop = 0.18 + tuck * 0.16 - open * 0.08;
       pose.leftForearmDrop = pose.forearmDrop;
       pose.rightForearmDrop = pose.forearmDrop;
-      pose.headLook = 0.16 + open * 0.42;
+      pose.headLook = 0.14 + open * 0.38;
       return pose;
+    };
+  }
+
+  const animationProto = SkateAnimationController.prototype;
+  if (!animationProto.__halfpipeV16BackflipPatched) {
+    animationProto.__halfpipeV16BackflipPatched = true;
+    const originalUpdate = animationProto.update;
+    animationProto.update = function updateV16Backflip(rawState = {}) {
+      const next = originalUpdate.call(this, rawState);
+      if (!(next.airborne && next.trickType === 'backflip')) return next;
+
+      const progress = clamp01(next.trickProgress);
+      const tuck = smoothstep(progress / 0.22)
+        * (1 - smoothstep((progress - 0.72) / 0.28));
+      const open = smoothstep((progress - 0.68) / 0.32);
+      const takeoffAnchor = 1 - smoothstep(progress / 0.18);
+      const targetFootLock = 0.72 + takeoffAnchor * 0.16 + open * 0.18 - tuck * 0.04;
+      next.footIKWeight = Math.max(clamp01(next.footIKWeight), clamp01(targetFootLock));
+      return next;
     };
   }
 }
@@ -172,7 +191,7 @@ function decorateTitleScreen() {
 
   const art = document.createElement('img');
   art.className = 'v16-title-art';
-  art.src = TITLE_SCREEN_DATA_URL;
+  art.src = TITLE_SCREEN_URL;
   art.alt = 'Chimpions Half Pipe';
   art.draggable = false;
   root.prepend(art);
