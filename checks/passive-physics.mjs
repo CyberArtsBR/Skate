@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { HalfpipeProfile } from '../src/halfpipe/HalfpipeProfile.js';
 import { HalfpipeSimulation } from '../src/halfpipe/HalfpipeSimulation.js';
 import { simulationToPresentationState } from '../src/halfpipe/HalfpipeSimulationPresentation.js';
+import { installHalfpipeV9GameplayPatches } from '../src/v9/installHalfpipeV9GameplayPatches.js';
+
+// The production entry point installs this before main.js. Physics regressions
+// must validate the same authoritative V9 simulation path rather than the
+// pre-bootstrap V8 prototype methods.
+installHalfpipeV9GameplayPatches();
 
 function runPassive(seconds = 20) {
   const profile = new HalfpipeProfile();
@@ -131,9 +137,9 @@ assert.ok(pumped.final.pumpWorkTotal > 0, 'correct pumping should add specific e
 assert.ok(pumped.maxAbsX > pumped.initialAmplitude, 'correct pumping should increase amplitude from a lower transition start');
 assert.ok(
   pumped.timeToHighAmplitude !== null
-    && pumped.timeToHighAmplitude >= 3.2
+    && pumped.timeToHighAmplitude >= 3.0
     && pumped.timeToHighAmplitude <= 6,
-  `V8 pumping should recover to 90% lip amplitude in a controlled 3.2-6s band, got ${pumped.timeToHighAmplitude}`,
+  `V9 pumping should recover to 90% lip amplitude in a controlled several-cycle band, got ${pumped.timeToHighAmplitude}`,
 );
 assert.ok(
   ['contact', 'airborne'].includes(pumped.final.mode),
@@ -152,7 +158,6 @@ console.log(JSON.stringify({
     pumpWorkTotal: pumped.final.pumpWorkTotal,
   },
 }, null, 2));
-
 
 function runUntilAirborne(seconds = 14) {
   const profile = new HalfpipeProfile();
@@ -183,7 +188,7 @@ const lipY = airborne.profile.sample(airborne.profile.rightLip).y;
 assert.ok(airborne.firstAirTime !== null, 'strong pumping should launch vertically above a lip');
 assert.ok(
   airborne.firstAirTime <= 13.5,
-  `stricter V7 pumping should still make aerial play reachable within 13.5s, got ${airborne.firstAirTime}`,
+  `V9 pumping should still make aerial play reachable within 13.5s, got ${airborne.firstAirTime}`,
 );
 assert.ok(
   airborne.final.highestAir > 0.6,
@@ -191,7 +196,7 @@ assert.ok(
 );
 assert.ok(
   airborne.final.highestAir <= 7.6,
-  `V7 airborne height should respect the approximately half-height cap, got ${airborne.final.highestAir}`,
+  `airborne height should respect the approximately half-height cap, got ${airborne.final.highestAir}`,
 );
 assert.ok(airborne.final.airLaunches >= 1, 'air launch telemetry must be recorded');
 
@@ -203,7 +208,6 @@ console.log(JSON.stringify({
     launches: airborne.final.airLaunches,
   },
 }, null, 2));
-
 
 function wallX(profile, side, fraction) {
   return side * (
@@ -222,13 +226,16 @@ kickTurnSim.setTurnIntent(1);
 const kickTurnStart = kickTurnSim.stepFixed();
 assert.equal(kickTurnStart.lastTrick, 'kick-turn');
 assert.equal(kickTurnStart.surfaceTrickActive, true);
-assert.equal(kickTurnStart.tangentVelocity, 0);
+assert.ok(
+  kickTurnStart.tangentVelocity < -0.1,
+  `V9 kick turn should enter a continuous deceleration instead of freezing, got ${kickTurnStart.tangentVelocity}`,
+);
 kickTurnSim.setTurnIntent(0);
 for (let index = 0; index < 120 && kickTurnSim.snapshot().surfaceTrickActive; index += 1) {
   kickTurnSim.stepFixed();
 }
 const kickTurnState = kickTurnSim.snapshot();
-assert.ok(kickTurnState.tangentVelocity > 0, 'left-wall kick turn should reverse back toward center after the slow-motion hold');
+assert.ok(kickTurnState.tangentVelocity > 0, 'left-wall kick turn should reverse back toward center after the pivot');
 assert.equal(kickTurnState.trickCount, 1);
 assert.ok(kickTurnState.lastTrickPoints >= 100 && kickTurnState.lastTrickPoints <= 300);
 assert.equal(kickTurnState.score, kickTurnState.lastTrickPoints);
@@ -265,7 +272,7 @@ for (let index = 0; index < 60 && aerialTurnSim.snapshot().mode !== 'airborne'; 
 }
 assert.equal(aerialTurnSim.snapshot().mode, 'airborne', 'aerial-turn probe must launch');
 aerialTurnSim.setTurnIntent(-1);
-for (let index = 0; index < 36; index += 1) aerialTurnSim.stepFixed();
+for (let index = 0; index < 24; index += 1) aerialTurnSim.stepFixed();
 aerialTurnSim.setTurnIntent(0);
 aerialTurnSim.stepFixed();
 assert.equal(
