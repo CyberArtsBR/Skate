@@ -24,6 +24,14 @@ function rejectionText(reason) {
 }
 
 function emitRejected(simulation, trick, reason, payload = {}) {
+  // A genuinely missed lip attempt has the same single arcade penalty as a
+  // failed landing. Ignore duplicate requests while a maneuver is active.
+  if (simulation.state.mode === 'contact' && !simulation.state.surfaceTrickActive
+    && !simulation.state.crashActive && reason !== 'TRICK_ALREADY_ACTIVE') {
+    simulation.state.tangentVelocity *= PHASE4_GAMEPLAY_CONFIG.crash.bailMomentumRetention;
+    simulation._startCrash(reason);
+    simulation._refreshDerivedState();
+  }
   const event = {
     trick,
     reason,
@@ -279,7 +287,14 @@ export function installHalfpipeV9GameplayPatches() {
     const entrySurfaceSpeed = Math.max(0, Number(this.state.airEntrySurfaceSpeed) || 0);
     const result = originalResolveLanding.call(this, side, baseY, impactVelocity);
 
-    if (!this.state.crashActive && entrySurfaceSpeed > 0) {
+    if (this.state.crashActive && entrySurfaceSpeed > 0) {
+      // One failed flight loses exactly 20% of takeoff surface speed. Do not
+      // stack penalties for both rotation channels or restore this loss.
+      this.state.tangentVelocity = (side < 0 ? 1 : -1)
+        * entrySurfaceSpeed * PHASE4_GAMEPLAY_CONFIG.crash.bailMomentumRetention;
+      this._lastDirection = side < 0 ? 1 : -1;
+      this._refreshDerivedState();
+    } else if (entrySurfaceSpeed > 0) {
       const minimumReturnedSpeed = entrySurfaceSpeed * 0.985;
       const currentSpeed = Math.abs(Number(this.state.tangentVelocity) || 0);
       if (currentSpeed < minimumReturnedSpeed) {
@@ -294,7 +309,6 @@ export function installHalfpipeV9GameplayPatches() {
   };
 
   proto.stepFixed = function stepFixedV9() {
-    if (this.state.severeCrash) return originalStepFixed.call(this);
     const beforeHandPlantBuffer = Number(this.handPlantBufferRemaining) || 0;
     const beforeKickTurnBuffer = Number(this._v9KickTurnBufferRemaining) || 0;
     const wasKickTurnActive = Boolean(
@@ -302,9 +316,6 @@ export function installHalfpipeV9GameplayPatches() {
     );
 
     originalStepFixed.call(this);
-    // A first-contact hook can promote this very airborne substep to severe
-    // crash. Do not process buffered trick failures or pump rewards afterward.
-    if (this.state.severeCrash) return this.snapshot();
 
     const dt = this.fixedDt;
     applyV9AirRateDelta(this, dt);

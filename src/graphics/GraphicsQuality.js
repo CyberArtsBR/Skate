@@ -5,7 +5,8 @@ const STANDARD_LIGHTING = Object.freeze({
   shadowRadius: 3.0,
 });
 
-const NO_POST_PROCESSING = Object.freeze({ enabled: false });
+const SELECTIVE_POST_PROCESSING = Object.freeze({ enabled: true, aoEnabled: false,
+  bloomStrength: 0.85, bloomRadius: 0.42, bloomThreshold: 0.45, bloomResolution: 0.65 });
 
 const PRESETS = Object.freeze({
   performance: Object.freeze({
@@ -20,7 +21,7 @@ const PRESETS = Object.freeze({
     fogDensity: 0.0038,
     vfxScale: 0.65,
     lighting: STANDARD_LIGHTING,
-    postProcessing: NO_POST_PROCESSING,
+    postProcessing: { ...SELECTIVE_POST_PROCESSING, bloomResolution: 0.4 },
   }),
   balanced: Object.freeze({
     pixelRatio: 1.3,
@@ -34,7 +35,7 @@ const PRESETS = Object.freeze({
     fogDensity: 0.0040,
     vfxScale: 0.82,
     lighting: STANDARD_LIGHTING,
-    postProcessing: NO_POST_PROCESSING,
+    postProcessing: SELECTIVE_POST_PROCESSING,
   }),
   high: Object.freeze({
     pixelRatio: 1.6,
@@ -48,7 +49,7 @@ const PRESETS = Object.freeze({
     fogDensity: 0.0042,
     vfxScale: 1.0,
     lighting: STANDARD_LIGHTING,
-    postProcessing: NO_POST_PROCESSING,
+    postProcessing: SELECTIVE_POST_PROCESSING,
   }),
   ultra: Object.freeze({
     pixelRatio: 2.0,
@@ -62,7 +63,7 @@ const PRESETS = Object.freeze({
     fogDensity: 0.0043,
     vfxScale: 1.15,
     lighting: STANDARD_LIGHTING,
-    postProcessing: NO_POST_PROCESSING,
+    postProcessing: { ...SELECTIVE_POST_PROCESSING, bloomResolution: 0.8 },
   }),
   cinematic: Object.freeze({
     pixelRatio: 2.25,
@@ -81,11 +82,9 @@ const PRESETS = Object.freeze({
       fill: 0.65,
       shadowRadius: 2.0,
     }),
-    // Critical visibility hotfix: retain all CINEMATIC renderer/IBL/shadow/PBR
-    // quality while bypassing the experimental full-screen composer that can
-    // produce a transparent base pass on some WebGL/browser combinations.
-    // Existing restrained emissive/glow shells remain active without the stack.
-    postProcessing: NO_POST_PROCESSING,
+    // The alpha-safe selective pipeline omits the old GTAO pass that could
+    // erase the transparent base. Only tagged wheel/coping emission blooms.
+    postProcessing: { ...SELECTIVE_POST_PROCESSING, bloomResolution: 0.8 },
   }),
 });
 

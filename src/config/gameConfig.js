@@ -14,7 +14,7 @@ export const GAME_CONFIG = Object.freeze({
     copingGlow: Object.freeze({
       // Keep the glow clearly visible but restrained so it never blooms over
       // the rider or washes out the authored ramp materials.
-      emissiveIntensity: 0.42,
+      emissiveIntensity: 3.2,
       innerExpansion: 0.012,
       innerOpacity: 0.024,
       outerExpansion: 0.026,

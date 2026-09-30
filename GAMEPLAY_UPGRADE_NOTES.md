@@ -1,5 +1,17 @@
 # Halfpipe gameplay and presentation pass
 
+## Current gameplay override
+
+The next owner-directed pass removes the severe head-first Game Over, detached board and all fall/tumble presentation described in the historical sections below. Bails now award no trick points, break the combo and return the rider on the board at exactly 80% speed (air entry speed for an aerial, entry speed for a surface trick). The round continues until its normal timer finishes.
+
+Selective, alpha-safe Unreal Bloom now runs in every graphics preset for tagged wheel and coping emission only; the old GTAO pass is omitted. Wheels glow from 35–85% speed, with maximum emission 3.8; red coping emission is 3.2. Bloom uses reduced-resolution buffers and preserves the photographic background through proper halo alpha.
+
+Skate audio now uses distinct stereo urethane rumble, truck chatter and wind layers, wheel-circumference modulation, distance-triggered panel contacts and six dry resonant deck-impact variants. Rolling fades out in air and during Hand Plant; impacts follow landing intensity. Impact voices are capped at six. These are procedural sound layers, with optional recordings still supported.
+
+The illustrated HOW TO RIDE tutorial appears in the existing controls step before countdown. It includes an expandable current-controller guide. Its footer describes the no-points / 20% speed penalty.
+
+No tests, benchmarks or local build were run for this override; Render performs the production build during deployment.
+
 Initial revision: `582126a91fa9b24ac3413818ca3cce1aa9915ffb`.
 
 This pass modifies the existing Chimpions Halfpipe project on `main`. The keyboard/gamepad input mappings, ramp profile, session flow, roster and established California presentation remain in use. The skateboard simulation continues to drive normal riding and tricks; animation follows its state.

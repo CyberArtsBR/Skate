@@ -1,3 +1,5 @@
+import { SKATE_SOUND, createSkateTexture, createDeckImpactBank } from './SkateSoundDesign.js';
+
 function clamp01(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 0;
@@ -9,21 +11,8 @@ function smoothstep(value) {
   return t * t * (3 - 2 * t);
 }
 
-function createNoiseBuffer(context, seconds = 4) {
-  const length = Math.max(1, Math.floor(context.sampleRate * seconds));
-  const buffer = context.createBuffer(1, length, context.sampleRate);
-  const data = buffer.getChannelData(0);
-  let previous = 0;
-  for (let i = 0; i < length; i += 1) {
-    const white = Math.random() * 2 - 1;
-    previous = previous * 0.72 + white * 0.28;
-    data[i] = previous;
-  }
-  return buffer;
-}
-
 export class SkateAudio {
-  constructor(context, destination, { speedReference = 18 } = {}) {
+  constructor(context, destination, { speedReference = SKATE_SOUND.referenceSpeed } = {}) {
     if (!context) throw new TypeError('SkateAudio requires an AudioContext');
     if (!destination) throw new TypeError('SkateAudio requires a destination AudioNode');
 
@@ -35,21 +24,37 @@ export class SkateAudio {
     this.distance = 0;
     this.previousSpeed = 0;
     this.loopPhase = 0;
+    this.impactIndex = 0;
+    this.impactVoices = new Set();
+    this.lastPanel = 0;
+    this.lastPanelTime = -Infinity;
+    this.wasAirborne = false;
+    this.impactBank = createDeckImpactBank(context);
 
-    this.noiseBuffer = createNoiseBuffer(context);
+    this.noiseBuffer = createSkateTexture(context, 'wind');
 
     this.rollFilter = context.createBiquadFilter();
-    // The procedural fallback is intentionally soft and broadband. A real
-    // seamless wheel sample can replace it through setContinuousBuffers().
+    // Separate dry urethane and truck textures. Optional recordings can still
+    // replace either layer through setContinuousBuffers().
     this.rollFilter.type = 'lowpass';
     this.rollFilter.Q.value = 0.42;
     this.rollGain = context.createGain();
     this.rollGain.gain.value = 0;
-    this.rollFilter.connect(this.rollGain).connect(destination);
+    this.wheelGrain = context.createGain();
+    this.wheelGrain.gain.value = 1;
+    this.wheelModulation = context.createOscillator();
+    this.wheelModulation.type = 'triangle';
+    this.wheelModulation.frequency.value = 1;
+    this.wheelModulationGain = context.createGain();
+    this.wheelModulationGain.gain.value = 0.045;
+    this.wheelModulation.connect(this.wheelModulationGain).connect(this.wheelGrain.gain);
+    this.wheelModulation.start();
+    this.rollFilter.connect(this.wheelGrain).connect(this.rollGain).connect(destination);
 
     this.rampFilter = context.createBiquadFilter();
-    this.rampFilter.type = 'highpass';
-    this.rampFilter.frequency.value = 380;
+    this.rampFilter.type = 'bandpass';
+    this.rampFilter.frequency.value = 1850;
+    this.rampFilter.Q.value = 0.65;
     this.rampGain = context.createGain();
     this.rampGain.gain.value = 0;
     this.rampFilter.connect(this.rampGain).connect(destination);
@@ -61,8 +66,8 @@ export class SkateAudio {
     this.windGain.gain.value = 0;
     this.windFilter.connect(this.windGain).connect(destination);
 
-    this.rollSource = this._createLoopSource(this.noiseBuffer, this.rollFilter);
-    this.rampSource = this._createLoopSource(this.noiseBuffer, this.rampFilter);
+    this.rollSource = this._createLoopSource(createSkateTexture(context, 'wheel'), this.rollFilter);
+    this.rampSource = this._createLoopSource(createSkateTexture(context, 'truck'), this.rampFilter);
     this.windSource = this._createLoopSource(this.noiseBuffer, this.windFilter);
   }
 
@@ -91,6 +96,23 @@ export class SkateAudio {
     if (wind) this._replaceLoopSource('windSource', wind, this.windFilter);
   }
 
+  playDeckImpact(intensity = 0.5, { delay = 0, gainScale = 1, pitch = 1 } = {}) {
+    if (this.disposed || this.paused || this.impactVoices.size >= SKATE_SOUND.maxImpactVoices) return;
+    const amount = clamp01(intensity);
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    source.buffer = this.impactBank[this.impactIndex++ % this.impactBank.length];
+    source.playbackRate.value = pitch * (1.08 - amount * 0.17);
+    gain.gain.value = (0.07 + amount * 0.24) * gainScale;
+    source.connect(gain).connect(this.destination);
+    const voice = { source, gain };
+    this.impactVoices.add(voice);
+    source.addEventListener('ended', () => {
+      source.disconnect(); gain.disconnect(); this.impactVoices.delete(voice);
+    }, { once: true });
+    source.start(this.context.currentTime + Math.max(0, delay));
+  }
+
   setPaused(paused) {
     this.paused = Boolean(paused);
     if (!this.context || this.disposed) return this.paused;
@@ -117,18 +139,21 @@ export class SkateAudio {
       this.windGain.gain.setTargetAtTime(0, now, 0.018);
       return;
     }
-    const smoothing = Math.max(0.025, Math.min(0.18, (Number(dt) || 0.016) * 5));
+    const smoothing = SKATE_SOUND.contactAttack;
     const mode = state.mode || 'contact';
     const speed = Math.abs(Number(
       state.speed ?? state.tangentVelocity ?? state.velocity ?? 0,
     ) || 0);
     const normalizedSpeed = clamp01(speed / this.speedReference);
+    const circumference = Math.PI * Math.max(0.02, Number(state.wheelDiameter) || 0.1);
+    this.wheelModulation.frequency.setTargetAtTime(Math.max(1, Math.min(180, speed / circumference)), now, 0.04);
     const frameDt = Math.max(0.001, Math.min(0.1, Number(dt) || 1 / 60));
     const acceleration = Math.min(1, Math.abs(speed - this.previousSpeed) / frameDt / 35);
     this.previousSpeed = speed;
     const fastSpeed = smoothstep((normalizedSpeed - 0.45) / 0.55);
     const region = String(state.region || 'flat').toLowerCase();
-    const airborne = mode === 'airborne' || state.airborne === true;
+    const airborne = mode === 'airborne' || state.airborne === true || state.surfaceTrickActive;
+    const contactSmoothing = airborne ? SKATE_SOUND.contactRelease : smoothing;
 
     const transition = region.includes('transition') || region.includes('wall');
     const flat = !transition && !airborne;
@@ -138,23 +163,32 @@ export class SkateAudio {
     // voices every frame. Wheels stop at rest and lose contact in the air.
     const grain = 1 + 0.045 * Math.sin(this.distance * 5.4)
       + 0.025 * Math.sin(this.distance * 13.7);
-    const rollIntensity = airborne ? 0 : moving * (0.014 + 0.22 * smoothstep(normalizedSpeed)) * grain;
-    const transitionBoost = transition ? 1.16 : flat ? 0.9 : 1;
+    const rollIntensity = airborne ? 0 : moving * (0.025 + 0.4 * Math.sqrt(normalizedSpeed)) * grain;
+    const transitionBoost = transition ? 1.12 : flat ? 0.94 : 1;
     const rollTarget = rollIntensity * transitionBoost;
 
-    const rollFrequency = 520 + normalizedSpeed * 1380;
+    const rollFrequency = 850 + normalizedSpeed * 2100;
     const rollQ = 0.38 + fastSpeed * 0.32;
-    this.rollGain.gain.setTargetAtTime(rollTarget, now, smoothing);
+    this.rollGain.gain.setTargetAtTime(rollTarget, now, contactSmoothing);
     this.rollFilter.frequency.setTargetAtTime(rollFrequency, now, smoothing);
     this.rollFilter.Q.setTargetAtTime(rollQ, now, smoothing);
-    this.rollSource.playbackRate.setTargetAtTime(0.55 + normalizedSpeed * 1.15, now, smoothing);
+    this.rollSource.playbackRate.setTargetAtTime(0.6 + normalizedSpeed * 1.5, now, smoothing);
 
     const rampTarget = airborne ? 0 : moving * (transition
       ? 0.012 + 0.09 * fastSpeed + acceleration * 0.012
       : 0.01 * normalizedSpeed);
-    this.rampGain.gain.setTargetAtTime(rampTarget, now, smoothing * 1.2);
-    this.rampFilter.frequency.setTargetAtTime(330 + normalizedSpeed * 640, now, smoothing);
+    this.rampGain.gain.setTargetAtTime(rampTarget, now, contactSmoothing);
+    this.rampFilter.frequency.setTargetAtTime(1200 + normalizedSpeed * 1200, now, smoothing);
     this.rampSource.playbackRate.setTargetAtTime(0.7 + normalizedSpeed * 0.8, now, smoothing);
+
+    const panel = Math.floor(this.distance / SKATE_SOUND.panelSpacing);
+    if (!airborne && !this.wasAirborne && speed > 1.4 && panel !== this.lastPanel
+      && now - this.lastPanelTime >= SKATE_SOUND.panelCooldown) {
+      this.playDeckImpact(normalizedSpeed * 0.35, { gainScale: 0.18, pitch: 1.22 });
+      this.lastPanelTime = now;
+    }
+    this.lastPanel = panel;
+    this.wasAirborne = airborne;
 
     const baseY = Number(state.airBaseY ?? state.baseY ?? 0) || 0;
     const airY = Number(state.airY ?? state.height ?? baseY) || baseY;
@@ -176,6 +210,13 @@ export class SkateAudio {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    try { this.wheelModulation.stop(); } catch {}
+    for (const { source, gain } of this.impactVoices) {
+      try { source.stop(); } catch {}
+      source.disconnect(); gain.disconnect();
+    }
+    this.impactVoices.clear();
+    this.impactBank = [];
 
     for (const source of [this.rollSource, this.rampSource, this.windSource]) {
       try { source.stop(); } catch {}
@@ -183,6 +224,7 @@ export class SkateAudio {
     }
     for (const node of [
       this.rollFilter, this.rollGain,
+      this.wheelGrain, this.wheelModulation, this.wheelModulationGain,
       this.rampFilter, this.rampGain,
       this.windFilter, this.windGain,
     ]) {

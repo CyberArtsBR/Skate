@@ -1,7 +1,6 @@
 import { AudioBus, clampAudioVolume } from './AudioBus.js';
 import { createAudioManifest } from './AudioManifest.js';
 import { SkateAudio } from './SkateAudio.js';
-import { ARCADE_FEEDBACK } from '../vfx/ArcadeFeedbackTuning.js';
 
 const DEFAULT_VOLUMES = Object.freeze({
   master: 0.8,
@@ -161,8 +160,6 @@ export class HalfpipeAudio {
     this.lastComboMultiplier = 1;
     this.timerWarningsPlayed = new Set();
     this.lastRemaining = null;
-    this.severeCrashTriggered = false;
-    this.sirenVoice = null;
   }
 
   get isReady() {
@@ -657,42 +654,7 @@ export class HalfpipeAudio {
     const key = keyByRating[rating] || keyByRating.CLEAN;
 
     this._assetOr(key, () => {
-      const bright = rating === 'PERFECT' || rating === 'CLEAN';
-      const heavy = rating === 'HEAVY';
-
-      this._noiseBurst({
-        duration: heavy ? 0.16 : 0.09,
-        gain: 0.06 + intensity * (heavy ? 0.13 : 0.08),
-        frequency: bright ? 1050 : 620,
-        q: bright ? 1.1 : 0.65,
-      });
-      // A quieter second truck/deck contact gives the impact weight without
-      // turning the landing into a single synthetic boom.
-      this._noiseBurst({
-        duration: 0.035 + intensity * 0.035,
-        gain: 0.018 + intensity * 0.045,
-        frequency: 1850 - intensity * 650,
-        q: 0.65,
-        delay: 0.018 + intensity * 0.012,
-      });
-      this._tone({
-        frequency: heavy ? 82 : 125,
-        endFrequency: heavy ? 55 : 90,
-        duration: heavy ? 0.18 : 0.1,
-        gain: 0.035 + intensity * 0.055,
-        type: 'triangle',
-      });
-
-      if (rating === 'PERFECT') {
-        this._tone({
-          frequency: 520,
-          endFrequency: 650,
-          duration: 0.07,
-          gain: 0.025,
-          type: 'sine',
-          delay: 0.025,
-        });
-      }
+      this.skate?.playDeckImpact(intensity);
     }, { gain: 0.55 + intensity * 0.6, rate: 1.04 - intensity * 0.1 });
 
     const strong = (
@@ -711,99 +673,11 @@ export class HalfpipeAudio {
 
   _bailCue(event) {
     if (!this._allowed('bail', COOLDOWNS.bail)) return;
-
-    const intensity = clamp01(
-      eventValue(event, 'intensity', 'impact', 'impactIntensity') ?? 0.8,
-    );
-
-    this._assetOr('sfx.bailBoard', () => {
-      this._noiseBurst({
-        duration: 0.18,
-        gain: 0.12 + intensity * 0.12,
-        frequency: 1350,
-        q: 1.4,
-      });
-      this._tone({
-        frequency: 240,
-        endFrequency: 95,
-        duration: 0.18,
-        gain: 0.06,
-        type: 'square',
-      });
-    });
-
-    this._assetOr('sfx.bailBody', () => {
-      this._noiseBurst({
-        duration: 0.25,
-        gain: 0.11 + intensity * 0.11,
-        frequency: 320,
-        type: 'lowpass',
-        q: 0.5,
-        delay: 0.045,
-      });
-      this._tone({
-        frequency: 74,
-        endFrequency: 46,
-        duration: 0.22,
-        gain: 0.08,
-        type: 'triangle',
-        delay: 0.045,
-      });
-    }, { delay: 0.045 });
-
-    this._assetOr('sfx.crowdOh', () => {
-      // Short layered vowel-like crowd reaction at the collision moment.
-      this._tone({
-        frequency: 190,
-        endFrequency: 145,
-        duration: 0.62,
-        gain: 0.042,
-        type: 'sine',
-        delay: 0.08,
-      });
-      this._tone({
-        frequency: 238,
-        endFrequency: 178,
-        duration: 0.58,
-        gain: 0.032,
-        type: 'triangle',
-        delay: 0.095,
-      });
-      this._tone({
-        frequency: 152,
-        endFrequency: 118,
-        duration: 0.66,
-        gain: 0.026,
-        type: 'sine',
-        delay: 0.11,
-      });
-      this._noiseBurst({
-        duration: 0.42,
-        gain: 0.026,
-        frequency: 760,
-        type: 'lowpass',
-        q: 0.45,
-        delay: 0.09,
-      });
-    }, { delay: 0.08 });
-
-    this._assetOr('sfx.bailRecovery', () => {
-      this._noiseBurst({
-        duration: 0.12,
-        gain: 0.035,
-        frequency: 540,
-        type: 'lowpass',
-        q: 0.5,
-        delay: 0.26,
-      });
-    }, { delay: 0.26 });
-
-    this._haptic({
-      weakMagnitude: 0.65,
-      strongMagnitude: 0.9,
-      durationMs: 180,
-      reason: 'bail',
-    });
+    // The skater never falls: use a brief deck/wheel stumble, no body slam,
+    // synthetic crowd vowel or emergency sound.
+    this.skate?.playDeckImpact(0.45, { gainScale: 0.75 });
+    this._noiseBurst({ duration: 0.075, gain: 0.025, frequency: 1850, q: 0.7 });
+    this._haptic({ weakMagnitude: 0.2, strongMagnitude: 0.15, durationMs: 55, reason: 'missed-trick' });
   }
 
   _scoreCue(event) {
@@ -903,10 +777,6 @@ export class HalfpipeAudio {
 
   _sessionEndCue() {
     if (!this._allowed('session-end', 1)) return;
-    if (this.severeCrashTriggered) {
-      this.stopMusic({ fadeSeconds: 0.18 });
-      return;
-    }
 
     this._assetOr('sfx.sessionEnd', () => {
       this._tone({
@@ -990,15 +860,6 @@ export class HalfpipeAudio {
       case 'CRASH':
         this._bailCue(event);
         break;
-      case 'HEAD_FIRST_CRASH':
-        if (!this.severeCrashTriggered) {
-          this.severeCrashTriggered = true;
-          this._bailCue(event);
-          this.stopMusic({ fadeSeconds: 0.18 });
-          this.skate?.setPaused(true);
-          this.startSevereCrashSiren();
-        }
-        break;
       case 'COMBO_CHANGED':
         this._comboCue(event);
         break;
@@ -1023,64 +884,14 @@ export class HalfpipeAudio {
   setPaused(paused) {
     this.paused = Boolean(paused);
     this.skate?.setPaused(this.paused);
-    if (this.paused) this.stopSevereCrashSiren();
     return this.paused;
-  }
-
-  startSevereCrashSiren() {
-    if (!this.isReady || this.sirenVoice) return false;
-    const context = this.context;
-    const start = context.currentTime + ARCADE_FEEDBACK.sirenDelay;
-    const end = start + ARCADE_FEEDBACK.sirenDuration;
-    const source = context.createOscillator();
-    const filter = context.createBiquadFilter();
-    const gain = context.createGain();
-    source.type = 'triangle';
-    filter.type = 'lowpass';
-    filter.frequency.value = 2200;
-    filter.Q.value = 0.5;
-    source.frequency.setValueAtTime(610, start);
-    // One synthesized emergency voice. Frequency automation supplies the
-    // alternating ambulance wail without stacked samples or per-frame nodes.
-    for (let at = start, high = true; at < end; at += 0.34, high = !high) {
-      source.frequency.linearRampToValueAtTime(high ? 930 : 610, Math.min(end, at + 0.34));
-    }
-    gain.gain.setValueAtTime(0, context.currentTime);
-    gain.gain.setValueAtTime(0, start);
-    gain.gain.linearRampToValueAtTime(ARCADE_FEEDBACK.sirenGain, start + 0.12);
-    gain.gain.setValueAtTime(ARCADE_FEEDBACK.sirenGain, end - ARCADE_FEEDBACK.sirenFade);
-    gain.gain.linearRampToValueAtTime(0, end);
-    source.connect(filter).connect(gain).connect(this.buses.SFX.gain);
-    const voice = { source, filter, gain };
-    this.sirenVoice = voice;
-    source.addEventListener('ended', () => {
-      try { source.disconnect(); } catch {}
-      try { filter.disconnect(); } catch {}
-      try { gain.disconnect(); } catch {}
-      if (this.sirenVoice === voice) this.sirenVoice = null;
-    }, { once: true });
-    source.start(start);
-    source.stop(end + 0.02);
-    return true;
-  }
-
-  stopSevereCrashSiren({ fadeSeconds = ARCADE_FEEDBACK.sirenFade } = {}) {
-    const voice = this.sirenVoice;
-    if (!voice || !this.context) return;
-    this.sirenVoice = null;
-    const now = this.context.currentTime;
-    const fade = Math.max(0.01, Math.min(0.6, Number(fadeSeconds) || 0.01));
-    voice.gain.gain.cancelScheduledValues(now);
-    voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
-    voice.gain.gain.linearRampToValueAtTime(0, now + fade);
-    try { voice.source.stop(now + fade + 0.01); } catch {}
   }
 
   update(state = {}, dt = 1 / 60) {
     if (this.disposed) return;
 
     if (this.isReady) {
-      this.skate?.setPaused(this.paused || this.severeCrashTriggered || state.severeCrash);
+      this.skate?.setPaused(this.paused);
       this.skate?.update(state, dt);
     }
 
@@ -1284,8 +1095,6 @@ export class HalfpipeAudio {
   }
 
   resetSessionAudioState() {
-    this.stopSevereCrashSiren();
-    this.severeCrashTriggered = false;
     this.lastComboMultiplier = 1;
     this.timerWarningsPlayed.clear();
     this.lastRemaining = null;
@@ -1294,7 +1103,6 @@ export class HalfpipeAudio {
 
   async dispose() {
     if (this.disposed) return;
-    this.stopSevereCrashSiren({ fadeSeconds: 0.01 });
     this.disposed = true;
 
     this.skate?.dispose();

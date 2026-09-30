@@ -2,24 +2,18 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
-import { SELECTIVE_BLOOM_LAYER } from './GraphicsLayers.js';
 
 const DEFAULT_CONFIG = Object.freeze({
-  enabled: false,
-  bloomStrength: 0.25,
-  bloomRadius: 0.30,
-  bloomThreshold: 0.90,
-  aoEnabled: true,
+  enabled: true,
+  bloomStrength: 0.85,
+  bloomRadius: 0.42,
+  bloomThreshold: 0.45,
+  bloomResolution: 0.65,
+  aoEnabled: false,
   aoBlendIntensity: 0.36,
   sharpenAmount: 0.08,
 });
-
-const BLOOM_VFX_NAMES = new Set([
-  'halfpipe-vfx-sparks',
-  'halfpipe-vfx-contact-flash',
-]);
 
 function createRenderTarget(name) {
   const target = new THREE.WebGLRenderTarget(1, 1, {
@@ -67,12 +61,19 @@ function createCompositeMaterial() {
         vec3 localAverage = (north + south + east + west) * 0.25;
         vec3 sharpened = base.rgb + (base.rgb - localAverage) * uSharpen;
         vec3 bloom = texture2D(tBloom, vUv).rgb;
-        gl_FragColor = vec4(max(vec3(0.0), sharpened + bloom), base.a);
+        // Bloom extends beyond opaque geometry into the transparent canvas.
+        // Give the halo coverage instead of discarding it with base.a = 0.
+        float haloAlpha = clamp(max(bloom.r, max(bloom.g, bloom.b)), 0.0, 0.85);
+        float alpha = base.a + (1.0 - base.a) * haloAlpha;
+        vec3 color = max(vec3(0.0), sharpened + bloom);
+        gl_FragColor = vec4(color / max(alpha, 0.00001), alpha);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
+        #include <premultiplied_alpha_fragment>
       }
     `,
-    transparent: true,
+    transparent: false,
+    premultipliedAlpha: true,
     depthTest: false,
     depthWrite: false,
     toneMapped: true,
@@ -90,8 +91,7 @@ export class CinematicPostProcessing {
     this._camera = null;
     this._size = new THREE.Vector2(1, 1);
     this._materialCache = new Map();
-    this._bloomLayer = new THREE.Layers();
-    this._bloomLayer.set(SELECTIVE_BLOOM_LAYER);
+    this._emissiveMaterials = new Map();
     this._originalRender = renderer.render;
     this._originalSetSize = renderer.setSize;
     this._originalSetPixelRatio = renderer.setPixelRatio;
@@ -125,7 +125,7 @@ export class CinematicPostProcessing {
     const preset = this.quality?.preset || {};
     const config = preset.postProcessing || DEFAULT_CONFIG;
     this.config = { ...DEFAULT_CONFIG, ...config };
-    const shouldEnable = Boolean(this.config.enabled && this.quality?.presetName === 'cinematic');
+    const shouldEnable = Boolean(this.config.enabled);
     this.enabled = shouldEnable;
 
     if (!shouldEnable) {
@@ -138,48 +138,21 @@ export class CinematicPostProcessing {
       this.bloomPass.radius = this.config.bloomRadius;
       this.bloomPass.threshold = this.config.bloomThreshold;
     }
-    if (this.gtaoPass) {
-      this.gtaoPass.enabled = Boolean(this.config.aoEnabled);
-      this.gtaoPass.blendIntensity = this.config.aoBlendIntensity;
-    }
     if (this.compositeMaterial) {
       this.compositeMaterial.uniforms.uSharpen.value = this.config.sharpenAmount;
     }
+    this._syncSize();
   }
 
   _buildPipeline(camera) {
     this._camera = camera;
 
-    this.baseComposer = new EffectComposer(
-      this.renderer,
-      createRenderTarget('halfpipe-cinematic-base'),
-    );
+    const baseTarget = createRenderTarget('halfpipe-cinematic-base');
+    baseTarget.samples = this.quality?.presetName === 'performance' ? 0 : 4;
+    this.baseComposer = new EffectComposer(this.renderer, baseTarget);
     this.baseComposer.renderToScreen = false;
     this.baseRenderPass = new RenderPass(this.scene, camera);
-    this.gtaoPass = new GTAOPass(this.scene, camera, 512, 512);
-    this.gtaoPass.output = GTAOPass.OUTPUT.Default;
-    this.gtaoPass.blendIntensity = this.config.aoBlendIntensity;
-    this.gtaoPass.enabled = Boolean(this.config.aoEnabled);
-    this.gtaoPass.updateGtaoMaterial({
-      radius: 0.20,
-      distanceExponent: 1.0,
-      thickness: 0.75,
-      scale: 0.72,
-      samples: 16,
-      distanceFallOff: 0.85,
-      screenSpaceRadius: true,
-    });
-    this.gtaoPass.updatePdMaterial({
-      lumaPhi: 8.0,
-      depthPhi: 2.0,
-      normalPhi: 3.0,
-      radius: 4.0,
-      radiusExponent: 1.5,
-      rings: 2,
-      samples: 12,
-    });
     this.baseComposer.addPass(this.baseRenderPass);
-    this.baseComposer.addPass(this.gtaoPass);
 
     this.bloomComposer = new EffectComposer(
       this.renderer,
@@ -196,14 +169,8 @@ export class CinematicPostProcessing {
     this.bloomComposer.addPass(this.bloomRenderPass);
     this.bloomComposer.addPass(this.bloomPass);
 
-    this.darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false });
-    this.bloomSourceMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      toneMapped: false,
-      transparent: false,
-      depthWrite: true,
-      depthTest: true,
-    });
+    this.darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false,
+      fog: false, side: THREE.DoubleSide });
     this.compositeMaterial = createCompositeMaterial();
     this.compositeMaterial.uniforms.uSharpen.value = this.config.sharpenAmount;
     this.compositeQuad = new FullScreenQuad(this.compositeMaterial);
@@ -222,7 +189,7 @@ export class CinematicPostProcessing {
     const safeHeight = Math.max(1, Math.floor(height || 1));
     const pixelRatio = Math.max(0.5, this.renderer.getPixelRatio?.() || 1);
     this.baseComposer.setPixelRatio(pixelRatio);
-    this.bloomComposer.setPixelRatio(pixelRatio);
+    this.bloomComposer.setPixelRatio(pixelRatio * this.config.bloomResolution);
     this.baseComposer.setSize(safeWidth, safeHeight);
     this.bloomComposer.setSize(safeWidth, safeHeight);
     this.compositeMaterial?.uniforms.uTexelSize.value.set(
@@ -233,9 +200,7 @@ export class CinematicPostProcessing {
 
   _isBloomTarget(object) {
     return Boolean(
-      object.layers.test(this._bloomLayer)
-      || object.userData?.visualGlowOnly
-      || BLOOM_VFX_NAMES.has(object.name),
+      object.userData?.emissiveBloom,
     );
   }
 
@@ -244,9 +209,19 @@ export class CinematicPostProcessing {
     this.scene.traverse((object) => {
       if (!object?.isMesh || !object.material) return;
       this._materialCache.set(object, object.material);
-      object.material = this._isBloomTarget(object)
-        ? this.bloomSourceMaterial
-        : this.darkMaterial;
+      const source = object.material;
+      const bloomMaterial = (material) => {
+        if (!this._isBloomTarget(object) || !material?.emissive) return this.darkMaterial;
+        let glow = this._emissiveMaterials.get(material);
+        if (!glow) {
+          glow = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false,
+            side: material.side, fog: false, depthTest: true, depthWrite: true });
+          this._emissiveMaterials.set(material, glow);
+        }
+        glow.color.copy(material.emissive).multiplyScalar(material.emissiveIntensity || 0);
+        return glow;
+      };
+      object.material = Array.isArray(source) ? source.map(bloomMaterial) : bloomMaterial(source);
     });
   }
 
@@ -261,15 +236,17 @@ export class CinematicPostProcessing {
 
     this._camera = camera;
     this.baseRenderPass.camera = camera;
-    this.gtaoPass.camera = camera;
     this.bloomRenderPass.camera = camera;
     this._rendering = true;
+    const shadowAutoUpdate = this.renderer.shadowMap.autoUpdate;
 
     try {
       this._prepareBloomMaterials();
       try {
+        this.renderer.shadowMap.autoUpdate = false;
         this.bloomComposer.render(0);
       } finally {
+        this.renderer.shadowMap.autoUpdate = shadowAutoUpdate;
         this._restoreMaterials();
       }
 
@@ -283,31 +260,30 @@ export class CinematicPostProcessing {
       this.compositeQuad.render(this.renderer);
     } finally {
       this._restoreMaterials();
+      this.renderer.shadowMap.autoUpdate = shadowAutoUpdate;
       this._rendering = false;
     }
   }
 
   _disposePipeline() {
     this._restoreMaterials();
-    this.gtaoPass?.dispose?.();
+    for (const material of this._emissiveMaterials.values()) material.dispose();
+    this._emissiveMaterials.clear();
     this.bloomPass?.dispose?.();
     this.baseComposer?.dispose?.();
     this.bloomComposer?.dispose?.();
     this.compositeQuad?.dispose?.();
     this.darkMaterial?.dispose?.();
-    this.bloomSourceMaterial?.dispose?.();
     this.compositeMaterial?.dispose?.();
 
     this.baseComposer = null;
     this.bloomComposer = null;
     this.baseRenderPass = null;
     this.bloomRenderPass = null;
-    this.gtaoPass = null;
     this.bloomPass = null;
     this.compositeQuad = null;
     this.compositeMaterial = null;
     this.darkMaterial = null;
-    this.bloomSourceMaterial = null;
   }
 
   dispose() {

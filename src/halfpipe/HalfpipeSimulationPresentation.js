@@ -298,9 +298,12 @@ export function simulationToPresentationState(profile, simulationState) {
   const airTuck = airborne && trickType === 'backflip'
     ? Math.max(0.82, baseAirTuck)
     : baseAirTuck;
-  const crash = crashPresentation(simulationState);
+  // Bails are an arcade speed/score penalty. The rider stays on the board;
+  // only normal landing compression plays, never a fall or slide pose.
+  const crash = { active: false, progress: 0, recovery: 0, stage: null };
   const landing = explicitLanding(simulationState);
-  const landingQuality = explicitLandingQuality(simulationState, crash);
+  const scoredLandingQuality = explicitLandingQuality(simulationState, crash);
+  const landingQuality = scoredLandingQuality === 'bail' ? 'heavy' : scoredLandingQuality;
 
   const presentation = {
     time: dropTime,

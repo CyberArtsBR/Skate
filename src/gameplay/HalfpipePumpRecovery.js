@@ -18,7 +18,7 @@ export function applyPumpRecovery(simulation, dt) {
   const config = PHASE4_GAMEPLAY_CONFIG.pumping.lowEnergyRecovery;
   simulation._pumpRecoveryCooldown = Math.max(0, (simulation._pumpRecoveryCooldown || 0) - dt);
   state.lastPumpImpulse = 0;
-  if (state.severeCrash || state.mode !== 'contact' || state.surfaceTrickActive) return;
+  if (state.crashActive || state.mode !== 'contact' || state.surfaceTrickActive) return;
   const speed = Math.abs(Number(state.tangentVelocity) || 0);
   const weight = RATING_WEIGHT[state.pumpRating] || 0;
   if (!state.pumpIntent || state.pumpIntent !== state.pumpDesiredIntent || !weight) return;

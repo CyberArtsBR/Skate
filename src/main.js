@@ -1,6 +1,5 @@
 import './style.css';
 import * as THREE from 'three';
-import './vfx/crash.css';
 import { GAME_CONFIG } from './config/gameConfig.js';
 import { quality } from './graphics/RenderQualityManager.js';
 import { createScene } from './scene/createScene.js';
@@ -18,10 +17,7 @@ import { simulationToPresentationState } from './halfpipe/HalfpipeSimulationPres
 import { SkateboardVisual } from './skateboard/SkateboardVisual.js';
 import { ChimpionLoader } from './character/ChimpionLoader.js';
 import { RiderController } from './character/RiderController.js';
-import { SkaterCrashPresentation } from './character/SkaterCrashPresentation.js';
-import { OrdinaryBailPresentation } from './character/OrdinaryBailPresentation.js';
-import { SkaterImpactContacts, collectSkaterImpactProbes } from './gameplay/SkaterImpactContacts.js';
-import { CRASH_PRESENTATION } from './gameplay/CrashPresentationTuning.js';
+import { collectSkaterImpactProbes } from './gameplay/SkaterImpactContacts.js';
 import { PHASE4_GAMEPLAY_CONFIG } from './gameplay/phase4GameplayConfig.js';
 import {
   RIDER_ROSTER,
@@ -45,10 +41,6 @@ import { GRAPHICS_PRESETS, DEFAULT_GRAPHICS_PRESET } from './graphics/GraphicsQu
 
 const stage = document.querySelector('#game-stage');
 const canvas = document.querySelector('#game-canvas');
-const crashFlash = document.createElement('div');
-crashFlash.className = 'halfpipe-crash-impact';
-crashFlash.setAttribute('aria-hidden', 'true');
-stage.append(crashFlash);
 const loadingState = document.querySelector('#loading-state');
 
 const { scene, renderer, disposeEnvironment } = createScene(canvas);
@@ -115,10 +107,6 @@ let pumpInput = null;
 let webglLost = false;
 let disposed = false;
 let audioUnlockStarted = false;
-let impactContacts = null;
-let crashPresentation = null;
-let ordinaryBailPresentation = null;
-let crashGameOverShown = false;
 let impactDebug = null;
 let unregisterRiderQuality = null;
 let controlsReturnState = HALFPIPE_FLOW_STATE.CHARACTER_SELECT;
@@ -430,7 +418,6 @@ function completeStartPrompt() {
 }
 
 function pauseRun() {
-  if (simulation?.state.severeCrash) return false;
   if (gameFlow.state !== HALFPIPE_FLOW_STATE.RUN || session.phase !== 'running') return false;
   session.pause();
   simulationRunning = false;
@@ -577,18 +564,8 @@ async function unlockAudioFromGesture() {
 
 function applySimulationState(state, { rotateWheels = true, presentationDt = 0 } = {}) {
   if (!rider || !presentationBinder || !simulation) return null;
-  if (state.severeCrash) {
-    crashPresentation?.update(presentationDt);
-    const saturation = Math.max(0, 1 - crashPresentation.elapsed / CRASH_PRESENTATION.grayscaleSeconds);
-    canvas.style.filter = 'grayscale(' + (1 - saturation) + ')';
-    stage.style.setProperty('--crash-grayscale', String(1 - saturation));
-    cameraController.updateForRider({ y: crashPresentation.body.position.y,
-      airborne: false, verticalVelocity: crashPresentation.bodyVelocity.y }, presentationDt);
-    return { ...lastPresentationState, crashActive: true, severeCrash: true, airborne: false };
-  }
   const presentationState = simulationToPresentationState(profile, state);
   presentationBinder.apply(presentationState);
-  ordinaryBailPresentation?.update(state);
   lastPresentationState = presentationState;
   cameraController.updateForRider({
     y: rider.root.position.y,
@@ -607,46 +584,18 @@ function applySimulationState(state, { rotateWheels = true, presentationDt = 0 }
   return presentationState;
 }
 
-function sampleImpactContacts(state, dt) {
-  if (!impactContacts || !rider || state.severeCrash) return null;
-  if (state.surfaceTrickActive) { impactContacts.end(); return null; }
-  if (state.mode !== 'airborne') return impactContacts.firstImpact;
-  const probes = collectSkaterImpactProbes(rider);
-  if (!impactContacts.active || impactContacts.episodeId !== state.airLaunches) {
-    impactContacts.begin({ probes, time: state.time, episodeId: state.airLaunches });
-    return null;
-  }
-  const result = impactContacts.sample({ probes, time: state.time,
-    dt: Math.max(simulation.fixedDt, state.time - (impactContacts.previousTime ?? state.time)),
-    velocity: { x: 0, y: state.airVerticalVelocity, z: 0 } });
-  simulation.state.firstImpactType = result.firstImpact?.type || null;
-  if (result.severeHeadImpact) {
-    const contact = result.severeHeadImpact;
-    ordinaryBailPresentation?.reset();
-    // Capture the failed pose and momenta before the severe simulation state
-    // clears all normal controls and trick state. Reparenting preserves pose.
-    crashPresentation.begin(contact, { x: 0, y: state.airVerticalVelocity, z: 0 });
-    simulation.beginSevereCrash({ ...contact, impactSpeed: contact.incomingSpeed });
-    pumpInput?.clearHeldState();
-    hud.clearFeedback();
-    crashFlash.classList.add('is-active');
-    stage.classList.add('is-severe-crash');
-  }
-  return result.firstImpact;
-}
-
 function vfxMotionState(state, presentationState) {
   const sample = profile.sample(state.pipeX);
   const speed = Math.abs(state.mode === 'airborne'
     ? state.airEntrySurfaceSpeed || state.airLaunchVelocity : state.tangentVelocity);
   const boardQuaternion = rider.skateboard.root.getWorldQuaternion(new THREE.Quaternion());
   return {
-    position: state.severeCrash ? crashPresentation.body.position : rider.root.position,
+    position: rider.root.position,
     velocity: { x: state.mode === 'airborne' ? 0 : state.tangentVelocity * Math.abs(sample.tangent.x),
       y: presentationState?.verticalVelocity || 0, z: 0 },
     verticalVelocity: presentationState?.verticalVelocity || 0,
     height: presentationState?.airHeight || 0,
-    airborne: Boolean(presentationState?.airborne && !state.severeCrash),
+    airborne: Boolean(presentationState?.airborne),
     speedRatio: Math.min(1, speed / PHASE4_GAMEPLAY_CONFIG.launch.speedForMaximumVelocity),
     turnAmount: state.surfaceTrickActive ? 0.5 : Math.abs(sample.tangent.y)
       * speed / PHASE4_GAMEPLAY_CONFIG.launch.speedForMaximumVelocity,
@@ -658,7 +607,6 @@ function vfxMotionState(state, presentationState) {
     aerialRotationDegrees: state.airRotationDegrees || 0,
     trickType: presentationState?.trickType,
     aerialBackflip: Boolean(presentationState?.aerialBackflip),
-    severeCrash: Boolean(state.severeCrash),
   };
 }
 
@@ -675,7 +623,6 @@ function buildResultsStats() {
     perfectLandings: stats.perfectLandings || 0,
     crashes: stats.crashes || 0,
     pumpAccuracy: stats.pumpAccuracy || 0,
-    severeCrash: Boolean(simulation?.state.severeCrash),
   };
 }
 
@@ -696,10 +643,6 @@ function routeGameplayEvents(events, state, presentationState) {
     ) event.handContactPosition = presentationState.copingWorldPoint;
 
     const type = String(event.type || '').toUpperCase();
-    if (type === 'HEAD_FIRST_CRASH') {
-      event.worldPosition = rawEvent.contactPoint || rawEvent.position || event.worldPosition;
-      event.surfaceNormal = rawEvent.normal || event.surfaceNormal;
-    }
     const vfxResult = vfx.handleEvent(event) || {};
     if (vfxResult.cameraImpact) cameraController.addImpact(vfxResult.cameraImpact);
     audio.handleEvent(event);
@@ -725,10 +668,7 @@ function routeGameplayEvents(events, state, presentationState) {
     } else if (type === 'LANDING') {
       hud.showLanding(event.quality || 'CLEAN', { multiplier: event.scoreMultiplier });
     } else if (type === 'BAIL') {
-      hud.showActionFeedback('bail', { text: 'BAIL', duration: 1100 });
-    } else if (type === 'HEAD_FIRST_CRASH') {
-      hud.clearFeedback();
-      hud.showActionFeedback('head-impact', { text: 'HEAD FIRST · RUN OVER', duration: 1700 });
+      hud.showActionFeedback('bail', { text: 'NO POINTS · −20% SPEED', duration: 1100 });
     } else if (type === 'COMBO_CHANGED') {
       integrationStats.longestCombo = Math.max(
         integrationStats.longestCombo,
@@ -741,14 +681,6 @@ function routeGameplayEvents(events, state, presentationState) {
 
 function resetSimulation({ keepFlow = false } = {}) {
   if (!simulation) return null;
-  ordinaryBailPresentation?.reset();
-  crashPresentation?.reset();
-  impactContacts?.reset();
-  crashGameOverShown = false;
-  stage.classList.remove('is-severe-crash');
-  stage.style.removeProperty('--crash-grayscale');
-  canvas.style.removeProperty('filter');
-  crashFlash.classList.remove('is-active');
   vfx.reset();
   rider.skateboard.resetSpeedGlow?.();
   const state = simulation.reset();
@@ -776,7 +708,7 @@ function finishSession(state) {
   audio.setPaused(true);
   if (session.phase !== 'finished') session.finish();
   updatePlayerHUD(state);
-  if (!state.severeCrash) audio.handleEvent({ type: 'SESSION_FINISHED', score: state.score || 0 });
+  audio.handleEvent({ type: 'SESSION_FINISHED', score: state.score || 0 });
   gameFlow.transitionTo(HALFPIPE_FLOW_STATE.RESULTS);
 }
 
@@ -866,7 +798,7 @@ function render(timestamp = 0) {
       && session.phase === 'running'
       && !webglLost
     );
-    const acceptsGameplay = isRunning && !simulation.state.severeCrash;
+    const acceptsGameplay = isRunning;
     const pumpIntent = pumpInput.keyboardIntent || pumpInput.gamepadIntent || 0;
     const turnIntent = pumpInput.keyboardTurnIntent || pumpInput.gamepadTurnIntent || 0;
     simulation.setPumpIntent(acceptsGameplay ? pumpIntent : 0);
@@ -879,39 +811,33 @@ function render(timestamp = 0) {
         frameDelta * GAME_CONFIG.gameplay.motionTimeScale,
       );
       const presentationDt = result.steps * simulation.fixedDt;
-      if (!result.state.severeCrash) session.step(presentationDelta);
+      session.step(presentationDelta);
       if (result.steps > 0) {
         session.setScore(result.state.score || 0);
         const presentationState = applySimulationState(result.state, {
-          presentationDt: result.state.severeCrash ? frameDelta : presentationDt,
+          presentationDt,
         });
-        sampleImpactContacts(result.state, presentationDt);
-        if (simulation.state.severeCrash) result.state = simulation.snapshot();
         const gameplayEvents = simulation.drainEvents();
         routeGameplayEvents(gameplayEvents, result.state, presentationState);
         updatePlayerHUD(result.state);
         vfx.update(presentationDt, vfxMotionState(result.state, presentationState));
-        audio.update({ ...result.state, sessionRemaining: session.remaining }, presentationDt);
+        audio.update({ ...result.state, wheelDiameter: rider.skateboard.measuredWheelDiameter,
+          sessionRemaining: session.remaining }, presentationDt);
       } else {
-        if (result.state.severeCrash) applySimulationState(result.state, { presentationDt: frameDelta });
+
         const gameplayEvents = simulation.drainEvents();
         routeGameplayEvents(gameplayEvents, result.state, lastPresentationState);
         vfx.update(frameDelta, vfxMotionState(result.state, lastPresentationState));
       }
-      if (!result.state.severeCrash && session.phase === 'finished') finishSession(result.state);
+      if (session.phase === 'finished') finishSession(result.state);
     } else {
       const idleState = simulation.snapshot();
       const gameplayEvents = simulation.drainEvents();
       routeGameplayEvents(gameplayEvents, idleState, lastPresentationState);
-      if (idleState.severeCrash) applySimulationState(idleState, { presentationDt: frameDelta });
+
       vfx.update(frameDelta, vfxMotionState(idleState, lastPresentationState));
-      audio.update({ ...idleState, sessionRemaining: session.remaining }, frameDelta);
-    }
-    if (simulation.state.severeCrash && !crashGameOverShown
-      && gameFlow.state === HALFPIPE_FLOW_STATE.RUN
-      && crashPresentation.elapsed >= CRASH_PRESENTATION.gameOverDelay) {
-      crashGameOverShown = true;
-      finishSession(simulation.snapshot());
+      audio.update({ ...idleState, wheelDiameter: rider.skateboard.measuredWheelDiameter,
+        sessionRemaining: session.remaining }, frameDelta);
     }
 
     if (hud.debugMode && timestamp - lastTelemetryTime >= 100) {
@@ -1080,23 +1006,7 @@ async function bootstrap() {
   scene.add(presentationDebug.root);
 
   simulation = new HalfpipeSimulation(profile);
-  impactContacts = new SkaterImpactContacts({ profile });
   impactDebug = new SkaterImpactDebug(scene);
-  crashPresentation = new SkaterCrashPresentation({ scene, rider, profile });
-  ordinaryBailPresentation = new OrdinaryBailPresentation({ rider, profile });
-  const resolveLanding = simulation._resolveLanding;
-  simulation._resolveLanding = function resolveLandingWithBodyContact(...args) {
-    // Inspect the final descending pose before the legacy landing method
-    // resets its rotation and awards points. Contact order wins over scoring.
-    applySimulationState(this.snapshot(), { rotateWheels: false, presentationDt: 0 });
-    sampleImpactContacts(this.state, this.fixedDt);
-    if (this.state.severeCrash) return;
-    const failedPose = ordinaryBailPresentation.capture();
-    const result = resolveLanding.apply(this, args);
-    if (this.state.crashActive) ordinaryBailPresentation.begin(failedPose, this.state.time);
-    impactContacts.end(); // A later head touch in this ordinary tumble is forgiven.
-    return result;
-  };
   pumpInput = new HalfpipePumpInput(window, {
     onPauseRequest() {
       if (gameFlow.state === HALFPIPE_FLOW_STATE.RUN) pauseRun();
@@ -1132,10 +1042,7 @@ async function bootstrap() {
     hud,
     vfx,
     audio,
-    impactContacts,
     impactDebug,
-    crashPresentation,
-    ordinaryBailPresentation,
     customization: {
       roster: RIDER_ROSTER,
       boardColors: SKATEBOARD_COLORS,
@@ -1178,10 +1085,7 @@ function dispose() {
   canvas.removeEventListener('webglcontextlost', onWebGLContextLost, false);
   canvas.removeEventListener('webglcontextrestored', onWebGLContextRestored, false);
   unregisterRiderQuality?.();
-  ordinaryBailPresentation?.reset();
-  crashPresentation?.dispose();
   impactDebug?.dispose();
-  crashFlash.remove();
   halfpipe?.dispose();
   rider?.dispose();
   profileDebug.dispose();

@@ -245,6 +245,7 @@ export class SkateboardVisual {
 
   _prepareWheelGlowMaterials() {
     for (const wheel of this.wheels) {
+      wheel.userData.emissiveBloom = true;
       const source = Array.isArray(wheel.material) ? wheel.material : [wheel.material];
       const materials = source.map(material => {
         if (!material?.emissive) return material;

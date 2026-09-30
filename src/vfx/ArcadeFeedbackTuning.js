@@ -1,8 +1,8 @@
 // Presentation-only tuning. None of these values feed skateboard physics.
 export const ARCADE_FEEDBACK = Object.freeze({
-  wheelGlowStart: 0.75,
-  wheelGlowFull: 0.95,
-  wheelGlowIntensity: 1.25,
+  wheelGlowStart: 0.35,
+  wheelGlowFull: 0.85,
+  wheelGlowIntensity: 3.8,
   wheelGlowColor: 0xff792c,
   wheelGlowResponse: 10,
   copingEmissiveColor: 0xff3518,

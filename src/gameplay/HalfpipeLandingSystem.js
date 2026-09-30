@@ -13,7 +13,7 @@ const RESULTS = Object.freeze({
   CLEAN: Object.freeze({ scoreMultiplier: 1, momentumRetention: 0.98 }),
   SKETCHY: Object.freeze({ scoreMultiplier: 0.72, momentumRetention: 0.9 }),
   HEAVY: Object.freeze({ scoreMultiplier: 0.38, momentumRetention: 0.76 }),
-  BAIL: Object.freeze({ scoreMultiplier: 0, momentumRetention: 0.35 }),
+  BAIL: Object.freeze({ scoreMultiplier: 0, momentumRetention: 0.8 }),
 });
 
 export function evaluateLanding({

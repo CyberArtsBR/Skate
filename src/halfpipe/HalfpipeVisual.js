@@ -260,6 +260,7 @@ export class HalfpipeVisual {
         );
 
         if (hasCopingMaterial) {
+          object.userData.emissiveBloom = true;
           object.userData.copingContactZone = true;
           preparedMaterials = preparedMaterials.map((material) => {
             if (material?.name !== COPING_MATERIAL_NAME) return material;
