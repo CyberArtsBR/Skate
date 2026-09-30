@@ -81,15 +81,11 @@ const PRESETS = Object.freeze({
       fill: 0.65,
       shadowRadius: 2.0,
     }),
-    postProcessing: Object.freeze({
-      enabled: true,
-      bloomStrength: 0.25,
-      bloomRadius: 0.30,
-      bloomThreshold: 0.90,
-      aoEnabled: true,
-      aoBlendIntensity: 0.36,
-      sharpenAmount: 0.08,
-    }),
+    // Critical visibility hotfix: retain all CINEMATIC renderer/IBL/shadow/PBR
+    // quality while bypassing the experimental full-screen composer that can
+    // produce a transparent base pass on some WebGL/browser combinations.
+    // Existing restrained emissive/glow shells remain active without the stack.
+    postProcessing: NO_POST_PROCESSING,
   }),
 });
 

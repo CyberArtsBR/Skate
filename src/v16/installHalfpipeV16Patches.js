@@ -1,7 +1,11 @@
+import * as THREE from 'three';
+import { GAME_CONFIG } from '../config/gameConfig.js';
 import { HeroSelectScreen } from '../ui/HeroSelectScreen.js';
+import { RiderController } from '../character/RiderController.js';
 import { TrickPoseController } from '../character/TrickPoseController.js';
 import { SkatePoseController } from '../character/SkatePoseController.js';
 import { SkateAnimationController } from '../character/SkateAnimationController.js';
+import { BackflipGrabIK } from '../character/BackflipGrabIK.js';
 import './v16.css';
 
 let installed = false;
@@ -72,8 +76,6 @@ function patchHeroSelect() {
     } else if (event.code === 'ArrowUp' || event.code === 'KeyW') {
       const previous = this.selectedHeroIndex;
       this.moveHeroGrid(0, -1);
-      // Preserve the legacy ArrowUp board-color shortcut only at the top edge.
-      // W and controller Up remain pure 2D rider navigation.
       if (event.code === 'ArrowUp' && previous === this.selectedHeroIndex) {
         this.selectBoardColor(this.selectedBoardIndex + 1);
       }
@@ -111,6 +113,86 @@ function patchHeroSelect() {
   };
 }
 
+function ensureBodyCenteredBackflipAxis(rider) {
+  if (!rider.backflipAxisCarrier) {
+    const carrier = new THREE.Group();
+    carrier.name = 'rider-backflip-body-axis-carrier';
+    rider.trickCarrier.add(carrier);
+    carrier.add(rider.boardPivot, rider.bodyCarrier);
+
+    rider.backflipAxisCarrier = carrier;
+    rider.backflipAxisY = rider.baseChimpionY + GAME_CONFIG.rider.targetHeight * 0.5;
+    rider.root.userData.hasBodyCenteredBackflipAxis = true;
+    rider.root.userData.backflipAxisY = rider.backflipAxisY;
+  }
+
+  if (
+    !rider.backflipGrabIK
+    || rider.backflipGrabIK.rigAdapter !== rider.chimpion?.rigAdapter
+  ) {
+    rider.backflipGrabIK = new BackflipGrabIK({
+      rigAdapter: rider.chimpion?.rigAdapter,
+      riderRoot: rider.root,
+      skateboard: rider.skateboard,
+    });
+  }
+
+  return rider.backflipAxisCarrier;
+}
+
+function patchRiderBackflipAxis() {
+  const proto = RiderController.prototype;
+  if (proto.__halfpipeV17BackflipAxisPatched) return;
+  proto.__halfpipeV17BackflipAxisPatched = true;
+
+  const originalSetPresentationState = proto.setPresentationState;
+  proto.setPresentationState = function setPresentationStateV17(nextState = {}) {
+    const axisCarrier = ensureBodyCenteredBackflipAxis(this);
+
+    axisCarrier.position.set(0, 0, 0);
+    axisCarrier.rotation.set(0, 0, 0);
+
+    const current = this.presentationState || {};
+    const airborne = Boolean(nextState.airborne ?? current.airborne);
+    const trickType = nextState.trickType ?? current.trickType;
+    const isBackflip = airborne && trickType === 'backflip';
+    const facingYaw = Number(nextState.facingYaw ?? current.facingYaw) || 0;
+    const facingSign = Math.cos(facingYaw) < 0 ? -1 : 1;
+    const incomingRoll = Number(nextState.trickRoll ?? current.trickRoll) || 0;
+
+    const patchedState = isBackflip
+      ? { ...nextState, trickRoll: incomingRoll * facingSign }
+      : nextState;
+
+    this.skateboard.root.position.x = airborne
+      ? 0
+      : -this.trickPoseController.rearPivotX;
+
+    const result = originalSetPresentationState.call(this, patchedState);
+    const resultBackflip = Boolean(result.airborne && result.trickType === 'backflip');
+
+    if (resultBackflip) {
+      const pivotY = this.backflipAxisY;
+      const roll = Number(result.trickRoll) || 0;
+
+      this.trickCarrier.rotation.z = 0;
+      axisCarrier.position.set(0, pivotY, 0);
+      axisCarrier.rotation.set(0, 0, roll);
+      this.boardPivot.position.y -= pivotY;
+      this.bodyCarrier.position.y -= pivotY;
+    }
+
+    this.root.updateWorldMatrix(true, true);
+    const grabResult = this.backflipGrabIK.update({
+      active: resultBackflip,
+      progress: result.trickProgress,
+    });
+    this.root.userData.backflipGrabIK = { ...grabResult };
+    this.root.updateWorldMatrix(true, true);
+    return result;
+  };
+}
+
 function patchBackflipPresentation() {
   const trickProto = TrickPoseController.prototype;
   if (!trickProto.__halfpipeV16BackflipPatched) {
@@ -118,6 +200,8 @@ function patchBackflipPresentation() {
     const originalEvaluate = trickProto.evaluate;
     trickProto.evaluate = function evaluateV16TrickPose(state = {}) {
       const output = originalEvaluate.call(this, state);
+
+      if (state.airborne) output.rearPivotX = 0;
       if (!(state.airborne && state.trickType === 'backflip')) return output;
 
       const progress = clamp01(state.trickProgress);
@@ -128,15 +212,12 @@ function patchBackflipPresentation() {
       const envelope = Math.sin(Math.PI * progress);
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
 
-      // Keep the body close to the deck while inverted. The previous negative
-      // local-Y offset inverted with the trick carrier and visually launched the
-      // rider away from the skateboard around 180 degrees.
-      output.bodyY = 0.11 * tuck - 0.01 * open;
-      output.bodyX = -side * (0.01 * envelope + 0.008 * tuck);
-      output.bodyRoll = direction * (0.025 * envelope + 0.025 * tuck);
-      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.05;
+      output.bodyY = -0.015 * tuck + 0.01 * open;
+      output.bodyX = -side * (0.008 * envelope + 0.006 * tuck);
+      output.bodyRoll = direction * (0.018 * envelope + 0.018 * tuck);
+      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.04;
       output.boardRoll = (Number(state.dropInRoll) || 0)
-        - direction * (0.014 * envelope + 0.018 * tuck);
+        - direction * (0.010 * envelope + 0.012 * tuck);
       return output;
     };
   }
@@ -154,18 +235,18 @@ function patchBackflipPresentation() {
         * (1 - smoothstep((progress - 0.72) / 0.28));
       const open = smoothstep((progress - 0.68) / 0.32);
 
-      pose.compression = Math.max(pose.compression, 0.66 + tuck * 0.25 - open * 0.18);
-      pose.hipFlex = 0.24 + tuck * 0.22 - open * 0.08;
-      pose.kneeFlex = Math.min(1.08, 0.68 + tuck * 0.30 - open * 0.16);
-      pose.ankleFlex = -0.10 + open * 0.025;
-      pose.torsoCounter = 0.06 + tuck * 0.05;
-      pose.leftArmBalance = 0.42 - tuck * 0.10 + open * 0.12;
+      pose.compression = Math.max(pose.compression, 0.82 + tuck * 0.16 - open * 0.18);
+      pose.hipFlex = 0.40 + tuck * 0.28 - open * 0.14;
+      pose.kneeFlex = Math.min(1.12, 0.82 + tuck * 0.26 - open * 0.18);
+      pose.ankleFlex = -0.13 + open * 0.035;
+      pose.torsoCounter = 0.12 + tuck * 0.16 - open * 0.05;
+      pose.leftArmBalance = 1.08 + tuck * 0.18 - open * 0.22;
       pose.rightArmBalance = pose.leftArmBalance;
       pose.armBalance = pose.leftArmBalance;
-      pose.forearmDrop = 0.18 + tuck * 0.16 - open * 0.08;
+      pose.forearmDrop = 0.36 + tuck * 0.22 - open * 0.12;
       pose.leftForearmDrop = pose.forearmDrop;
       pose.rightForearmDrop = pose.forearmDrop;
-      pose.headLook = 0.14 + open * 0.38;
+      pose.headLook = 0.12 + open * 0.42;
       return pose;
     };
   }
@@ -176,15 +257,21 @@ function patchBackflipPresentation() {
     const originalUpdate = animationProto.update;
     animationProto.update = function updateV16Backflip(rawState = {}) {
       const next = originalUpdate.call(this, rawState);
-      if (!(next.airborne && next.trickType === 'backflip')) return next;
+      if (!(next.airborne && next.trickType)) return next;
 
-      const progress = clamp01(next.trickProgress);
-      const tuck = smoothstep(progress / 0.22)
-        * (1 - smoothstep((progress - 0.72) / 0.28));
-      const open = smoothstep((progress - 0.68) / 0.32);
-      const takeoffAnchor = 1 - smoothstep(progress / 0.18);
-      const targetFootLock = 0.72 + takeoffAnchor * 0.16 + open * 0.18 - tuck * 0.04;
-      next.footIKWeight = Math.max(clamp01(next.footIKWeight), clamp01(targetFootLock));
+      if (next.trickType === 'backflip') {
+        const progress = clamp01(next.trickProgress);
+        const tuck = smoothstep(progress / 0.22)
+          * (1 - smoothstep((progress - 0.72) / 0.28));
+        const open = smoothstep((progress - 0.68) / 0.32);
+        const takeoffAnchor = 1 - smoothstep(progress / 0.18);
+        const targetFootLock = 0.90 + takeoffAnchor * 0.07 + open * 0.03 - tuck * 0.02;
+        next.footIKWeight = Math.max(clamp01(next.footIKWeight), clamp01(targetFootLock));
+        return next;
+      }
+
+      const targetFootLock = 0.82 + clamp01(next.landingAnticipation) * 0.14;
+      next.footIKWeight = Math.max(clamp01(next.footIKWeight), targetFootLock);
       return next;
     };
   }
@@ -225,6 +312,7 @@ export function installHalfpipeV16Patches() {
   if (installed) return false;
   installed = true;
   patchHeroSelect();
+  patchRiderBackflipAxis();
   patchBackflipPresentation();
   installTitleDecorator();
   return true;
