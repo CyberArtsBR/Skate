@@ -34,12 +34,26 @@ function installCyberBackgroundAlias() {
     return result;
   };
 
-  // The map picker is created during main initialization, before this runtime
-  // alias can wrap the background API. Repair its preview once so Cyber Night
-  // uses the real shipped image instead of requesting the absent .jpg alias.
+  // The map picker is created during main initialization. Repair its preview so
+  // Cyber Night uses the real shipped image instead of requesting the absent
+  // logical .jpg alias.
   const cyberPreview = document.querySelector('.map-card[data-map-id="cyber-night"] img');
   if (cyberPreview) cyberPreview.src = CYBER_BACKGROUND_ASSET;
   return true;
+}
+
+function installCyberBackgroundAliasWhenReady() {
+  const startedAt = globalThis.performance?.now?.() ?? Date.now();
+  const timeoutMs = 30000;
+
+  const attempt = () => {
+    if (installCyberBackgroundAlias()) return;
+    const now = globalThis.performance?.now?.() ?? Date.now();
+    if (now - startedAt >= timeoutMs) return;
+    globalThis.requestAnimationFrame?.(attempt);
+  };
+
+  attempt();
 }
 
 // Preserve the V18 customization behavior: fresh loads begin with Random on
@@ -59,7 +73,9 @@ installHalfpipeV18Patches();
 installHalfpipeV19PresentationPatches();
 
 await import('../main.js');
-installCyberBackgroundAlias();
+// main.js starts its GLB/background boot asynchronously, so the public runtime
+// foundation is not guaranteed to exist when the module import resolves.
+installCyberBackgroundAliasWhenReady();
 // Load after main.js/style.css and V18 CSS so V19 remains a small, reversible
 // presentation layer rather than forking the working UI/gameplay architecture.
 await import('./v19.css');
