@@ -27,19 +27,23 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     rhythmBoostPenalty: 0.02,
     rhythmBoostMax: 0.085,
     lowEnergyRecovery: Object.freeze({
-      referenceSpeed: 3.2,
-      minimumSpeed: 0.18,
-      acceleration: 2.1,
+      // Low-energy pumping must remain playable instead of falling into a
+      // dead-zone below the normal cruising speed. Correctly timed pumping is
+      // still required; this only strengthens recovery while energy is low.
+      referenceSpeed: 4.8,
+      minimumSpeed: 0.05,
+      acceleration: 3.8,
       eligibleRatings: Object.freeze(['PERFECT', 'GOOD', 'WEAK']),
     }),
   }),
   aerial: Object.freeze({
-    // Retain the audited legacy presentation rate for non-V9 consumers. The
-    // V9 bootstrap applies the explicit higher deterministic rate below.
+    // V14 deliberately slows aerial turning and caps the highest valid turn at
+    // 720. The 720 remains achievable on a maximum-energy launch, but 900 is
+    // no longer a valid or reachable scored target.
     rotationDegreesPerSecond: 600,
-    v9RotationDegreesPerSecond: 900,
+    v9RotationDegreesPerSecond: 720,
     targetStepDegrees: 180,
-    maximumDegrees: 900,
+    maximumDegrees: 720,
     validErrorDegrees: 48,
     hardOverrunDegrees: 72,
     idealErrorDegrees: 12,
@@ -47,7 +51,7 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     idealMinDegrees: 168,
     idealMaxDegrees: 192,
     validMaxDegrees: 228,
-    overturnDegrees: 972,
+    overturnDegrees: 792,
   }),
   backflip: Object.freeze({
     rotationDegreesPerSecond: 500,
