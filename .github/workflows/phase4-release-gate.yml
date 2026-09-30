@@ -145,3 +145,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "${{ needs.physics_audit.outputs.summary }}"
+
+  v9_test_audit:
+    name: V9 regression failure audit
+    runs-on: ubuntu-latest
+    outputs:
+      summary: ${{ steps.audit.outputs.summary }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: audit
+        run: node tools/v9-test-audit.mjs
+
+  v9_test_report:
+    needs: v9_test_audit
+    name: V9 regression ${{ needs.v9_test_audit.outputs.summary }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ needs.v9_test_audit.outputs.summary }}"
