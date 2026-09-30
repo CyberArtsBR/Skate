@@ -47,7 +47,7 @@ assert.deepEqual(stats, {
   finalScore: 9876,
   bestTrick: 'AERIAL 180 +811',
   highestAir: '3.13m',
-  longestCombo: '×2',
+  longestCombo: '2 TRICKS',
   tricksLanded: 12,
   perfectLandings: 4,
   crashes: 1,
