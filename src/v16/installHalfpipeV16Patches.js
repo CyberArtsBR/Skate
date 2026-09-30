@@ -5,6 +5,7 @@ import { RiderController } from '../character/RiderController.js';
 import { TrickPoseController } from '../character/TrickPoseController.js';
 import { SkatePoseController } from '../character/SkatePoseController.js';
 import { SkateAnimationController } from '../character/SkateAnimationController.js';
+import { BackflipGrabIK } from '../character/BackflipGrabIK.js';
 import './v16.css';
 
 let installed = false;
@@ -75,8 +76,6 @@ function patchHeroSelect() {
     } else if (event.code === 'ArrowUp' || event.code === 'KeyW') {
       const previous = this.selectedHeroIndex;
       this.moveHeroGrid(0, -1);
-      // Preserve the legacy ArrowUp board-color shortcut only at the top edge.
-      // W and controller Up remain pure 2D rider navigation.
       if (event.code === 'ArrowUp' && previous === this.selectedHeroIndex) {
         this.selectBoardColor(this.selectedBoardIndex + 1);
       }
@@ -115,18 +114,30 @@ function patchHeroSelect() {
 }
 
 function ensureBodyCenteredBackflipAxis(rider) {
-  if (rider.backflipAxisCarrier) return rider.backflipAxisCarrier;
+  if (!rider.backflipAxisCarrier) {
+    const carrier = new THREE.Group();
+    carrier.name = 'rider-backflip-body-axis-carrier';
+    rider.trickCarrier.add(carrier);
+    carrier.add(rider.boardPivot, rider.bodyCarrier);
 
-  const carrier = new THREE.Group();
-  carrier.name = 'rider-backflip-body-axis-carrier';
-  rider.trickCarrier.add(carrier);
-  carrier.add(rider.boardPivot, rider.bodyCarrier);
+    rider.backflipAxisCarrier = carrier;
+    rider.backflipAxisY = rider.baseChimpionY + GAME_CONFIG.rider.targetHeight * 0.5;
+    rider.root.userData.hasBodyCenteredBackflipAxis = true;
+    rider.root.userData.backflipAxisY = rider.backflipAxisY;
+  }
 
-  rider.backflipAxisCarrier = carrier;
-  rider.backflipAxisY = rider.baseChimpionY + GAME_CONFIG.rider.targetHeight * 0.5;
-  rider.root.userData.hasBodyCenteredBackflipAxis = true;
-  rider.root.userData.backflipAxisY = rider.backflipAxisY;
-  return carrier;
+  if (
+    !rider.backflipGrabIK
+    || rider.backflipGrabIK.rigAdapter !== rider.chimpion?.rigAdapter
+  ) {
+    rider.backflipGrabIK = new BackflipGrabIK({
+      rigAdapter: rider.chimpion?.rigAdapter,
+      riderRoot: rider.root,
+      skateboard: rider.skateboard,
+    });
+  }
+
+  return rider.backflipAxisCarrier;
 }
 
 function patchRiderBackflipAxis() {
@@ -138,8 +149,6 @@ function patchRiderBackflipAxis() {
   proto.setPresentationState = function setPresentationStateV17(nextState = {}) {
     const axisCarrier = ensureBodyCenteredBackflipAxis(this);
 
-    // Always begin from a neutral nested pivot. The previous frame may have
-    // been mid-flip and must never contaminate the next IK solve.
     axisCarrier.position.set(0, 0, 0);
     axisCarrier.rotation.set(0, 0, 0);
 
@@ -151,16 +160,10 @@ function patchRiderBackflipAxis() {
     const facingSign = Math.cos(facingYaw) < 0 ? -1 : 1;
     const incomingRoll = Number(nextState.trickRoll ?? current.trickRoll) || 0;
 
-    // The gameplay rotation is expressed in ramp/world-side space. A 180°
-    // rider facing change reverses the apparent local Z rotation, so compensate
-    // only for presentation. This keeps a backflip a backflip in both fakie and
-    // forward camera-facing orientations.
     const patchedState = isBackflip
       ? { ...nextState, trickRoll: incomingRoll * facingSign }
       : nextState;
 
-    // Aerial tricks should rotate a centered deck, not orbit around the rear
-    // truck pivot. Keep the rear-truck pivot only for grounded lip tricks.
     this.skateboard.root.position.x = airborne
       ? 0
       : -this.trickPoseController.rearPivotX;
@@ -172,9 +175,6 @@ function patchRiderBackflipAxis() {
       const pivotY = this.backflipAxisY;
       const roll = Number(result.trickRoll) || 0;
 
-      // Remove the main flip from the board-level carrier and reapply it around
-      // the rider's body center. The character now spins around its own center
-      // while the skateboard describes the larger orbit below the body.
       this.trickCarrier.rotation.z = 0;
       axisCarrier.position.set(0, pivotY, 0);
       axisCarrier.rotation.set(0, 0, roll);
@@ -182,6 +182,12 @@ function patchRiderBackflipAxis() {
       this.bodyCarrier.position.y -= pivotY;
     }
 
+    this.root.updateWorldMatrix(true, true);
+    const grabResult = this.backflipGrabIK.update({
+      active: resultBackflip,
+      progress: result.trickProgress,
+    });
+    this.root.userData.backflipGrabIK = { ...grabResult };
     this.root.updateWorldMatrix(true, true);
     return result;
   };
@@ -195,8 +201,6 @@ function patchBackflipPresentation() {
     trickProto.evaluate = function evaluateV16TrickPose(state = {}) {
       const output = originalEvaluate.call(this, state);
 
-      // Keep airborne board rotations around the board center so the deck stays
-      // centralized under both feet instead of swinging from a rear-axle pivot.
       if (state.airborne) output.rearPivotX = 0;
       if (!(state.airborne && state.trickType === 'backflip')) return output;
 
@@ -208,9 +212,6 @@ function patchBackflipPresentation() {
       const envelope = Math.sin(Math.PI * progress);
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
 
-      // With the main flip now centered on the rider, keep secondary offsets
-      // restrained. Feet/board contact carries the tuck instead of separating
-      // the body from the deck around the inverted phase.
       output.bodyY = -0.015 * tuck + 0.01 * open;
       output.bodyX = -side * (0.008 * envelope + 0.006 * tuck);
       output.bodyRoll = direction * (0.018 * envelope + 0.018 * tuck);
@@ -234,8 +235,6 @@ function patchBackflipPresentation() {
         * (1 - smoothstep((progress - 0.72) / 0.28));
       const open = smoothstep((progress - 0.68) / 0.32);
 
-      // Strong compact backflip silhouette: deep crouch, chest toward knees and
-      // both arms dropping toward the deck/grab zone through the inverted phase.
       pose.compression = Math.max(pose.compression, 0.82 + tuck * 0.16 - open * 0.18);
       pose.hipFlex = 0.40 + tuck * 0.28 - open * 0.14;
       pose.kneeFlex = Math.min(1.12, 0.82 + tuck * 0.26 - open * 0.18);
@@ -271,9 +270,6 @@ function patchBackflipPresentation() {
         return next;
       }
 
-      // Other aerial tricks still need the board tight to the feet. Preserve a
-      // little freedom for style while preventing the visibly detached/crooked
-      // board positions seen in screenshots.
       const targetFootLock = 0.82 + clamp01(next.landingAnticipation) * 0.14;
       next.footIKWeight = Math.max(clamp01(next.footIKWeight), targetFootLock);
       return next;
