@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ImpactVFX } from './ImpactVFX.js';
 import { SpeedTrailVFX } from './SpeedTrailVFX.js';
+import { quality } from '../graphics/RenderQualityManager.js';
 
 const LANDING_IMPACTS = Object.freeze({
   PERFECT: Object.freeze({ strength: 0.005, duration: 0.08 }),
@@ -16,10 +17,19 @@ function ratingOf(event, fallback = 'CLEAN') {
 
 function eventPosition(event) {
   return event?.handContactPosition
+    || event?.plantHandWorldPosition
     || event?.contactPosition
     || event?.worldPosition
     || event?.position
     || null;
+}
+
+function eventVelocity(event) {
+  return event?.worldVelocity || event?.velocity || null;
+}
+
+function eventNormal(event) {
+  return event?.surfaceNormal || event?.normal || null;
 }
 
 export class HalfpipeVFX {
@@ -27,14 +37,22 @@ export class HalfpipeVFX {
     if (!scene?.add) throw new TypeError('HalfpipeVFX requires a THREE.Scene-like parent');
     this.scene = scene;
     this.reducedMotion = Boolean(reducedMotion);
-    this.impact = new ImpactVFX(scene, { reducedMotion: this.reducedMotion });
-    this.speedTrail = new SpeedTrailVFX(scene, { reducedMotion: this.reducedMotion });
+    this.vfxScale = quality.vfxScale;
+    this.impact = new ImpactVFX(scene, {
+      reducedMotion: this.reducedMotion,
+      scale: this.vfxScale,
+    });
+    this.speedTrail = new SpeedTrailVFX(scene, {
+      reducedMotion: this.reducedMotion,
+      scale: this.vfxScale,
+    });
     this.lastAirState = {
       position: new THREE.Vector3(),
       verticalVelocity: 0,
       height: 0,
       airborne: false,
     };
+    this._unsubscribeQuality = quality.subscribe(({ vfxScale }) => this.setScale(vfxScale));
   }
 
   setReducedMotion(enabled) {
@@ -43,9 +61,18 @@ export class HalfpipeVFX {
     this.speedTrail.setReducedMotion(this.reducedMotion);
   }
 
+  setScale(scale) {
+    this.vfxScale = THREE.MathUtils.clamp(Number(scale) || 1, 0.35, 1.25);
+    this.impact.setScale(this.vfxScale);
+    this.speedTrail.setScale(this.vfxScale);
+    return this.vfxScale;
+  }
+
   handleEvent(event = {}) {
     const type = String(event.type || '').trim().toUpperCase();
     const position = eventPosition(event);
+    const velocity = eventVelocity(event);
+    const normal = eventNormal(event);
     let cameraImpact = null;
     let handled = true;
 
@@ -54,12 +81,12 @@ export class HalfpipeVFX {
         if (position) {
           this.impact.pump({
             position,
-            velocity: event.velocity,
+            velocity,
             rating: ratingOf(event, 'GOOD'),
           });
           this.speedTrail.pulse({
             position,
-            velocity: event.velocity,
+            velocity,
             intensity: ratingOf(event, 'GOOD') === 'PERFECT' ? 0.75 : 0.42,
           });
         }
@@ -70,8 +97,8 @@ export class HalfpipeVFX {
         if (position) {
           this.impact.copingContact({
             position,
-            normal: event.normal,
-            velocity: event.velocity,
+            normal,
+            velocity,
           });
         }
         break;
@@ -79,10 +106,10 @@ export class HalfpipeVFX {
 
       case 'TAKEOFF': {
         if (position) {
-          this.impact.takeoff({ position, velocity: event.velocity });
+          this.impact.takeoff({ position, velocity });
           this.speedTrail.pulse({
             position,
-            velocity: event.velocity,
+            velocity,
             intensity: 0.48,
           });
         }
@@ -91,14 +118,11 @@ export class HalfpipeVFX {
 
       case 'TRICK_COMPLETED': {
         const trick = String(event.trick || event.trickType || '').toLowerCase();
-        // Hand Plant is the only trick that gets a coping spark here. The caller
-        // must provide the actual hand-contact world position; otherwise no
-        // spatial effect is fabricated.
         if (trick === 'hand-plant' && event.handContactPosition) {
           this.impact.copingContact({
             position: event.handContactPosition,
-            normal: event.normal,
-            velocity: event.velocity,
+            normal,
+            velocity,
           });
         }
         break;
@@ -109,7 +133,7 @@ export class HalfpipeVFX {
         if (position) {
           this.impact.landing({
             position,
-            velocity: event.velocity,
+            velocity,
             rating,
           });
         }
@@ -119,7 +143,7 @@ export class HalfpipeVFX {
 
       case 'BAIL': {
         if (position) {
-          this.impact.crash({ position, velocity: event.velocity });
+          this.impact.crash({ position, velocity });
         }
         cameraImpact = LANDING_IMPACTS.BAIL;
         break;
@@ -171,6 +195,8 @@ export class HalfpipeVFX {
   }
 
   dispose() {
+    this._unsubscribeQuality?.();
+    this._unsubscribeQuality = null;
     this.impact.dispose();
     this.speedTrail.dispose();
   }
