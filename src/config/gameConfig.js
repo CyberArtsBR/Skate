@@ -12,13 +12,13 @@ export const GAME_CONFIG = Object.freeze({
     shadowMapSize: 2048,
     environmentIntensity: 0.84,
     copingGlow: Object.freeze({
-      // Keep the glow clearly visible but restrained so it never blooms over
-      // the rider or washes out the authored ramp materials.
-      emissiveIntensity: 0.42,
-      innerExpansion: 0.012,
-      innerOpacity: 0.024,
-      outerExpansion: 0.026,
-      outerOpacity: 0.01,
+      // Premium accent only: the coping should read as energized white metal,
+      // never as a fluorescent tube or a light source washing over the rider.
+      emissiveIntensity: 0.26,
+      innerExpansion: 0.008,
+      innerOpacity: 0.015,
+      outerExpansion: 0.018,
+      outerOpacity: 0.006,
     }),
     frontMetal: Object.freeze({
       // V9 asset audit of public/models/halfpipe/halfpipe.glb resolves the
@@ -117,11 +117,18 @@ export const GAME_CONFIG = Object.freeze({
     landingVelocityRetention: 0.94,
   }),
   camera: Object.freeze({
-    fov: 30,
+    // Slightly closer than the legacy framing while preserving the classic
+    // California Games presentation angle. Wide screens reveal more scenery;
+    // narrow screens expand vertical FOV instead of introducing side bars.
+    fov: 29.5,
     near: 0.1,
     far: 180,
-    position: Object.freeze([0, 6.0, 24.5]),
-    target: Object.freeze([0, 3.9, 0]),
+    position: Object.freeze([0, 6.0, 23.8]),
+    target: Object.freeze([0, 3.95, 0]),
+    responsiveFraming: Object.freeze({
+      referenceAspect: 16 / 9,
+      maxNarrowFov: 39,
+    }),
     dynamicAirTracking: Object.freeze({
       enterHeight: 7.4,
       exitHeight: 6.8,
