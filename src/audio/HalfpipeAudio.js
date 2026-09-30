@@ -1,6 +1,7 @@
 import { AudioBus, clampAudioVolume } from './AudioBus.js';
 import { createAudioManifest } from './AudioManifest.js';
 import { SkateAudio } from './SkateAudio.js';
+import { ARCADE_FEEDBACK } from '../vfx/ArcadeFeedbackTuning.js';
 
 const DEFAULT_VOLUMES = Object.freeze({
   master: 0.8,
@@ -160,6 +161,8 @@ export class HalfpipeAudio {
     this.lastComboMultiplier = 1;
     this.timerWarningsPlayed = new Set();
     this.lastRemaining = null;
+    this.severeCrashTriggered = false;
+    this.sirenVoice = null;
   }
 
   get isReady() {
@@ -900,6 +903,10 @@ export class HalfpipeAudio {
 
   _sessionEndCue() {
     if (!this._allowed('session-end', 1)) return;
+    if (this.severeCrashTriggered) {
+      this.stopMusic({ fadeSeconds: 0.18 });
+      return;
+    }
 
     this._assetOr('sfx.sessionEnd', () => {
       this._tone({
@@ -983,6 +990,15 @@ export class HalfpipeAudio {
       case 'CRASH':
         this._bailCue(event);
         break;
+      case 'HEAD_FIRST_CRASH':
+        if (!this.severeCrashTriggered) {
+          this.severeCrashTriggered = true;
+          this._bailCue(event);
+          this.stopMusic({ fadeSeconds: 0.18 });
+          this.skate?.setPaused(true);
+          this.startSevereCrashSiren();
+        }
+        break;
       case 'COMBO_CHANGED':
         this._comboCue(event);
         break;
@@ -1007,14 +1023,64 @@ export class HalfpipeAudio {
   setPaused(paused) {
     this.paused = Boolean(paused);
     this.skate?.setPaused(this.paused);
+    if (this.paused) this.stopSevereCrashSiren();
     return this.paused;
+  }
+
+  startSevereCrashSiren() {
+    if (!this.isReady || this.sirenVoice) return false;
+    const context = this.context;
+    const start = context.currentTime + ARCADE_FEEDBACK.sirenDelay;
+    const end = start + ARCADE_FEEDBACK.sirenDuration;
+    const source = context.createOscillator();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    source.type = 'triangle';
+    filter.type = 'lowpass';
+    filter.frequency.value = 2200;
+    filter.Q.value = 0.5;
+    source.frequency.setValueAtTime(610, start);
+    // One synthesized emergency voice. Frequency automation supplies the
+    // alternating ambulance wail without stacked samples or per-frame nodes.
+    for (let at = start, high = true; at < end; at += 0.34, high = !high) {
+      source.frequency.linearRampToValueAtTime(high ? 930 : 610, Math.min(end, at + 0.34));
+    }
+    gain.gain.setValueAtTime(0, context.currentTime);
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(ARCADE_FEEDBACK.sirenGain, start + 0.12);
+    gain.gain.setValueAtTime(ARCADE_FEEDBACK.sirenGain, end - ARCADE_FEEDBACK.sirenFade);
+    gain.gain.linearRampToValueAtTime(0, end);
+    source.connect(filter).connect(gain).connect(this.buses.SFX.gain);
+    const voice = { source, filter, gain };
+    this.sirenVoice = voice;
+    source.addEventListener('ended', () => {
+      try { source.disconnect(); } catch {}
+      try { filter.disconnect(); } catch {}
+      try { gain.disconnect(); } catch {}
+      if (this.sirenVoice === voice) this.sirenVoice = null;
+    }, { once: true });
+    source.start(start);
+    source.stop(end + 0.02);
+    return true;
+  }
+
+  stopSevereCrashSiren({ fadeSeconds = ARCADE_FEEDBACK.sirenFade } = {}) {
+    const voice = this.sirenVoice;
+    if (!voice || !this.context) return;
+    this.sirenVoice = null;
+    const now = this.context.currentTime;
+    const fade = Math.max(0.01, Math.min(0.6, Number(fadeSeconds) || 0.01));
+    voice.gain.gain.cancelScheduledValues(now);
+    voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+    voice.gain.gain.linearRampToValueAtTime(0, now + fade);
+    try { voice.source.stop(now + fade + 0.01); } catch {}
   }
 
   update(state = {}, dt = 1 / 60) {
     if (this.disposed) return;
 
     if (this.isReady) {
-      this.skate?.setPaused(this.paused);
+      this.skate?.setPaused(this.paused || this.severeCrashTriggered || state.severeCrash);
       this.skate?.update(state, dt);
     }
 
@@ -1218,6 +1284,8 @@ export class HalfpipeAudio {
   }
 
   resetSessionAudioState() {
+    this.stopSevereCrashSiren();
+    this.severeCrashTriggered = false;
     this.lastComboMultiplier = 1;
     this.timerWarningsPlayed.clear();
     this.lastRemaining = null;
@@ -1226,6 +1294,7 @@ export class HalfpipeAudio {
 
   async dispose() {
     if (this.disposed) return;
+    this.stopSevereCrashSiren({ fadeSeconds: 0.01 });
     this.disposed = true;
 
     this.skate?.dispose();

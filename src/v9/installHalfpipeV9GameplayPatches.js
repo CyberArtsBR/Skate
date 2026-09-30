@@ -1,5 +1,6 @@
 import { HalfpipeSimulation } from '../halfpipe/HalfpipeSimulation.js';
 import { PHASE4_GAMEPLAY_CONFIG } from '../gameplay/phase4GameplayConfig.js';
+import { applyPumpRecovery, resetPumpRecovery } from '../gameplay/HalfpipePumpRecovery.js';
 
 const INSTALLED = Symbol.for('chimpions.halfpipe.v9.gameplay-patches');
 
@@ -120,6 +121,7 @@ export function installHalfpipeV9GameplayPatches() {
     this.state.airEntrySurfaceSpeed = 0;
     this.state.lastPumpImpulse = 0;
     this.state.pumpBoosts = 0;
+    resetPumpRecovery(this);
     return this.snapshot();
   };
 
@@ -133,12 +135,6 @@ export function installHalfpipeV9GameplayPatches() {
         this._v9KickTurnBufferRemaining,
         PHASE4_GAMEPLAY_CONFIG.surfaceTricks.kickTurnBufferSeconds,
       );
-
-      if (this.state?.mode === 'airborne' && this.state?.backflipAttempted) {
-        emitRejected(this, 'aerial-turn', 'TRICK_ALREADY_ACTIVE', {
-          attempt: this._v9KickTurnAttemptSerial,
-        });
-      }
     }
     return next;
   };
@@ -154,9 +150,7 @@ export function installHalfpipeV9GameplayPatches() {
     const previous = this.backflipHeld;
     const next = originalSetBackflipHeld.call(this, held);
     if (next && !previous) {
-      if (this.state?.mode === 'airborne' && this.state?.airTurnAttempted) {
-        emitRejected(this, 'backflip', 'TRICK_ALREADY_ACTIVE');
-      } else if (this.state?.surfaceTrickActive) {
+      if (this.state?.surfaceTrickActive) {
         emitRejected(this, 'backflip', 'TRICK_ALREADY_ACTIVE');
       }
     }
@@ -300,14 +294,17 @@ export function installHalfpipeV9GameplayPatches() {
   };
 
   proto.stepFixed = function stepFixedV9() {
+    if (this.state.severeCrash) return originalStepFixed.call(this);
     const beforeHandPlantBuffer = Number(this.handPlantBufferRemaining) || 0;
     const beforeKickTurnBuffer = Number(this._v9KickTurnBufferRemaining) || 0;
-    const beforePumpAttempts = Number(this.state?.pumpAttempts) || 0;
     const wasKickTurnActive = Boolean(
       this.state?.surfaceTrickActive && this.state?.surfaceTrickType === 'kick-turn',
     );
 
     originalStepFixed.call(this);
+    // A first-contact hook can promote this very airborne substep to severe
+    // crash. Do not process buffered trick failures or pump rewards afterward.
+    if (this.state.severeCrash) return this.snapshot();
 
     const dt = this.fixedDt;
     applyV9AirRateDelta(this, dt);
@@ -361,97 +358,7 @@ export function installHalfpipeV9GameplayPatches() {
       }
     }
 
-    const recovery = PHASE4_GAMEPLAY_CONFIG.pumping.lowEnergyRecovery;
-    const rating = String(this.state.pumpRating || '').toUpperCase();
-    const ratingWeight = {
-      PERFECT: 1,
-      GOOD: 0.82,
-      WEAK: 0.58,
-      EARLY: 0.34,
-      LATE: 0.34,
-    }[rating] || 0;
-    const correctPump = Boolean(
-      this.state.mode === 'contact'
-      && !this.state.surfaceTrickActive
-      && this.state.pumpIntent !== 0
-      && this.state.pumpIntent === this.state.pumpDesiredIntent
-      && ratingWeight > 0
-    );
-
-    this.state.lastPumpImpulse = 0;
-
-    let speed = Math.abs(Number(this.state.tangentVelocity) || 0);
-    const pumpAttemptedThisStep = (
-      Number(this.state.pumpAttempts) || 0
-    ) > beforePumpAttempts;
-    const rewardTargetSpeed = Math.max(
-      recovery.referenceSpeed,
-      Number(recovery.rewardTargetSpeed) || recovery.referenceSpeed,
-    );
-    const baseImpulse = Math.max(
-      0,
-      Number(recovery.attemptImpulseByRating?.[rating]) || 0,
-    );
-
-    if (
-      pumpAttemptedThisStep
-      && correctPump
-      && baseImpulse > 0
-      && speed >= recovery.minimumSpeed
-      && speed < rewardTargetSpeed
-    ) {
-      const deficit = clamp01(1 - speed / rewardTargetSpeed);
-      const minimumScale = clamp01(recovery.minimumImpulseScale);
-      const impulseScale = minimumScale + (1 - minimumScale) * deficit;
-      const requestedImpulse = baseImpulse * impulseScale;
-      const impulse = Math.min(
-        requestedImpulse,
-        Math.max(0, rewardTargetSpeed - speed),
-      );
-      const direction = Math.sign(this.state.tangentVelocity)
-        || Math.sign(this.state.pumpDesiredIntent)
-        || 1;
-      const speedBeforeImpulse = speed;
-
-      this.state.tangentVelocity += impulse * direction;
-      speed = Math.abs(Number(this.state.tangentVelocity) || 0);
-      const impulseWork = Math.max(
-        0,
-        0.5 * (speed * speed - speedBeforeImpulse * speedBeforeImpulse),
-      );
-      this.state.lastPumpImpulse = impulse;
-      this.state.pumpBoosts = (Number(this.state.pumpBoosts) || 0) + 1;
-      this.state.lastPumpWork += impulseWork;
-      this.state.pumpWorkTotal += impulseWork;
-      this.state.pumpActive = true;
-      this._emit('PUMP_BOOST', {
-        rating,
-        impulse,
-        speedBefore: speedBeforeImpulse,
-        speedAfter: speed,
-        boosts: this.state.pumpBoosts,
-      });
-      this._refreshDerivedState();
-    }
-
-    if (
-      correctPump
-      && speed >= recovery.minimumSpeed
-      && speed < recovery.referenceSpeed
-    ) {
-      const deficit = clamp01(1 - speed / recovery.referenceSpeed);
-      const direction = Math.sign(this.state.tangentVelocity)
-        || Math.sign(this.state.pumpDesiredIntent)
-        || 1;
-      const assistAcceleration = recovery.acceleration * ratingWeight * deficit;
-      const velocityDelta = assistAcceleration * dt * direction;
-      this.state.tangentVelocity += velocityDelta;
-      this.state.tangentialAcceleration += assistAcceleration * direction;
-      const assistWork = Math.max(0, assistAcceleration * Math.max(speed, 0.1) * dt);
-      this.state.lastPumpWork += assistWork;
-      this.state.pumpWorkTotal += assistWork;
-      this._refreshDerivedState();
-    }
+    applyPumpRecovery(this, dt);
 
     return this.snapshot();
   };

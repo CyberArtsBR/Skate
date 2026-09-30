@@ -15,6 +15,16 @@ export function repetitionMultiplier(repeatCount) {
 }
 
 export function scoreRangeForTrick(scoringConfig, type) {
+  const combined = /^aerial-(180|360|540|720)-(backflip|double-backflip)$/.exec(String(type || ''));
+  if (combined) {
+    const aerial = scoreRangeForTrick(scoringConfig, 'aerial-' + combined[1]);
+    const flip = scoreRangeForTrick(scoringConfig, combined[2]);
+    const difficulty = Math.max(1, Number(scoringConfig.airCombinationMultiplier) || 1.1);
+    return {
+      min: Math.round((aerial.min + flip.min) * difficulty),
+      max: Math.round((aerial.max + flip.max) * difficulty),
+    };
+  }
   if (type === 'kick-turn') return scoringConfig.kickTurn;
   if (type === 'hand-plant') return scoringConfig.handPlant;
   if (type === 'backflip') return scoringConfig.backflip || scoringConfig.aerialTurn;
@@ -45,6 +55,9 @@ export function describeTrickScore(config, state, event, flowMultiplier = 1) {
     rotationDegrees: /backflip/.test(event.trick)
       ? Math.abs(Number(state.backflipRotationDegrees) || 0)
       : Math.abs(Number(state.airRotationDegrees) || 0),
+    aerialRotationDegrees: Math.abs(Number(state.airRotationDegrees) || 0),
+    backflipRotationDegrees: Math.abs(Number(state.backflipRotationDegrees) || 0),
+    combinedTrick: /^aerial-\d+-(?:double-)?backflip$/.test(event.trick),
     landingMultiplier: Number(event.landingScoreMultiplier) || 1,
     comboMultiplier: Number(event.comboMultiplier) || 1,
     varietyMultiplier: Number(event.varietyMultiplier) || 1,

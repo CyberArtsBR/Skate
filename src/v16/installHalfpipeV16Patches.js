@@ -157,7 +157,10 @@ function patchRiderBackflipAxis() {
     const trickType = nextState.trickType ?? current.trickType;
     const isBackflip = airborne && trickType === 'backflip';
     const facingYaw = Number(nextState.facingYaw ?? current.facingYaw) || 0;
-    const facingSign = Math.cos(facingYaw) < 0 ? -1 : 1;
+    // Use the launch facing for the flip axis. Continuous aerial yaw can cross
+    // 90 degrees mid-flip; switching sign there would reverse the whole pose.
+    const flipFacingYaw = Number(nextState.flipLaunchFacingYaw ?? current.flipLaunchFacingYaw ?? facingYaw);
+    const facingSign = Math.cos(isBackflip ? flipFacingYaw : facingYaw) < 0 ? -1 : 1;
     const incomingRoll = Number(nextState.trickRoll ?? current.trickRoll) || 0;
 
     const patchedState = isBackflip

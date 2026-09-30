@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ImpactVFX } from './ImpactVFX.js';
 import { SpeedTrailVFX } from './SpeedTrailVFX.js';
 import { quality } from '../graphics/RenderQualityManager.js';
+import { ARCADE_FEEDBACK } from './ArcadeFeedbackTuning.js';
 
 const LANDING_IMPACTS = Object.freeze({
   PERFECT: Object.freeze({ strength: 0.005, duration: 0.08 }),
@@ -10,6 +11,8 @@ const LANDING_IMPACTS = Object.freeze({
   HEAVY: Object.freeze({ strength: 0.105, duration: 0.22 }),
   BAIL: Object.freeze({ strength: 0.19, duration: 0.32 }),
 });
+const TRAIL_OBJECT_KEYS = Object.freeze(['velocity', 'boardQuaternion', 'trickType']);
+const TRAIL_NUMBER_KEYS = Object.freeze(['speedRatio', 'backflipRotationDegrees', 'aerialRotationDegrees']);
 
 function ratingOf(event, fallback = 'CLEAN') {
   return String(event?.rating || event?.quality || fallback).trim().toUpperCase();
@@ -51,7 +54,17 @@ export class HalfpipeVFX {
       verticalVelocity: 0,
       height: 0,
       airborne: false,
+      velocity: null,
+      speedRatio: 0,
+      boardQuaternion: null,
+      backflipRotationDegrees: 0,
+      aerialRotationDegrees: 0,
+      trickType: '',
+      aerialBackflip: false,
+      severeCrash: false,
     };
+    this.severeCrashActive = false;
+    this._carveAccumulator = 0;
     this._unsubscribeQuality = quality.subscribe(({ vfxScale }) => this.setScale(vfxScale));
   }
 
@@ -142,10 +155,21 @@ export class HalfpipeVFX {
       }
 
       case 'BAIL': {
+        if (this.severeCrashActive) break;
         if (position) {
           this.impact.crash({ position, velocity });
         }
         cameraImpact = LANDING_IMPACTS.BAIL;
+        break;
+      }
+
+      case 'HEAD_FIRST_CRASH': {
+        if (this.severeCrashActive) break;
+        this.severeCrashActive = true;
+        if (position) this.impact.severeCrash({
+          position, velocity, normal, impactSpeed: event.impactSpeed,
+        });
+        cameraImpact = { strength: 0.24, duration: 0.3 };
         break;
       }
 
@@ -189,9 +213,53 @@ export class HalfpipeVFX {
       this.lastAirState.verticalVelocity = Number(riderState.verticalVelocity) || 0;
       this.lastAirState.height = Number(riderState.height ?? riderState.y) || 0;
       this.lastAirState.airborne = Boolean(riderState.airborne);
+      for (const key of TRAIL_OBJECT_KEYS) {
+        this.lastAirState[key] = riderState[key] ?? null;
+      }
+      for (const key of TRAIL_NUMBER_KEYS) {
+        this.lastAirState[key] = Number(riderState[key]) || 0;
+      }
+      this.lastAirState.aerialBackflip = Boolean(riderState.aerialBackflip);
+      this.lastAirState.severeCrash = Boolean(riderState.severeCrash || this.severeCrashActive);
+
+      const turn = Math.abs(Number(riderState.turnAmount) || 0);
+      const speedRatio = this.lastAirState.speedRatio;
+      if (
+        !this.lastAirState.airborne && !this.lastAirState.severeCrash
+        && speedRatio > ARCADE_FEEDBACK.carveMinSpeedRatio
+        && turn > ARCADE_FEEDBACK.carveMinTurn
+      ) {
+        this._carveAccumulator += step;
+        const interval = 1 / (ARCADE_FEEDBACK.carveEmissionRate * this.vfxScale);
+        if (this._carveAccumulator >= interval) {
+          this._carveAccumulator %= interval;
+          this.impact.carve({
+            position: riderState.contactPosition || this.lastAirState.position,
+            velocity: riderState.velocity,
+            normal: riderState.normal || riderState.surfaceNormal,
+            intensity: THREE.MathUtils.clamp(
+              speedRatio * turn * Math.min(1.25, Number(riderState.contactForce) || 1), 0, 1,
+            ),
+          });
+        }
+      } else this._carveAccumulator = 0;
     }
 
     this.speedTrail.update(step, this.lastAirState);
+  }
+
+  onEvent(event) {
+    return this.handleEvent(event);
+  }
+
+  reset() {
+    this.impact.reset();
+    this.speedTrail.reset();
+    this.severeCrashActive = false;
+    this._carveAccumulator = 0;
+    this.lastAirState.airborne = false;
+    this.lastAirState.severeCrash = false;
+    this.lastAirState.speedRatio = 0;
   }
 
   dispose() {

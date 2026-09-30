@@ -11,7 +11,8 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     uphillScale: 1.35,
   }),
   pumping: Object.freeze({
-    acceleration: 8.2,
+    acceleration: 9.6,
+    inputBufferSeconds: 0.15,
     wrongPenaltyAcceleration: 0.9,
     ratingMultipliers: Object.freeze({
       PERFECT: 1.0,
@@ -27,25 +28,27 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     rhythmBoostPenalty: 0.02,
     rhythmBoostMax: 0.085,
     lowEnergyRecovery: Object.freeze({
-      // V15 makes a successful low-energy pump produce a real increase in
-      // kinetic energy instead of asking a tiny frame-by-frame assist to fight
-      // gravity and drag. Continuous assist still smooths the recovery between
-      // successful pump beats, while the per-attempt impulse guarantees that a
-      // PERFECT/GOOD timing event is felt on the very next passage.
-      referenceSpeed: 8.0,
-      minimumSpeed: 0.02,
+      // All recovery work requires a correctly directed player pump. Budget
+      // the extra kinetic energy per surface phase, not per button press.
+      referenceSpeed: 10.0,
+      minimumSpeed: 0,
+      minRecoverableSpeed: 0.35,
       acceleration: 6.0,
-      rewardTargetSpeed: 12.0,
+      lowSpeedPumpMultiplier: 1.65,
+      maxPumpBonus: 6.0,
+      maxWindowWork: 24.0,
+      pumpCooldownSeconds: 0.32,
+      rewardTargetSpeed: 13.0,
       minimumImpulseScale: 0.35,
       attemptImpulseByRating: Object.freeze({
         PERFECT: 1.4,
         GOOD: 0.95,
         WEAK: 0.35,
-        EARLY: 0,
-        LATE: 0,
+        EARLY: 0.45,
+        LATE: 0.45,
         WRONG: 0,
       }),
-      eligibleRatings: Object.freeze(['PERFECT', 'GOOD', 'WEAK']),
+      eligibleRatings: Object.freeze(['PERFECT', 'GOOD', 'WEAK', 'EARLY', 'LATE']),
     }),
   }),
   aerial: Object.freeze({
@@ -96,6 +99,10 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     technicalBounceSpeed: 2.4,
   }),
   surfaceTricks: Object.freeze({
+    handPlantEligibilityFraction: 0.955,
+    handPlantInputBufferSeconds: 0.32,
+    handPlantMaxCopingDistance: 0.27,
+    handPlantMinimumEntrySpeed: 0.4,
     handPlantMinimumHoldSeconds: 1 / 120,
     handPlantIdealHoldSeconds: 0.28,
     handPlantMaximumQualityHoldSeconds: 0.52,

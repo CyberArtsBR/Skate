@@ -80,6 +80,9 @@ export class ResultsScreen {
 
   show(stats = {}) {
     const normalized = normalizeResultsStats(stats);
+    this.root.classList.toggle('is-game-over', Boolean(stats.severeCrash));
+    this.root.querySelector('.menu-eyebrow').textContent = stats.severeCrash ? 'HEAD FIRST · RUN OVER' : 'RUN COMPLETE';
+    this.root.querySelector('h1').textContent = stats.severeCrash ? 'GAME OVER' : 'RESULTS';
     this.grid.innerHTML = STAT_ROWS.map(([key, label]) => (
       '<div class="result-stat" data-stat="' + key + '"><span>' + label + '</span><strong>'
       + escapeText(key === 'finalScore' ? normalized[key].toLocaleString('en-US') : normalized[key]) + '</strong></div>'

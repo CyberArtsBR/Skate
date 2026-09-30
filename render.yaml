@@ -3,6 +3,6 @@ services:
     name: chimpions-halfpipe
     runtime: static
     branch: main
-    buildCommand: npm ci && npm run check:release
+    buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     autoDeployTrigger: commit

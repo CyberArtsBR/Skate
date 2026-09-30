@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 const HIDDEN_SCALE = 0.00001;
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 function finite(value, fallback = 0) {
   const numeric = Number(value);
@@ -65,6 +66,7 @@ export class ParticlePool {
 
     this._scratch = new THREE.Object3D();
     this._scratchScale = new THREE.Vector3();
+    this._scratchRotation = new THREE.Quaternion();
     this._states = Array.from({ length: this.capacity }, () => ({
       active: false,
       age: 0,
@@ -79,6 +81,7 @@ export class ParticlePool {
       position: new THREE.Vector3(),
       velocity: new THREE.Vector3(),
       color: new THREE.Color(0xffffff),
+      quaternion: new THREE.Quaternion(),
     }));
 
     for (let index = 0; index < this.capacity; index += 1) {
@@ -101,6 +104,7 @@ export class ParticlePool {
     rotation = 0,
     angularVelocity = 0,
     color = 0xffffff,
+    quaternion = null,
   } = {}) {
     if (this.disposed) return false;
 
@@ -119,6 +123,9 @@ export class ParticlePool {
     setVector(state.position, position);
     setVector(state.velocity, velocity);
     state.color.set(color);
+    if (quaternion?.isQuaternion) state.quaternion.copy(quaternion);
+    else if (Array.isArray(quaternion)) state.quaternion.fromArray(quaternion);
+    else state.quaternion.identity();
 
     this._writeInstance(index, state, 0);
     this.mesh.instanceMatrix.needsUpdate = true;
@@ -198,10 +205,13 @@ export class ParticlePool {
       this._scratch.rotation.set(
         0,
         0,
-        Math.atan2(state.velocity.y, state.velocity.x) - Math.PI * 0.5,
+        Math.atan2(state.velocity.y, state.velocity.x),
       );
     } else {
-      this._scratch.rotation.set(0, 0, state.rotation);
+      this._scratch.quaternion.copy(state.quaternion);
+      if (state.rotation) this._scratch.quaternion.multiply(
+        this._scratchRotation.setFromAxisAngle(Z_AXIS, state.rotation),
+      );
     }
     this._scratchScale.set(
       Math.max(HIDDEN_SCALE, size * state.aspect),

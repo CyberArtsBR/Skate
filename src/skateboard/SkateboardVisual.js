@@ -4,6 +4,7 @@ import { GAME_CONFIG } from '../config/gameConfig.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
 import { SkateboardAssetAdapter } from './SkateboardAssetAdapter.js';
 import { SkateboardRig } from './SkateboardRig.js';
+import { ARCADE_FEEDBACK } from '../vfx/ArcadeFeedbackTuning.js';
 
 export const SKATEBOARD_COORDINATE_SYSTEM = Object.freeze({
   forwardAxis: '+X',
@@ -78,6 +79,8 @@ export class SkateboardVisual {
     this.deckColorMaterials = null;
     this.deckColorOriginals = null;
     this.deckColor = null;
+    this.wheelGlowMaterials = [];
+    this.wheelGlowAmount = 0;
   }
 
   async load() {
@@ -174,6 +177,7 @@ export class SkateboardVisual {
     this.rearLeft = wheelRefs.rearLeft;
     this.rearRight = wheelRefs.rearRight;
     this.wheels = this.wheelRig.list().map((wheel) => wheel.mesh);
+    this._prepareWheelGlowMaterials();
     this.wheelSpinSafe = (
       audit.semanticWheelCount === 4
       && audit.wheelAxisVerified
@@ -237,6 +241,54 @@ export class SkateboardVisual {
     this.deckColorOriginals = this.deckColorMaterials.map((material) => (
       material?.color?.clone?.() || null
     ));
+  }
+
+  _prepareWheelGlowMaterials() {
+    for (const wheel of this.wheels) {
+      const source = Array.isArray(wheel.material) ? wheel.material : [wheel.material];
+      const materials = source.map(material => {
+        if (!material?.emissive) return material;
+        // Wheels share GLB materials with other board parts. Clone only these
+        // four mesh slots so changing emissive cannot light the trucks/deck.
+        const owned = material.clone();
+        owned.name = `${material.name || 'wheel'}-speed-feedback`;
+        this.wheelGlowMaterials.push({
+          material: owned,
+          emissive: owned.emissive.clone(),
+          intensity: Number(owned.emissiveIntensity) || 0,
+        });
+        return owned;
+      });
+      wheel.material = Array.isArray(wheel.material) ? materials : materials[0];
+    }
+    this._wheelGlowColor = new THREE.Color(ARCADE_FEEDBACK.wheelGlowColor);
+  }
+
+  setSpeedGlow(speedRatio, dt = 1 / 60) {
+    const ratio = THREE.MathUtils.clamp(Number(speedRatio) || 0, 0, 1);
+    const target = THREE.MathUtils.smoothstep(
+      ratio, ARCADE_FEEDBACK.wheelGlowStart, ARCADE_FEEDBACK.wheelGlowFull,
+    );
+    const step = THREE.MathUtils.clamp(Number(dt) || 0, 0, 0.1);
+    const blend = 1 - Math.exp(-ARCADE_FEEDBACK.wheelGlowResponse * step);
+    this.wheelGlowAmount += (target - this.wheelGlowAmount) * blend;
+    for (const entry of this.wheelGlowMaterials) {
+      entry.material.emissive.copy(entry.emissive).lerp(this._wheelGlowColor, this.wheelGlowAmount);
+      entry.material.emissiveIntensity = entry.intensity
+        + ARCADE_FEEDBACK.wheelGlowIntensity * this.wheelGlowAmount;
+    }
+    this.root.userData.speedRatio = ratio;
+    this.root.userData.wheelGlowAmount = this.wheelGlowAmount;
+    return this.wheelGlowAmount;
+  }
+
+  resetSpeedGlow() {
+    this.wheelGlowAmount = 0;
+    for (const entry of this.wheelGlowMaterials) {
+      entry.material.emissive.copy(entry.emissive);
+      entry.material.emissiveIntensity = entry.intensity;
+    }
+    this.root.userData.wheelGlowAmount = 0;
   }
 
   setDeckColor(color = null) {

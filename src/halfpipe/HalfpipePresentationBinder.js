@@ -23,6 +23,8 @@ export class HalfpipePresentationBinder {
     this.lastContactRootOffset = new THREE.Vector3();
     this._visualNormal = new THREE.Vector3();
     this._visualBase = new THREE.Vector3();
+    rider.rampProfile = profile;
+    rider.rampVisual = visualSurface;
   }
 
   _resolveContact(sample, normalVector, angle) {
@@ -108,6 +110,10 @@ export class HalfpipePresentationBinder {
       ...this.rider.presentationState,
       ...nextState,
     });
+    if (state.trickType === 'hand-plant') {
+      const coping = this.visualSurface?.getCopingContactPoint?.(state.wallSide, 0);
+      if (coping) state.copingWorldPoint = { x: coping.x, y: coping.y, z: coping.z };
+    }
     const sample = this.profile.sample(state.pipeX);
     tangent.copy(sample.tangent);
     normal.copy(sample.normal);

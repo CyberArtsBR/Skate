@@ -215,6 +215,12 @@ export function simulationToPresentationState(profile, simulationState) {
     trickProgress = segment;
     trickVisualActive = flipDegrees > 0;
     trickType = 'backflip';
+    // Yaw and flip are independent channels of the same airborne maneuver.
+    // Keep the flip pose/pivot used by the existing rig while also showing
+    // the player's actual aerial rotation; starting a flip never erases it.
+    if (simulationState.airTurnAttempted) {
+      facingYaw += THREE.MathUtils.degToRad(Number(simulationState.airRotationSignedDegrees) || 0);
+    }
   } else if (
     airborne
     && (
@@ -336,7 +342,11 @@ export function simulationToPresentationState(profile, simulationState) {
     preloadCompression,
     airHeight,
     airTuck,
-    footIKWeight: airborne ? 0.3 + landingAnticipation * 0.6 : 1,
+    footIKWeight: 1,
+    aerialBackflip: Boolean(simulationState.airTurnAttempted && simulationState.backflipAttempted),
+    flipLaunchFacingYaw: finalFacingYaw,
+    airRotationDegrees: Number(simulationState.airRotationDegrees) || 0,
+    backflipRotationDegrees: Number(simulationState.backflipRotationDegrees) || 0,
     secondaryLag: 0,
     copingWorldPoint: {
       x: Number(copingSample?.x ?? copingX),

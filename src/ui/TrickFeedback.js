@@ -34,7 +34,8 @@ export class TrickFeedback {
     if (breakdown?.varietyMultiplier < 1) details.push('REPEAT ×' + trimMultiplier(breakdown.varietyMultiplier));
     else if (breakdown?.quality >= 0.9) details.push('GREAT EXECUTION');
     const detailLabel = details.length ? '<small>' + escapeText(details.join(' · ')) + '</small>' : '';
-    this._show(this.trick, label + pointsLabel + detailLabel, duration, 'is-trick');
+    this._show(this.trick, '<strong class="trick-award-name">' + label + '</strong>'
+      + pointsLabel + detailLabel, duration, 'is-trick');
   }
 
   showLanding(result, {
@@ -129,6 +130,8 @@ export class TrickFeedback {
 
 export function formatTrickName(name) {
   return String(name || '')
+    .replace(/^aerial-(\d+)-(double-)?backflip$/, (_, rotation, double) =>
+      'AERIAL ' + rotation + '° + ' + (double ? 'DOUBLE ' : '') + 'BACKFLIP')
     .replace(/[-_]+/g, ' ')
     .trim()
     .toUpperCase();

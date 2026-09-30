@@ -92,6 +92,7 @@ export const GAME_CONFIG = Object.freeze({
     aerial900: Object.freeze({ min: 2800, max: 4000 }),
     backflip: Object.freeze({ min: 1600, max: 2400 }),
     doubleBackflip: Object.freeze({ min: 3200, max: 5000 }),
+    airCombinationMultiplier: 1.1,
     aerialTurn: Object.freeze({ min: 400, max: 999 }),
   }),
   trickPresentation: Object.freeze({

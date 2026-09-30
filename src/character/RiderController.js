@@ -6,6 +6,7 @@ import { SkatePoseController } from './SkatePoseController.js';
 import { SkateAnimationController } from './SkateAnimationController.js';
 import { TrickPoseController } from './TrickPoseController.js';
 import { HandPlantIK } from './HandPlantIK.js';
+import { correctHandPlantClearance } from './HandPlantClearance.js';
 
 export class RiderController {
   constructor({ skateboard, chimpion }) {
@@ -61,6 +62,7 @@ export class RiderController {
   }
 
   _rebuildCharacterIK() {
+    this._handPlantClearanceState = null;
     this.smoothedPose = null;
     this.poseTime = null;
     const boardRotation = this.boardPivot.quaternion.clone();
@@ -170,23 +172,33 @@ export class RiderController {
 
     const footResult = this.footIK.update({ ...this.presentationState, kneeFlex: pose.kneeFlex });
     this.root.updateWorldMatrix(true, true);
+    const planting = this.presentationState.trickVisualActive
+      && this.presentationState.trickType === 'hand-plant';
+    if (planting) {
+      const incoming = this.presentationState.copingWorldPoint;
+      if (!this.plantContact || this.presentationState.trickProgress < (this.plantProgress ?? 0)) {
+        this.plantContact = incoming ? { ...incoming } : null;
+      }
+      this.plantProgress = this.presentationState.trickProgress;
+      this.presentationState.copingWorldPoint = this.plantContact;
+      this.root.userData.handPlantClearance = correctHandPlantClearance(this, this.presentationState);
+    } else {
+      this._handPlantClearanceState = null;
+      this.plantContact = null;
+      this.plantProgress = 0;
+      this.root.userData.handPlantClearance = null;
+    }
     const handResult = this.handPlantIK.update({
-      active: this.presentationState.trickVisualActive
-        && this.presentationState.trickType === 'hand-plant',
+      active: planting,
       progress: this.presentationState.trickProgress,
       side: this.presentationState.wallSide,
       copingWorldPoint: this.presentationState.copingWorldPoint,
       facingYaw: this.presentationState.facingYaw,
     });
     if (handResult.active && handResult.plantHandWorldPosition && handResult.plantTargetWorldPosition) {
-      // Anchor the whole visual maneuver to the planted wrist, keeping board
-      // and body together. This closes an unreachable arm without stretching
-      // bones or moving the authoritative contact root. Reach/release weights
-      // bring the board continuously into and out of the coping pivot.
-      const target = this.root.worldToLocal(handResult.plantTargetWorldPosition.clone());
-      const hand = this.root.worldToLocal(handResult.plantHandWorldPosition.clone());
-      this.trickCarrier.position.add(target.sub(hand).multiplyScalar(handResult.weight));
-      this.root.updateWorldMatrix(true, true);
+      // Clearance owns the shared body/deck placement. Pulling that assembly
+      // back to an unreachable wrist undid clearance and buried the head.
+      // The analytical arm solve preserves its lengths and the stored contact.
       const bone = this.chimpion.rigAdapter.rig[`${handResult.side}Hand`];
       bone.getWorldPosition(handResult.plantHandWorldPosition);
       handResult.error = handResult.plantHandWorldPosition.distanceTo(handResult.plantTargetWorldPosition);

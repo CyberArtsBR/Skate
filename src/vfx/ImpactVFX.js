@@ -41,6 +41,8 @@ export class ImpactVFX {
     this._normal = new THREE.Vector3(0, 1, 0);
     this._velocity = new THREE.Vector3();
     this._emitVelocity = new THREE.Vector3();
+    this._surfaceRotation = new THREE.Quaternion();
+    this._surfaceForward = new THREE.Vector3(0, 0, 1);
 
     this.dust = new ParticlePool(scene, {
       capacity: 42,
@@ -103,6 +105,18 @@ export class ImpactVFX {
     });
     this.flash.ownsGeometry = true;
     this.flash.ownsMaterial = true;
+
+    this.shockwave = new ParticlePool(scene, {
+      capacity: 3,
+      name: 'halfpipe-vfx-crash-shockwave',
+      geometry: new THREE.RingGeometry(0.84, 1, 32),
+      material: new THREE.MeshBasicMaterial({
+        color: 0xffd29a, transparent: true, opacity: 0.42,
+        depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+      }),
+    });
+    this.shockwave.ownsGeometry = true;
+    this.shockwave.ownsMaterial = true;
   }
 
   setReducedMotion(enabled) {
@@ -270,11 +284,69 @@ export class ImpactVFX {
     this.landing({ ...payload, rating: 'BAIL' });
   }
 
+  carve({ position, velocity, normal, intensity = 0.4 } = {}) {
+    const pos = setVector(this._position, position, DEFAULT_POSITION);
+    const vel = setVector(this._velocity, velocity, DEFAULT_POSITION);
+    const n = setVector(this._normal, normal, DEFAULT_NORMAL).normalize();
+    const strength = THREE.MathUtils.clamp(Number(intensity) || 0, 0, 1);
+    this._emitVelocity.copy(vel).multiplyScalar(-0.045).addScaledVector(n, 0.35);
+    this.dust.emit({
+      position: pos, velocity: this._emitVelocity,
+      lifetime: this.reducedMotion ? 0.11 : 0.2,
+      startSize: 0.045 + strength * 0.035, endSize: 0.11,
+      drag: 5, gravity: -2.4, color: 0xd8cfb9,
+    });
+    // Only the strongest loaded carve produces a tiny edge spark.
+    if (!this.reducedMotion && strength > 0.8) {
+      this._emitVelocity.addScaledVector(n, 0.8);
+      this.sparks.emit({
+        position: pos, velocity: this._emitVelocity,
+        lifetime: 0.09, startSize: 0.055, endSize: 0.008,
+        aspect: 2, drag: 4, gravity: -4, color: 0xffcb75,
+      });
+    }
+  }
+
+  severeCrash({ position, normal, velocity, impactSpeed = 12 } = {}) {
+    this.crash({ position, velocity });
+    const pos = setVector(this._position, position, DEFAULT_POSITION);
+    const n = setVector(this._normal, normal, DEFAULT_NORMAL).normalize();
+    if (n.lengthSq() < 0.5) n.set(0, 1, 0);
+    const strength = THREE.MathUtils.clamp((Number(impactSpeed) || 0) / 18, 0.25, 1);
+    this._surfaceRotation.setFromUnitVectors(this._surfaceForward, n);
+    pos.addScaledVector(n, 0.02);
+    this._emitVelocity.copy(n).multiplyScalar(0.08);
+    this.shockwave.emit({
+      position: pos, velocity: this._emitVelocity, quaternion: this._surfaceRotation,
+      lifetime: this.reducedMotion ? 0.16 : 0.34,
+      startSize: 0.1, endSize: this.reducedMotion ? 0.35 : 1.6 + strength * 0.7,
+      color: 0xffcb91,
+    });
+    const count = this.reducedMotion ? 2 : scaledCount(7, this.scale, 3);
+    for (let index = 0; index < count; index += 1) {
+      const angle = index * 2.399963;
+      this._emitVelocity.set(Math.cos(angle) * (1 + strength), 1.3 + index * 0.09, Math.sin(angle) * 0.6);
+      this._emitVelocity.addScaledVector(n, 0.6 + strength);
+      this.debris.emit({
+        position: pos, velocity: this._emitVelocity,
+        lifetime: 0.45 + (index % 3) * 0.07,
+        startSize: 0.5 + strength * 0.4, endSize: 0.2,
+        gravity: -9, drag: 0.7, angularVelocity: (index % 2 ? -1 : 1) * 9,
+        color: 0x9c8064,
+      });
+    }
+  }
+
+  reset() {
+    for (const pool of [this.dust, this.sparks, this.debris, this.flash, this.shockwave]) pool.clear();
+  }
+
   update(dt) {
     this.dust.update(dt);
     this.sparks.update(dt);
     this.debris.update(dt);
     this.flash.update(dt);
+    this.shockwave.update(dt);
   }
 
   dispose() {
@@ -282,5 +354,6 @@ export class ImpactVFX {
     this.sparks.dispose();
     this.debris.dispose();
     this.flash.dispose();
+    this.shockwave.dispose();
   }
 }

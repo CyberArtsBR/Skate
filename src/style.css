@@ -205,6 +205,25 @@ button:focus-visible {
 }
 
 .hud-trick-feedback > span { display: block; font-size: 1.15em; line-height: 1.05; }
+.trick-award-name {
+  display: block;
+  max-width: min(68vw, 620px);
+  line-height: 1.04;
+  color: #ffdf67;
+  letter-spacing: .025em;
+  transform: rotate(-3deg) skewX(-4deg);
+  -webkit-text-stroke: 2px #142a32;
+  text-shadow: 3px 4px 0 #ed6b32, 5px 6px 0 #142a32, -3px 5px 0 #42bbca;
+}
+.trick-award-name::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -.25em -.4em;
+  background: radial-gradient(ellipse at center, rgb(43 152 168 / 46%), transparent 68%);
+  pointer-events: none;
+}
+.results-screen.is-game-over h1 { color: #ffb068; }
 .hud-trick-feedback small {
   display: block;
   margin-top: 0.45em;

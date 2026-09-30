@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { solveTwoBone } from './TwoBoneIK.js';
+import { HANDPLANT_CLEARANCE as PLANT_TUNING } from '../gameplay/CrashPresentationTuning.js';
 
 const jointPosition = new THREE.Vector3();
 const effectorPosition = new THREE.Vector3();
@@ -10,6 +11,9 @@ const parentWorld = new THREE.Quaternion();
 const localDelta = new THREE.Quaternion();
 const axis = new THREE.Vector3();
 const fallbackTarget = new THREE.Vector3();
+const ELBOW_COPING_CLEARANCE = 0.16;
+const ELBOW_COPING_LIFT = 0.06;
+const SHOULDER_FOLLOW_LIMIT = 0.06;
 
 const clamp01 = (value) => THREE.MathUtils.clamp(Number(value) || 0, 0, 1);
 const smoothstep = (value) => {
@@ -88,7 +92,16 @@ export class HandPlantIK {
     for (const side of sides) {
       const hand = this.rigAdapter.rig[`${side}Hand`];
       if (!hand) continue;
-      const distance = hand.getWorldPosition(new THREE.Vector3()).distanceToSquared(target);
+      const upper = this.rigAdapter.rig[`${side}UpperArm`];
+      const elbow = this.rigAdapter.rig[`${side}Forearm`];
+      const wrist = hand.getWorldPosition(new THREE.Vector3());
+      const shoulder = upper?.getWorldPosition(new THREE.Vector3());
+      const joint = elbow?.getWorldPosition(new THREE.Vector3());
+      const reach = shoulder && joint ? shoulder.distanceTo(joint) + joint.distanceTo(wrist) : 0;
+      // Prefer a hand that can support the body with a small adjustment, not
+      // simply whichever wrist happens to sweep closest during the inversion.
+      const unreachable = shoulder ? Math.max(0, shoulder.distanceTo(target) - reach) : 0;
+      const distance = wrist.distanceToSquared(target) + unreachable * unreachable * 4;
       if (distance < bestDistance) {
         bestDistance = distance;
         best = side;
@@ -97,6 +110,28 @@ export class HandPlantIK {
 
     if (!Number.isFinite(bestDistance)) return Number(wallSide) < 0 ? 'left' : 'right';
     return best;
+  }
+
+  getReachConstraint({ copingWorldPoint = null, side = 0, progress = 0 } = {}) {
+    if (!this.rigAdapter || !this.riderRoot) return null;
+    const target = targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
+    this.riderRoot.updateWorldMatrix(true, true);
+    if (!this.selectedPlantHand) this.selectedPlantHand = this._selectSide(target, side);
+    const plantSide = this.selectedPlantHand;
+    if (!plantSide) return null;
+    const rig = this.rigAdapter.rig;
+    const upper = rig[`${plantSide}UpperArm`], lower = rig[`${plantSide}Forearm`], hand = rig[`${plantSide}Hand`];
+    if (!upper || !lower || !hand) return null;
+    const shoulder = upper.getWorldPosition(new THREE.Vector3());
+    const elbow = lower.getWorldPosition(new THREE.Vector3());
+    const wrist = hand.getWorldPosition(new THREE.Vector3());
+    const upperLength = shoulder.distanceTo(elbow), lowerLength = elbow.distanceTo(wrist);
+    const t = clamp01(progress);
+    const weight = smoothstep(t / PLANT_TUNING.enterEnd)
+      * (1 - smoothstep((t - PLANT_TUNING.releaseStart) / (1 - PLANT_TUNING.releaseStart)));
+    return { side: plantSide, target, shoulder, wrist,
+      minimum: Math.abs(upperLength - lowerLength) + 0.01,
+      maximum: Math.max(0.02, (upperLength + lowerLength) * 0.985), weight };
   }
 
   update({
@@ -125,8 +160,8 @@ export class HandPlantIK {
     // Reach the coping earlier, hold a true planted phase through the middle of
     // the maneuver, then release late. This produces a clear contact beat and
     // prevents the hand from visibly floating away while the body is inverted.
-    const reach = smoothstep(t / 0.26);
-    const release = t <= 0.84 ? 1 : 1 - smoothstep((t - 0.84) / 0.16);
+    const reach = smoothstep(t / PLANT_TUNING.enterEnd);
+    const release = 1 - smoothstep((t - PLANT_TUNING.releaseStart) / (1 - PLANT_TUNING.releaseStart));
     const weight = clamp01(reach * release);
 
     const target = targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
@@ -153,7 +188,11 @@ export class HandPlantIK {
     }
 
     const pole = forearm.getWorldPosition(new THREE.Vector3());
-    rotateJointToward(shoulder, hand, target, weight * 0.5, 0.095);
+    // Bend into the open interior rather than letting an inverted rest elbow
+    // choose a plane through the wall. This changes rotations, never lengths.
+    pole.x -= (Math.sign(side) || 1) * ELBOW_COPING_CLEARANCE * weight;
+    pole.y += ELBOW_COPING_LIFT * weight;
+    rotateJointToward(shoulder, hand, target, weight * 0.25, SHOULDER_FOLLOW_LIMIT);
     this.riderRoot.updateWorldMatrix(true, true);
     solveTwoBone(upperArm, forearm, hand, target, pole, weight);
 
@@ -165,6 +204,7 @@ export class HandPlantIK {
     this.result.weight = weight;
     this.result.error = Number.isFinite(error) ? error : 0;
     this.result.contactError = this.result.error;
+    this.result.degraded = weight > 0.98 && error > 0.035;
     this.result.plantHandWorldPosition = handWorld.clone();
     this.result.plantTargetWorldPosition = target.clone();
     return this.result;

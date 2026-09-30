@@ -4,6 +4,7 @@ import { GAME_CONFIG } from '../config/gameConfig.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
 import { quality } from '../graphics/RenderQualityManager.js';
 import { prepareRampSurfaceFinish } from '../graphics/RampSurfaceFinish.js';
+import { ARCADE_FEEDBACK } from '../vfx/ArcadeFeedbackTuning.js';
 
 const COPING_MATERIAL_NAME = 'Rail_Metal';
 
@@ -65,18 +66,28 @@ function createGlowMaterial(expansion, opacity) {
     uniforms: {
       uExpansion: { value: expansion },
       uOpacity: { value: opacity },
+      uColor: { value: new THREE.Color(ARCADE_FEEDBACK.copingGlowColor) },
     },
     vertexShader: `
       uniform float uExpansion;
+      varying vec3 vViewNormal;
+      varying vec3 vViewDirection;
       void main() {
         vec3 expanded = position + normalize(normal) * uExpansion;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(expanded, 1.0);
+        vec4 viewPosition = modelViewMatrix * vec4(expanded, 1.0);
+        vViewNormal = normalize(normalMatrix * normal);
+        vViewDirection = normalize(-viewPosition.xyz);
+        gl_Position = projectionMatrix * viewPosition;
       }
     `,
     fragmentShader: `
       uniform float uOpacity;
+      uniform vec3 uColor;
+      varying vec3 vViewNormal;
+      varying vec3 vViewDirection;
       void main() {
-        gl_FragColor = vec4(vec3(1.0), uOpacity);
+        float rim = pow(1.0 - abs(dot(normalize(vViewNormal), normalize(vViewDirection))), 1.6);
+        gl_FragColor = vec4(uColor, uOpacity * (0.18 + rim * 0.82));
       }
     `,
     transparent: true,
@@ -188,6 +199,7 @@ export class HalfpipeVisual {
     this.alignment = null;
     this._surfaceRaycaster = new THREE.Raycaster();
     this._unregisterQuality = null;
+    this.copingBounds = { left: new THREE.Box3(), right: new THREE.Box3() };
   }
 
   async load() {
@@ -255,7 +267,7 @@ export class HalfpipeVisual {
             const coping = material.clone();
             coping.name = `${material.name}-soft-emissive`;
             if (coping.emissive?.set) {
-              coping.emissive.set(0xffffff);
+              coping.emissive.setHex(ARCADE_FEEDBACK.copingEmissiveColor);
               coping.emissiveIntensity = GAME_CONFIG.renderer.copingGlow.emissiveIntensity;
             }
             coping.needsUpdate = true;
@@ -308,6 +320,7 @@ export class HalfpipeVisual {
     const box = visibleBounds(this.root);
     this.bounds.copy(box);
     this.ridingSurfaceBounds.copy(worldBounds(this.ridingSurface));
+    this._measureCopingContacts();
 
     const alignedRidingBoundsCenter = this.ridingSurfaceBounds.getCenter(new THREE.Vector3());
     this.alignment = Object.freeze({
@@ -351,6 +364,42 @@ export class HalfpipeVisual {
       point: hit.point.clone(),
       distance: hit.distance,
     };
+  }
+
+  _measureCopingContacts() {
+    this.copingBounds.left.makeEmpty();
+    this.copingBounds.right.makeEmpty();
+    const point = new THREE.Vector3();
+    this.model.traverse(object => {
+      if (!object.isMesh || !object.userData.copingContactZone || !object.geometry) return;
+      const geometry = object.geometry;
+      const positions = geometry.getAttribute('position');
+      if (!positions) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      const groups = geometry.groups.length ? geometry.groups : [{ start: 0, count: geometry.index?.count || positions.count, materialIndex: 0 }];
+      for (const group of groups) {
+        if (!String(materials[group.materialIndex]?.name || '').startsWith(COPING_MATERIAL_NAME)) continue;
+        const end = Math.min(group.start + group.count, geometry.index?.count || positions.count);
+        for (let vertex = group.start; vertex < end; vertex += 1) {
+          const index = geometry.index ? geometry.index.getX(vertex) : vertex;
+          point.fromBufferAttribute(positions, index).applyMatrix4(object.matrixWorld);
+          this.copingBounds[point.x < 0 ? 'left' : 'right'].expandByPoint(point);
+        }
+      }
+    });
+  }
+
+  getCopingContactPoint(side, z = 0) {
+    const right = Number(side) > 0 || side === 'right';
+    const box = this.copingBounds[right ? 'right' : 'left'];
+    if (box.isEmpty()) return null;
+    // Use the actual inner edge and top of the authored rail. The contact
+    // target remains on its span instead of an approximate physics lip.
+    return new THREE.Vector3(
+      right ? box.min.x : box.max.x,
+      box.max.y + 0.015,
+      THREE.MathUtils.clamp(Number(z) || 0, box.min.z, box.max.z),
+    );
   }
 
   dispose() {

@@ -29,7 +29,7 @@
     "check:static": "node --check src/main.js && node --check src/v9/bootstrap.js && node --check src/v9/installHalfpipeV9GameplayPatches.js && node --check src/v9/installHalfpipeV9EventPatches.js && node --check src/v9/installHalfpipeV9RuntimePatches.js && node --check src/v16/installHalfpipeV16Patches.js && node --check src/v18/bootstrap.js && node --check src/v18/installHalfpipeV18Patches.js && node --check tools/restore-halfpipe-title.mjs && node --check checks/v16-browser-regressions.mjs && node checks/foundation-invariants.mjs && node checks/phase4-contracts.mjs && node checks/release-contracts.mjs && node checks/phase4-integration.mjs",
     "check:browser:release": "node checks/browser-release-smoke.mjs",
     "check:release:browser": "node checks/run-npm-suite.mjs check:browser:release check:v16:browser check:browser check:visual-contact",
-    "check:release": "node checks/run-npm-suite.mjs check:static check:physics check:contact check:session check:controller check:camera check:tricks check:gameplay check:v9 check:v15 check:rigs check:character check:ui check:integration build",
+    "check:release": "node tools/run-release.mjs",
     "check:security": "npm audit --audit-level=high",
     "prebuild": "npm run verify:characters",
     "predev": "npm run verify:characters",
