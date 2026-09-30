@@ -30,6 +30,8 @@ export class HalfpipeHUD {
       '<pre class="hud-debug" data-debug hidden></pre>',
     ].join('');
     stage.append(this.root);
+    this.scoreElement = this.root.querySelector('[data-score]');
+    this.timeElement = this.root.querySelector('[data-time]');
 
     this.feedback = new TrickFeedback(this.root);
     this.setPlayerMode({ highContrast, uiScale, reducedMotion });
@@ -37,13 +39,16 @@ export class HalfpipeHUD {
   }
 
   setScore(score) {
-    this.root.querySelector('[data-score]').textContent = String(
-      Math.max(0, Math.round(Number(score) || 0)),
-    );
+    const label = Math.max(0, Math.round(Number(score) || 0)).toLocaleString('en-US');
+    if (this.scoreElement.textContent !== label) this.scoreElement.textContent = label;
   }
 
   setTime(time) {
-    this.root.querySelector('[data-time]').textContent = String(time);
+    const label = String(time);
+    if (this.timeElement.textContent !== label) this.timeElement.textContent = label;
+    const parts = label.split(':').map(Number);
+    const seconds = parts.length === 2 ? parts[0] * 60 + parts[1] : Number(label);
+    this.root.classList.toggle('is-time-low', seconds <= 10);
   }
 
   setCombo(multiplier = 1) {
@@ -51,6 +56,7 @@ export class HalfpipeHUD {
   }
 
   showTrick(name, points = 0, options = {}) {
+    this.lastScoreBreakdown = options.breakdown ? { ...options.breakdown } : null;
     this.feedback.showTrick(name, points, options);
   }
 
@@ -100,6 +106,7 @@ export class HalfpipeHUD {
   }
 
   clearFeedback() {
+    this.lastScoreBreakdown = null;
     this.feedback.clear();
   }
 

@@ -9,7 +9,7 @@ function smoothstep(value) {
   return t * t * (3 - 2 * t);
 }
 
-function createNoiseBuffer(context, seconds = 2) {
+function createNoiseBuffer(context, seconds = 4) {
   const length = Math.max(1, Math.floor(context.sampleRate * seconds));
   const buffer = context.createBuffer(1, length, context.sampleRate);
   const data = buffer.getChannelData(0);
@@ -32,6 +32,9 @@ export class SkateAudio {
     this.speedReference = Math.max(1, Number(speedReference) || 18);
     this.disposed = false;
     this.paused = false;
+    this.distance = 0;
+    this.previousSpeed = 0;
+    this.loopPhase = 0;
 
     this.noiseBuffer = createNoiseBuffer(context);
 
@@ -68,7 +71,8 @@ export class SkateAudio {
     source.buffer = buffer || this.noiseBuffer;
     source.loop = true;
     source.connect(destination);
-    source.start(this.context.currentTime);
+    this.loopPhase = (this.loopPhase + 0.731) % source.buffer.duration;
+    source.start(this.context.currentTime, this.loopPhase);
     return source;
   }
 
@@ -119,13 +123,22 @@ export class SkateAudio {
       state.speed ?? state.tangentVelocity ?? state.velocity ?? 0,
     ) || 0);
     const normalizedSpeed = clamp01(speed / this.speedReference);
+    const frameDt = Math.max(0.001, Math.min(0.1, Number(dt) || 1 / 60));
+    const acceleration = Math.min(1, Math.abs(speed - this.previousSpeed) / frameDt / 35);
+    this.previousSpeed = speed;
     const fastSpeed = smoothstep((normalizedSpeed - 0.45) / 0.55);
     const region = String(state.region || 'flat').toLowerCase();
     const airborne = mode === 'airborne' || state.airborne === true;
 
     const transition = region.includes('transition') || region.includes('wall');
     const flat = !transition && !airborne;
-    const rollIntensity = airborne ? 0 : (0.018 + 0.24 * smoothstep(normalizedSpeed));
+    const moving = smoothstep(speed / 1.2);
+    if (!airborne) this.distance = (this.distance + speed * frameDt) % 1000;
+    // Quiet distance-based grain avoids a static loop without allocating
+    // voices every frame. Wheels stop at rest and lose contact in the air.
+    const grain = 1 + 0.045 * Math.sin(this.distance * 5.4)
+      + 0.025 * Math.sin(this.distance * 13.7);
+    const rollIntensity = airborne ? 0 : moving * (0.014 + 0.22 * smoothstep(normalizedSpeed)) * grain;
     const transitionBoost = transition ? 1.16 : flat ? 0.9 : 1;
     const rollTarget = rollIntensity * transitionBoost;
 
@@ -134,10 +147,14 @@ export class SkateAudio {
     this.rollGain.gain.setTargetAtTime(rollTarget, now, smoothing);
     this.rollFilter.frequency.setTargetAtTime(rollFrequency, now, smoothing);
     this.rollFilter.Q.setTargetAtTime(rollQ, now, smoothing);
+    this.rollSource.playbackRate.setTargetAtTime(0.55 + normalizedSpeed * 1.15, now, smoothing);
 
-    const rampTarget = airborne ? 0 : (transition ? 0.02 + 0.16 * fastSpeed : 0.012 * normalizedSpeed);
+    const rampTarget = airborne ? 0 : moving * (transition
+      ? 0.012 + 0.09 * fastSpeed + acceleration * 0.012
+      : 0.01 * normalizedSpeed);
     this.rampGain.gain.setTargetAtTime(rampTarget, now, smoothing * 1.2);
     this.rampFilter.frequency.setTargetAtTime(330 + normalizedSpeed * 640, now, smoothing);
+    this.rampSource.playbackRate.setTargetAtTime(0.7 + normalizedSpeed * 0.8, now, smoothing);
 
     const baseY = Number(state.airBaseY ?? state.baseY ?? 0) || 0;
     const airY = Number(state.airY ?? state.height ?? baseY) || baseY;

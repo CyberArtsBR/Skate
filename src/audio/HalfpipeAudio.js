@@ -633,9 +633,12 @@ export class HalfpipeAudio {
     const rating = normalizeType(
       eventValue(event, 'rating', 'quality', 'grade'),
     ) || 'CLEAN';
-    const intensity = clamp01(
-      eventValue(event, 'intensity', 'impact', 'impactIntensity') ?? 0.55,
-    );
+    // LANDING.impact is velocity in game units, not a normalized gain.
+    // Clamping it directly made nearly every landing sound equally hard.
+    const explicitIntensity = eventValue(event, 'intensity', 'impactIntensity');
+    const impactSpeed = Number(eventValue(event, 'impact'));
+    const intensity = clamp01(explicitIntensity
+      ?? (Number.isFinite(impactSpeed) ? impactSpeed / 20 : 0.55));
 
     if (rating === 'BAIL') {
       this._bailCue(event);
@@ -660,6 +663,15 @@ export class HalfpipeAudio {
         frequency: bright ? 1050 : 620,
         q: bright ? 1.1 : 0.65,
       });
+      // A quieter second truck/deck contact gives the impact weight without
+      // turning the landing into a single synthetic boom.
+      this._noiseBurst({
+        duration: 0.035 + intensity * 0.035,
+        gain: 0.018 + intensity * 0.045,
+        frequency: 1850 - intensity * 650,
+        q: 0.65,
+        delay: 0.018 + intensity * 0.012,
+      });
       this._tone({
         frequency: heavy ? 82 : 125,
         endFrequency: heavy ? 55 : 90,
@@ -678,7 +690,7 @@ export class HalfpipeAudio {
           delay: 0.025,
         });
       }
-    });
+    }, { gain: 0.55 + intensity * 0.6, rate: 1.04 - intensity * 0.1 });
 
     const strong = (
       rating === 'HEAVY'

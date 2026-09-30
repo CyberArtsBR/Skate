@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { solveTwoBone } from './TwoBoneIK.js';
 
 const jointPosition = new THREE.Vector3();
 const effectorPosition = new THREE.Vector3();
@@ -86,14 +87,10 @@ export class BackflipGrabIK {
     const shoulder = this.rigAdapter.rig[`${side}Shoulder`];
     if (!upperArm || !forearm || !hand) return 0;
 
-    for (let iteration = 0; iteration < 8; iteration += 1) {
-      rotateJointToward(forearm, hand, target, weight, 0.26);
-      this.riderRoot.updateWorldMatrix(true, true);
-      rotateJointToward(upperArm, hand, target, weight, 0.22);
-      this.riderRoot.updateWorldMatrix(true, true);
-      rotateJointToward(shoulder, hand, target, weight * 0.62, 0.095);
-      this.riderRoot.updateWorldMatrix(true, true);
-    }
+    const pole = forearm.getWorldPosition(new THREE.Vector3());
+    rotateJointToward(shoulder, hand, target, weight * 0.5, 0.095);
+    this.riderRoot.updateWorldMatrix(true, true);
+    solveTwoBone(upperArm, forearm, hand, target, pole, weight);
 
     const error = hand.getWorldPosition(new THREE.Vector3()).distanceTo(target);
     return Number.isFinite(error) ? error : 0;

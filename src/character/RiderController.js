@@ -61,6 +61,12 @@ export class RiderController {
   }
 
   _rebuildCharacterIK() {
+    this.smoothedPose = null;
+    this.poseTime = null;
+    const boardRotation = this.boardPivot.quaternion.clone();
+    const bodyRotation = this.bodyCarrier.quaternion.clone();
+    this.boardPivot.quaternion.identity();
+    this.bodyCarrier.quaternion.identity();
     this.footIK = new RiderFootIK({
       rigAdapter: this.chimpion.rigAdapter,
       riderRoot: this.root,
@@ -68,6 +74,8 @@ export class RiderController {
       chimpionRoot: this.chimpion.root,
       stance: GAME_CONFIG.rider.stance,
     });
+    this.boardPivot.quaternion.copy(boardRotation);
+    this.bodyCarrier.quaternion.copy(bodyRotation);
     this.handPlantIK = new HandPlantIK({
       rigAdapter: this.chimpion.rigAdapter,
       riderRoot: this.root,
@@ -113,7 +121,22 @@ export class RiderController {
       this.presentationState.trickPitch,
       this.presentationState.facingYaw,
       this.presentationState.trickRoll,
+      this.presentationState.trickType === 'hand-plant' ? 'ZXY' : 'XYZ',
     );
+    if (this.presentationState.trickVisualActive
+      && this.presentationState.trickType === 'hand-plant'
+      && this.presentationState.copingWorldPoint) {
+      const point = this.presentationState.copingWorldPoint;
+      const anchor = this.root.worldToLocal(new THREE.Vector3(point.x, point.y, point.z));
+      const unrolled = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        this.presentationState.trickPitch, this.presentationState.facingYaw, 0, 'ZXY',
+      ));
+      const rotatedAnchor = anchor.clone().applyQuaternion(unrolled.invert())
+        .applyQuaternion(this.trickCarrier.quaternion);
+      // The existing roll/timing stays intact. Its visual pivot is now the
+      // actual coping region, with continuous entry and exit at zero roll.
+      this.trickCarrier.position.add(anchor.sub(rotatedAnchor));
+    }
 
     const trickPose = this.trickPoseController.evaluate(this.presentationState);
     this.boardPivot.position.set(trickPose.rearPivotX, 0, 0);
@@ -124,14 +147,28 @@ export class RiderController {
     const backAmount = (
       1 - Math.cos(this.presentationState.facingYaw)
     ) * 0.5;
-    this.chimpion.root.position.y = this.baseChimpionY
-      - GAME_CONFIG.rider.fakieBodyDrop * backAmount;
+    this.chimpion.root.position.set(0, this.baseChimpionY
+      - GAME_CONFIG.rider.fakieBodyDrop * backAmount, 0.015);
 
-    const pose = this.poseController.evaluate(this.presentationState);
+    const targetPose = this.poseController.evaluate(this.presentationState);
+    const time = this.presentationState.time;
+    const resetPose = !this.smoothedPose || time < this.poseTime;
+    const dt = Math.min(0.05, Math.max(0, time - (this.poseTime ?? time)));
+    const alpha = 1 - Math.exp(-22 * dt);
+    const pose = { ...targetPose };
+    if (!resetPose) {
+      for (const [key, value] of Object.entries(pose)) {
+        if (typeof value === 'number' && key !== 'facingSign') {
+          pose[key] = THREE.MathUtils.lerp(this.smoothedPose[key] ?? value, value, alpha);
+        }
+      }
+    }
+    this.smoothedPose = { ...pose };
+    this.poseTime = time;
     this.chimpion.updatePose(pose);
     this.root.updateWorldMatrix(true, true);
 
-    const footResult = this.footIK.update(this.presentationState);
+    const footResult = this.footIK.update({ ...this.presentationState, kneeFlex: pose.kneeFlex });
     this.root.updateWorldMatrix(true, true);
     const handResult = this.handPlantIK.update({
       active: this.presentationState.trickVisualActive
@@ -141,6 +178,20 @@ export class RiderController {
       copingWorldPoint: this.presentationState.copingWorldPoint,
       facingYaw: this.presentationState.facingYaw,
     });
+    if (handResult.active && handResult.plantHandWorldPosition && handResult.plantTargetWorldPosition) {
+      // Anchor the whole visual maneuver to the planted wrist, keeping board
+      // and body together. This closes an unreachable arm without stretching
+      // bones or moving the authoritative contact root. Reach/release weights
+      // bring the board continuously into and out of the coping pivot.
+      const target = this.root.worldToLocal(handResult.plantTargetWorldPosition.clone());
+      const hand = this.root.worldToLocal(handResult.plantHandWorldPosition.clone());
+      this.trickCarrier.position.add(target.sub(hand).multiplyScalar(handResult.weight));
+      this.root.updateWorldMatrix(true, true);
+      const bone = this.chimpion.rigAdapter.rig[`${handResult.side}Hand`];
+      bone.getWorldPosition(handResult.plantHandWorldPosition);
+      handResult.error = handResult.plantHandWorldPosition.distanceTo(handResult.plantTargetWorldPosition);
+      handResult.contactError = handResult.error;
+    }
 
     this.root.userData.animationState = this.presentationState.animationState;
     this.root.userData.footIK = { ...footResult };

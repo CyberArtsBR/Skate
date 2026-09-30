@@ -16,11 +16,12 @@ export function createLighting(scene) {
   key.shadow.camera.near = 1;
   key.shadow.camera.far = 55;
   key.shadow.bias = -0.00025;
+  key.shadow.normalBias = 0.018;
   key.shadow.radius = 3;
   scene.add(key);
   const unregisterShadow = quality.registerShadowLight(key);
 
-  const fill = new THREE.DirectionalLight(0x8ec8e8, 0.95);
+  const fill = new THREE.DirectionalLight(0xb7d3e0, 1.05);
   fill.position.set(12, 8, -12);
   scene.add(fill);
 

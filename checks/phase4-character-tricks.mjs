@@ -81,7 +81,7 @@ const airborne = createRiderPresentationState({
   animationState: SKATE_ANIMATION_STATE.AIR,
 });
 const airAnimated = animation.update(airborne);
-assert.ok(airAnimated.footIKWeight < 0.9, 'airborne foot IK should release');
+assert.equal(airAnimated.footIKWeight, 1, 'existing aerial tricks must retain board-relative foot contact');
 const landed = animation.update(createRiderPresentationState({
   ...airborne,
   time: 1.016,
@@ -97,9 +97,8 @@ assert.ok([
   SKATE_ANIMATION_STATE.HEAVY_LAND,
 ].includes(landed.animationState));
 
-// A bail must immediately restore full deck contact even when airborne IK was
-// previously released. The impact expression belongs in the body pose, not in
-// a visually detached foot.
+// A bail must retain full deck contact. The impact expression belongs in the
+// body pose, not in a visually detached foot.
 const bailAnimation = new SkateAnimationController();
 const bailAir = bailAnimation.update(createRiderPresentationState({
   time: 2,
@@ -110,7 +109,7 @@ const bailAir = bailAnimation.update(createRiderPresentationState({
   dropInProgress: 1,
   animationState: SKATE_ANIMATION_STATE.AIR,
 }));
-assert.ok(bailAir.footIKWeight < 0.9);
+assert.equal(bailAir.footIKWeight, 1);
 const bailContact = bailAnimation.update(createRiderPresentationState({
   ...bailAir,
   time: 2.016,

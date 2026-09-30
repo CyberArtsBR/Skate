@@ -1,4 +1,5 @@
 import { HalfpipeSimulation } from '../halfpipe/HalfpipeSimulation.js';
+import { describeTrickScore } from '../scoring/HalfpipeScoreSystem.js';
 
 const INSTALLED = Symbol.for('chimpions.halfpipe.v9.event-patches');
 
@@ -6,6 +7,18 @@ export function installHalfpipeV9EventPatches() {
   const proto = HalfpipeSimulation.prototype;
   if (proto[INSTALLED]) return false;
   Object.defineProperty(proto, INSTALLED, { value: true });
+
+  const originalAward = proto._awardValidatedTrick;
+  proto._awardValidatedTrick = function awardWithExplanation(type, quality, landing = 1, side = 0, direction = 0) {
+    const previous = this.scoreFlowMultiplier;
+    this.scoreFlowMultiplier = this.state.lastCompletedTrickSide && side
+      && this.state.lastCompletedTrickSide !== side ? 1.08 : 1;
+    try {
+      return originalAward.call(this, type, quality, landing, side, direction);
+    } finally {
+      this.scoreFlowMultiplier = previous;
+    }
+  };
 
   const originalEmit = proto._emit;
   proto._emit = function emitV9(type, payload = {}) {
@@ -27,6 +40,9 @@ export function installHalfpipeV9EventPatches() {
     };
 
     return originalEmit.call(this, type, {
+      ...(type === 'TRICK_COMPLETED' ? {
+        scoreBreakdown: describeTrickScore(this.scoring, this.state, payload, this.scoreFlowMultiplier || 1),
+      } : {}),
       worldVelocity,
       velocity: worldVelocity,
       surfaceNormal,

@@ -7,6 +7,7 @@ import {
 const TEXTURE_KEYS = Object.freeze([
   'map',
   'normalMap',
+  'bumpMap',
   'roughnessMap',
   'metalnessMap',
   'aoMap',

@@ -1,7 +1,7 @@
 const STANDARD_LIGHTING = Object.freeze({
-  hemisphere: 1.7,
-  key: 3.7,
-  fill: 0.95,
+  hemisphere: 1.35,
+  key: 3.25,
+  fill: 1.05,
   shadowRadius: 3.0,
 });
 

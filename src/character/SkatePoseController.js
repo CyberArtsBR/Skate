@@ -166,13 +166,13 @@ export class SkatePoseController {
           : -0.08 - compression * 0.075 + anticipation * 0.035,
       torsoCounter,
       torsoBalanceZ:
-        -surfaceAngle * 0.52 * facingSign
+        -surfaceAngle * (air ? 0.12 : 0.42) * facingSign
         + asymmetry
         + bailLean * 0.16
         - wallSide * (handPlant ? 0.19 : 0)
         - wallSide * flipTuck * 0.035,
       headBalanceZ:
-        -surfaceAngle * 0.04 * facingSign
+        -surfaceAngle * (air ? 0.01 : 0.04) * facingSign
         + asymmetry * 0.28
         - bailLean * 0.07
         + wallSide * flipOpen * 0.035,

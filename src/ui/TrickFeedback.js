@@ -24,12 +24,17 @@ export class TrickFeedback {
     this.timers = new Map();
   }
 
-  showTrick(name, points = 0, { duration = 1350 } = {}) {
-    const label = formatTrickName(name);
+  showTrick(name, points = 0, { duration = 1500, breakdown = null } = {}) {
+    const label = escapeText(formatTrickName(name));
     const pointsLabel = Number(points) > 0
-      ? ' <span>+' + Math.round(Number(points)) + '</span>'
+      ? ' <span>+' + Math.round(Number(points)).toLocaleString('en-US') + '</span>'
       : '';
-    this._show(this.trick, label + pointsLabel, duration, 'is-trick');
+    const details = [];
+    if (breakdown?.airHeight >= 0.5) details.push(breakdown.airHeight.toFixed(1) + 'm AIR');
+    if (breakdown?.varietyMultiplier < 1) details.push('REPEAT ×' + trimMultiplier(breakdown.varietyMultiplier));
+    else if (breakdown?.quality >= 0.9) details.push('GREAT EXECUTION');
+    const detailLabel = details.length ? '<small>' + escapeText(details.join(' · ')) + '</small>' : '';
+    this._show(this.trick, label + pointsLabel + detailLabel, duration, 'is-trick');
   }
 
   showLanding(result, {
@@ -84,6 +89,8 @@ export class TrickFeedback {
         'is-perfect',
         'is-clean',
         'is-heavy',
+        'is-sketchy',
+        'is-bail',
         'is-action',
       );
     }
@@ -101,7 +108,9 @@ export class TrickFeedback {
 
     element.innerHTML = html;
     element.hidden = false;
-    element.classList.remove('is-leaving');
+    element.classList.remove('is-visible', 'is-leaving', 'is-perfect', 'is-clean', 'is-heavy', 'is-sketchy', 'is-bail');
+    // Restart the short pop for successive awards, including identical tricks.
+    void element.offsetWidth;
     element.classList.add('is-visible', className);
 
     const timer = setTimeout(() => {

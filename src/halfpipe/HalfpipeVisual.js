@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
 import { quality } from '../graphics/RenderQualityManager.js';
+import { prepareRampSurfaceFinish } from '../graphics/RampSurfaceFinish.js';
 
 const COPING_MATERIAL_NAME = 'Rail_Metal';
 
@@ -206,15 +207,21 @@ export class HalfpipeVisual {
         const sourceMaterials = Array.isArray(object.material)
           ? object.material
           : [object.material];
+        for (const material of sourceMaterials) prepareRampSurfaceFinish(material);
         const frontMetal = GAME_CONFIG.renderer.frontMetal;
+        // The current shipped GLB splits Object_4 into named material meshes.
+        // Retain the legacy audit match, and recognize its actual FRENTE face.
+        const isCurrentFront = object.name.startsWith('Object_4_')
+          && sourceMaterials.some(material => material?.name === 'FRENTE');
         let preparedMaterials = sourceMaterials;
 
         if (
-          isAuditedFrontMetalObject(object, frontMetal)
-          && sourceMaterials.some((material) => material?.name === frontMetal.materialName)
+          (isAuditedFrontMetalObject(object, frontMetal)
+          && sourceMaterials.some((material) => material?.name === frontMetal.materialName))
+          || isCurrentFront
         ) {
           preparedMaterials = sourceMaterials.map((material) => {
-            if (material?.name !== frontMetal.materialName) return material;
+            if (material?.name !== frontMetal.materialName && material?.name !== 'FRENTE') return material;
 
             // V9 audit maps Material -> source mesh Object_0 -> runtime node
             // Object_4 uniquely. Preserve authored roughness/maps exactly and

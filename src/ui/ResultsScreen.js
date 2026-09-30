@@ -81,8 +81,8 @@ export class ResultsScreen {
   show(stats = {}) {
     const normalized = normalizeResultsStats(stats);
     this.grid.innerHTML = STAT_ROWS.map(([key, label]) => (
-      '<div class="result-stat"><span>' + label + '</span><strong>'
-      + escapeText(normalized[key]) + '</strong></div>'
+      '<div class="result-stat" data-stat="' + key + '"><span>' + label + '</span><strong>'
+      + escapeText(key === 'finalScore' ? normalized[key].toLocaleString('en-US') : normalized[key]) + '</strong></div>'
     )).join('');
     this.root.hidden = false;
     this.selectedIndex = 0;

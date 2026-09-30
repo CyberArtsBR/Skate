@@ -261,7 +261,9 @@ export function simulationToPresentationState(profile, simulationState) {
       - turnDirection * Math.PI * (1 - trickProgress);
 
     if (isHandPlant) {
-      trickRoll = -side * trickConfig.handPlantRoll * envelope;
+      // Invert toward the coping; the old sign cancelled the ramp tangent
+      // and left the rider upright during the planted phase.
+      trickRoll = side * trickConfig.handPlantRoll * envelope;
       trickOffsetX = -side * trickConfig.handPlantShift * envelope;
       trickOffsetY = trickConfig.handPlantLift * envelope;
     } else {

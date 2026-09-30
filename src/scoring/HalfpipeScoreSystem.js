@@ -30,3 +30,26 @@ export function scoreRangeForTrick(scoringConfig, type) {
 
   return scoringConfig.aerialTurn;
 }
+
+// Read-only explanation of the shipped score formula. Execution quality
+// already includes height, completed rotation, hold timing and landing.
+// Exposing this does not award points or change the established balance.
+export function describeTrickScore(config, state, event, flowMultiplier = 1) {
+  const range = scoreRangeForTrick(config, event.trick);
+  const quality = Math.max(0, Math.min(1, Number(event.quality) || 0));
+  return Object.freeze({
+    basePoints: Math.round(range.min + (range.max - range.min) * quality),
+    quality,
+    airHeight: /backflip|aerial/.test(event.trick)
+      ? Math.max(0, (Number(state.currentAirPeakY) || 0) - (Number(state.currentAirBaseY) || 0)) : 0,
+    rotationDegrees: /backflip/.test(event.trick)
+      ? Math.abs(Number(state.backflipRotationDegrees) || 0)
+      : Math.abs(Number(state.airRotationDegrees) || 0),
+    landingMultiplier: Number(event.landingScoreMultiplier) || 1,
+    comboMultiplier: Number(event.comboMultiplier) || 1,
+    varietyMultiplier: Number(event.varietyMultiplier) || 1,
+    rhythmMultiplier: 1 + (Number(state.comboPumpBoost) || 0),
+    flowMultiplier,
+    finalPoints: Number(event.points) || 0,
+  });
+}

@@ -9,11 +9,15 @@ const QUALITY_SEGMENTS = Object.freeze({
   cinematic: [80, 40],
 });
 
+const DAYLIGHT_URL = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr';
+const localEnvironmentUrl = url => url === DAYLIGHT_URL
+  ? '/hdri/piazza_martin_lutero_1k.hdr' : url;
+
 export class OutdoorEnvironment {
   constructor(renderer, { url = null, onReady = null } = {}) {
     this.renderer = renderer;
     this.pmrem = new THREE.PMREMGenerator(renderer);
-    this.url = url;
+    this.url = localEnvironmentUrl(url);
     this.onReady = typeof onReady === 'function' ? onReady : null;
     this.fallbackTarget = null;
     this.hdriTarget = null;
@@ -64,7 +68,7 @@ export class OutdoorEnvironment {
 
   async setUrl(url = null) {
     if (this.disposed) return null;
-    const nextUrl = url ? String(url) : null;
+    const nextUrl = url ? localEnvironmentUrl(String(url)) : null;
     if (nextUrl === this.url && this.hdriTarget?.texture) {
       this.texture = this.hdriTarget.texture;
       this.onReady?.(this.texture);

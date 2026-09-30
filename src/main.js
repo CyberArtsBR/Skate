@@ -622,7 +622,7 @@ function routeGameplayEvents(events, state, presentationState) {
         duration: 650,
       });
     } else if (type === 'TRICK_COMPLETED') {
-      hud.showTrick(event.trick || 'TRICK', event.points || 0);
+      hud.showTrick(event.trick || 'TRICK', event.points || 0, { breakdown: event.scoreBreakdown });
       hud.setCombo(event.comboMultiplier || state.comboMultiplier || 1);
     } else if (type === 'TRICK_FAILED') {
       hud.showActionFeedback(event.reason || 'MISSED', {

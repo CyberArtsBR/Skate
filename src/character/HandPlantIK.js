@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { solveTwoBone } from './TwoBoneIK.js';
 
 const jointPosition = new THREE.Vector3();
 const effectorPosition = new THREE.Vector3();
@@ -129,7 +130,6 @@ export class HandPlantIK {
     const weight = clamp01(reach * release);
 
     const target = targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
-    target.z += Math.cos(Number(facingYaw) || 0) * (0.012 + 0.008 * weight);
     this.riderRoot.updateWorldMatrix(true, true);
 
     // Select exactly once at maneuver start. Never switch hands during the
@@ -152,17 +152,10 @@ export class HandPlantIK {
       return this.result;
     }
 
-    // Extra low-cost CCD passes plus slightly wider safe joint limits make the
-    // arm settle on the coping rather than oscillating around it. The shoulder
-    // remains restrained so different Chimpion rigs keep a believable silhouette.
-    for (let iteration = 0; iteration < 8; iteration += 1) {
-      rotateJointToward(forearm, hand, target, weight, 0.26);
-      this.riderRoot.updateWorldMatrix(true, true);
-      rotateJointToward(upperArm, hand, target, weight, 0.21);
-      this.riderRoot.updateWorldMatrix(true, true);
-      rotateJointToward(shoulder, hand, target, weight * 0.62, 0.095);
-      this.riderRoot.updateWorldMatrix(true, true);
-    }
+    const pole = forearm.getWorldPosition(new THREE.Vector3());
+    rotateJointToward(shoulder, hand, target, weight * 0.5, 0.095);
+    this.riderRoot.updateWorldMatrix(true, true);
+    solveTwoBone(upperArm, forearm, hand, target, pole, weight);
 
     const handWorld = hand.getWorldPosition(new THREE.Vector3());
     const error = handWorld.distanceTo(target);
