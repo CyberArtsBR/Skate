@@ -88,7 +88,9 @@ try {
   assert.equal(await selectedId(), startHero);
 
   // Exercise the installed V16/V17 presentation patch without changing physics.
-  // Mid-flip the body stays compact and foot IK keeps the rider attached to deck.
+  // The approved hotfix re-parents body + board beneath a body-centered axis,
+  // so local bodyCarrier Y is intentionally negative during the flip. Validate
+  // the actual pivot contract instead of the obsolete board-level coordinate.
   const backflip = await page.evaluate(() => {
     const rider = window.__HALFPIPE_FOUNDATION__.rider;
     const base = { ...rider.presentationState };
@@ -109,22 +111,33 @@ try {
       landing: 0,
       landingAnticipation: 0,
     });
+    const grabIK = rider.root.userData.backflipGrabIK || {};
     const result = {
-      bodyY: rider.bodyCarrier.position.y,
       bodyRoll: rider.bodyCarrier.rotation.z,
       boardRoll: rider.boardPivot.rotation.z,
+      trickCarrierRoll: rider.trickCarrier.rotation.z,
+      axisY: rider.backflipAxisCarrier?.position?.y ?? null,
+      axisRoll: rider.backflipAxisCarrier?.rotation?.z ?? null,
+      pivotY: rider.backflipAxisY ?? null,
       footIKWeight: rider.root.userData.footIK?.weight || 0,
+      grabIKActive: Boolean(grabIK.active),
+      grabIKWeight: Number(grabIK.weight) || 0,
       hasBodyAxis: Boolean(rider.root.userData.hasBodyCenteredBackflipAxis),
     };
     rider.setPresentationState(base);
     return result;
   });
 
-  assert.ok(backflip.bodyY > 0.06 && backflip.bodyY < 0.14, `mid-flip bodyY must stay compact; got ${backflip.bodyY}`);
-  assert.ok(Math.abs(backflip.bodyRoll) < 0.08, `mid-flip body roll must stay controlled; got ${backflip.bodyRoll}`);
+  assert.equal(backflip.hasBodyAxis, true, 'backflip body-centered axis hotfix must remain installed');
+  assert.ok(Number.isFinite(backflip.axisY) && Number.isFinite(backflip.pivotY), 'body-centered axis must expose a finite pivot');
+  assert.ok(Math.abs(backflip.axisY - backflip.pivotY) < 0.001, `axis must rotate around rider body center; axis=${backflip.axisY}, pivot=${backflip.pivotY}`);
+  assert.ok(Math.abs(backflip.trickCarrierRoll) < 0.001, `legacy board-level carrier must not own the flip; got ${backflip.trickCarrierRoll}`);
+  assert.ok(Math.abs(Math.abs(backflip.axisRoll) - Math.PI) < 0.08, `body-centered axis must own the mid-flip rotation; got ${backflip.axisRoll}`);
+  assert.ok(Math.abs(backflip.bodyRoll) < 0.08, `body secondary roll must stay controlled; got ${backflip.bodyRoll}`);
   assert.ok(Math.abs(backflip.boardRoll) < 0.06, `board secondary roll must stay restrained; got ${backflip.boardRoll}`);
   assert.ok(backflip.footIKWeight >= 0.65, `backflip feet must stay visually anchored; got ${backflip.footIKWeight}`);
-  assert.equal(backflip.hasBodyAxis, true, 'backflip body-centered axis hotfix must remain installed');
+  assert.equal(backflip.grabIKActive, true, 'mid-flip two-hand skateboard grab IK must be active');
+  assert.ok(backflip.grabIKWeight >= 0.5, `mid-flip grab IK must have meaningful weight; got ${backflip.grabIKWeight}`);
 
   assert.deepEqual(pageErrors, [], 'V16 browser regression must not produce page errors');
   assert.deepEqual(consoleErrors, [], 'V16 browser regression must not produce console errors');
