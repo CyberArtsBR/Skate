@@ -124,7 +124,9 @@ function stepComparison({ wallFraction, velocity, intent, expectedRating }) {
 }
 
 // The reward tapers and stops at a controlled useful-speed target rather than
-// becoming an infinite arcade boost at high velocity.
+// becoming an infinite arcade boost at high velocity. The cap is evaluated
+// against the post-physics speed for this fixed step because gravity/drag act
+// before the V15 reward is applied.
 {
   const nearTarget = makeSimulation({
     wallFraction: 0.62,
@@ -132,12 +134,19 @@ function stepComparison({ wallFraction, velocity, intent, expectedRating }) {
   });
   nearTarget.setPumpIntent(1);
   const state = nearTarget.stepFixed();
+  const boost = nearTarget.drainEvents().find((event) => event.type === 'PUMP_BOOST') || null;
   assert.equal(state.pumpRating, 'PERFECT');
-  assert.ok(state.lastPumpImpulse >= 0);
+  assert.ok(boost, 'near-target PERFECT pump should report the bounded boost');
+  assert.ok(boost.speedAfter > boost.speedBefore);
   assert.ok(
-    state.lastPumpImpulse <= 0.11,
-    `pump impulse must respect the recovery target cap, got ${state.lastPumpImpulse}`,
+    boost.speedAfter <= recovery.rewardTargetSpeed + 1e-9,
+    `pump boost must never cross recovery target: ${JSON.stringify(boost)}`,
   );
+  assert.ok(
+    boost.impulse <= Math.max(0, recovery.rewardTargetSpeed - boost.speedBefore) + 1e-9,
+    `pump impulse must be bounded by remaining speed headroom: ${JSON.stringify(boost)}`,
+  );
+  assert.ok(Math.abs(state.lastPumpImpulse - boost.impulse) < 1e-9);
 }
 
 assert.ok(recovery.referenceSpeed >= 7.5);
