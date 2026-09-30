@@ -16,6 +16,11 @@ const DEFAULT_CONFIG = Object.freeze({
   sharpenAmount: 0.08,
 });
 
+const BLOOM_VFX_NAMES = new Set([
+  'halfpipe-vfx-sparks',
+  'halfpipe-vfx-contact-flash',
+]);
+
 function createRenderTarget(name) {
   const target = new THREE.WebGLRenderTarget(1, 1, {
     type: THREE.HalfFloatType,
@@ -221,12 +226,20 @@ export class CinematicPostProcessing {
     );
   }
 
+  _isBloomTarget(object) {
+    return Boolean(
+      object.layers.test(this._bloomLayer)
+      || object.userData?.visualGlowOnly
+      || BLOOM_VFX_NAMES.has(object.name),
+    );
+  }
+
   _prepareBloomMaterials() {
     this._materialCache.clear();
     this.scene.traverse((object) => {
       if (!object?.isMesh || !object.material) return;
       this._materialCache.set(object, object.material);
-      object.material = object.layers.test(this._bloomLayer)
+      object.material = this._isBloomTarget(object)
         ? this.bloomSourceMaterial
         : this.darkMaterial;
     });
