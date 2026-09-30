@@ -20,12 +20,18 @@ export function createScene(canvas) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  // Keep the photographic background as the visible DOM plate while giving
-  // authored PBR metals an outdoor California-like world to reflect. The
-  // procedural PMREM is reflection-only: it never replaces or darkens the
-  // approved merch/Hollywood background.
+  // The supplied HDRI is reflection/IBL only. The approved photographic DOM
+  // background stays visible and is never replaced by scene.background.
   quality.attachRenderer(renderer, scene);
-  const outdoorEnvironment = new OutdoorEnvironment(renderer);
+  let disposed = false;
+  const outdoorEnvironment = new OutdoorEnvironment(renderer, {
+    url: GAME_CONFIG.assets.environment,
+    onReady(texture) {
+      if (disposed) return;
+      scene.environment = texture;
+      scene.environmentIntensity = quality.preset.environmentIntensity;
+    },
+  });
   quality.attachEnvironment(outdoorEnvironment);
 
   return {
@@ -33,6 +39,7 @@ export function createScene(canvas) {
     renderer,
     quality,
     disposeEnvironment() {
+      disposed = true;
       if (scene.environment === outdoorEnvironment.texture) scene.environment = null;
       quality.detachEnvironment(outdoorEnvironment);
       outdoorEnvironment.dispose();
