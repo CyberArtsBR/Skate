@@ -274,8 +274,10 @@ export class CinematicPostProcessing {
       }
 
       this.baseComposer.render(0);
+      const bloomTexture = this.bloomPass.renderTargetsHorizontal?.[0]?.texture
+        || this.bloomComposer.readBuffer.texture;
       this.compositeMaterial.uniforms.tBase.value = this.baseComposer.readBuffer.texture;
-      this.compositeMaterial.uniforms.tBloom.value = this.bloomComposer.readBuffer.texture;
+      this.compositeMaterial.uniforms.tBloom.value = bloomTexture;
       this.renderer.setRenderTarget(null);
       this.renderer.clear(true, true, true);
       this.compositeQuad.render(this.renderer);
