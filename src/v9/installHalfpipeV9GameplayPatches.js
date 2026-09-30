@@ -30,10 +30,6 @@ function emitRejected(simulation, trick, reason, payload = {}) {
     ...payload,
   };
   simulation._emit('TRICK_REJECTED', event);
-
-  // The current HUD route predates TRICK_REJECTED and listens for TRICK_FAILED.
-  // Keep one semantic rejection event while adding a compatibility feedback
-  // event that does not touch combo/scoring state.
   simulation._emit('TRICK_FAILED', {
     ...event,
     rejected: true,
@@ -53,6 +49,8 @@ export function installHalfpipeV9GameplayPatches() {
   const originalTrySurfaceTurn = proto._trySurfaceTurn;
   const originalStartSurfaceTrick = proto._startSurfaceTrick;
   const originalStepSurfaceTrick = proto._stepSurfaceTrick;
+  const originalEnterAir = proto._enterAir;
+  const originalResolveLanding = proto._resolveLanding;
   const originalStepFixed = proto.stepFixed;
 
   proto.reset = function resetV9(initialState = {}) {
@@ -64,6 +62,7 @@ export function installHalfpipeV9GameplayPatches() {
     this._v9LastRejectedAttempt = null;
     this.state.kickTurnBufferRemaining = 0;
     this.state.kickTurnBufferedIntent = 0;
+    this.state.airEntrySurfaceSpeed = 0;
     return this.snapshot();
   };
 
@@ -152,9 +151,6 @@ export function installHalfpipeV9GameplayPatches() {
 
     if (type !== 'kick-turn') return result;
 
-    // V8/V13 froze tangent velocity for the whole trick. V9 keeps the same
-    // authoritative surface-trick state but lets simulation velocity follow a
-    // continuous approach -> pivot -> release curve.
     this.state.surfaceTrickEntryVelocity = velocity;
     this.state.surfaceTrickPivotX = this.state.pipeX;
     this.state.surfaceTrickPhase = 'APPROACH';
@@ -222,6 +218,33 @@ export function installHalfpipeV9GameplayPatches() {
     return this.snapshot();
   };
 
+  proto._enterAir = function enterAirV9(side, incomingVelocity, anchorX) {
+    const result = originalEnterAir.call(this, side, incomingVelocity, anchorX);
+    // The compact air model stores only vertical velocity. Keep the earned
+    // surface speed separately so a tiny, continuous pop cannot collapse all
+    // momentum when it returns to the ramp one or two frames later.
+    this.state.airEntrySurfaceSpeed = Math.abs(Number(incomingVelocity) || 0);
+    return result;
+  };
+
+  proto._resolveLanding = function resolveLandingV9(side, baseY, impactVelocity) {
+    const entrySurfaceSpeed = Math.max(0, Number(this.state.airEntrySurfaceSpeed) || 0);
+    const result = originalResolveLanding.call(this, side, baseY, impactVelocity);
+
+    if (!this.state.crashActive && entrySurfaceSpeed > 0) {
+      const minimumReturnedSpeed = entrySurfaceSpeed * 0.985;
+      const currentSpeed = Math.abs(Number(this.state.tangentVelocity) || 0);
+      if (currentSpeed < minimumReturnedSpeed) {
+        const returnDirection = side < 0 ? 1 : -1;
+        this.state.tangentVelocity = returnDirection * minimumReturnedSpeed;
+        this._lastDirection = returnDirection;
+        this._refreshDerivedState();
+      }
+    }
+    this.state.airEntrySurfaceSpeed = 0;
+    return result;
+  };
+
   proto.stepFixed = function stepFixedV9() {
     const beforeHandPlantBuffer = Number(this.handPlantBufferRemaining) || 0;
     const beforeKickTurnBuffer = Number(this._v9KickTurnBufferRemaining) || 0;
@@ -281,9 +304,6 @@ export function installHalfpipeV9GameplayPatches() {
       }
     }
 
-    // Low-energy recovery is still player-authored: only correctly directed
-    // pumps receive a small assist, scaled down as speed returns. Wrong pumps
-    // keep the existing penalty and never get free acceleration.
     const recovery = PHASE4_GAMEPLAY_CONFIG.pumping.lowEnergyRecovery;
     const speed = Math.abs(Number(this.state.tangentVelocity) || 0);
     const rating = String(this.state.pumpRating || '').toUpperCase();
