@@ -24,11 +24,24 @@ export function createLighting(scene) {
   fill.position.set(12, 8, -12);
   scene.add(fill);
 
+  function applyLightingPreset() {
+    const lighting = quality.preset.lighting || {};
+    hemisphere.intensity = Number(lighting.hemisphere ?? 1.7);
+    key.intensity = Number(lighting.key ?? 3.7);
+    fill.intensity = Number(lighting.fill ?? 0.95);
+    key.shadow.radius = Number(lighting.shadowRadius ?? 3.0);
+    key.shadow.needsUpdate = true;
+  }
+
+  applyLightingPreset();
+  const unsubscribeQuality = quality.subscribe(applyLightingPreset);
+
   return {
     hemisphere,
     key,
     fill,
     dispose() {
+      unsubscribeQuality();
       unregisterShadow();
       scene.remove(hemisphere, key, fill);
       key.shadow.map?.dispose?.();
