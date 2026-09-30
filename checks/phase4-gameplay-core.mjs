@@ -43,6 +43,8 @@ const profile = new Profile();
 
 assert.equal(PHASE4_GAMEPLAY_CONFIG.crash.bailMomentumRetention, 0.90);
 assert.equal(PHASE4_GAMEPLAY_CONFIG.pumping.acceleration, 8.2);
+assert.equal(PHASE4_GAMEPLAY_CONFIG.aerial.maximumDegrees, 720);
+assert.ok(PHASE4_GAMEPLAY_CONFIG.aerial.v9RotationDegreesPerSecond < 900);
 assert.equal(
   evaluatePumpRating({
     intent: 1,
@@ -111,10 +113,13 @@ assert.equal(tap.state.airTurnCompleted, false);
 assert.equal(tap.state.airTurnFailedReason, null, 'releasing in air must pause, not fail the trick');
 assert.equal(tap.state.airTurnActive, false);
 
+const aerialRate = PHASE4_GAMEPLAY_CONFIG.aerial.v9RotationDegreesPerSecond;
+const stepsForAerialDegrees = (sim, degrees) => Math.round((degrees / aerialRate) / sim.fixedDt);
+
 const clean = new HalfpipeSimulation(profile);
 clean._enterAir(-1, -16, profile.leftLip + clean.airTakeoffInset);
 clean.setTurnIntent(-1);
-for (let i=0;i<24;i++) clean.stepFixed();
+for (let i=0;i<stepsForAerialDegrees(clean, 180);i++) clean.stepFixed();
 clean.setTurnIntent(0);
 clean.stepFixed();
 assert.equal(clean.state.airTurnCompleted, false);
@@ -128,7 +133,7 @@ assert.equal(clean.state.airTurnDirection, 1);
 const spin360 = new HalfpipeSimulation(profile);
 spin360._enterAir(1, 22, profile.rightLip - spin360.airTakeoffInset);
 spin360.setTurnIntent(-1);
-for (let i=0;i<48;i++) spin360.stepFixed();
+for (let i=0;i<stepsForAerialDegrees(spin360, 360);i++) spin360.stepFixed();
 spin360.setTurnIntent(0);
 spin360.stepFixed();
 spin360._finishAirTurnFromInput();
@@ -138,12 +143,12 @@ assert.equal(spin360.state.airRotationTargetDegrees, 360);
 const over = new HalfpipeSimulation(profile);
 over._enterAir(-1, -30, profile.leftLip + over.airTakeoffInset);
 over.setTurnIntent(-1);
-for (let i=0;i<32;i++) over.stepFixed();
+for (let i=0;i<stepsForAerialDegrees(over, 240);i++) over.stepFixed();
 assert.ok(over.state.airRotationDegrees > 230);
 
 // Correct the over-turn before landing by steering in the opposite direction.
 over.setTurnIntent(1);
-for (let i=0;i<8;i++) over.stepFixed();
+for (let i=0;i<stepsForAerialDegrees(over, 60);i++) over.stepFixed();
 assert.ok(
   over.state.airRotationDegrees >= 175 && over.state.airRotationDegrees <= 185,
   `opposite in-air input should rewind rotation toward 180: ${over.state.airRotationDegrees}`,
