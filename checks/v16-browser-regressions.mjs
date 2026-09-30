@@ -49,29 +49,24 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.hero-card').length === 10);
 
   const selectedId = () => page.locator('.hero-card.is-selected').getAttribute('data-hero-id');
+  const selectedIndex = () => page.evaluate(() => (
+    [...document.querySelectorAll('.hero-card')]
+      .findIndex((card) => card.classList.contains('is-selected'))
+  ));
+
   const startHero = await selectedId();
   assert.equal(startHero, 'heretic');
+  assert.equal(await selectedIndex(), 0);
 
   // Ten riders render as two rows of five on desktop. Down must move to the
   // same column of row two, and Up must return to the original row.
   await page.keyboard.press('ArrowDown');
   assert.notEqual(await selectedId(), startHero, 'ArrowDown must move to another rider row');
-  assert.equal(
-    await page.evaluate(() => document.querySelector('.hero-card.is-selected')?.dataset.heroId),
-    window.__unused,
-  ).catch?.(() => {});
-  const afterDownIndex = await page.evaluate(() => (
-    [...document.querySelectorAll('.hero-card')]
-      .findIndex((card) => card.classList.contains('is-selected'))
-  ));
-  assert.equal(afterDownIndex, 5, 'ArrowDown from rider 0 must select rider 5');
+  assert.equal(await selectedIndex(), 5, 'ArrowDown from rider 0 must select rider 5');
 
   await page.keyboard.press('ArrowUp');
-  const afterUpIndex = await page.evaluate(() => (
-    [...document.querySelectorAll('.hero-card')]
-      .findIndex((card) => card.classList.contains('is-selected'))
-  ));
-  assert.equal(afterUpIndex, 0, 'ArrowUp must return to the same column on row one');
+  assert.equal(await selectedIndex(), 0, 'ArrowUp must return to the same column on row one');
+  assert.equal(await selectedId(), startHero);
 
   // Exercise the actual installed V16 presentation patch without changing
   // authoritative physics. Mid-flip the body should tuck toward the deck,
@@ -79,7 +74,7 @@ try {
   // strong visual connection to the skateboard.
   const backflip = await page.evaluate(() => {
     const rider = window.__HALFPIPE_FOUNDATION__.rider;
-    const base = rider.presentationState;
+    const base = { ...rider.presentationState };
     rider.setPresentationState({
       ...base,
       time: (Number(base.time) || 0) + 0.016,
