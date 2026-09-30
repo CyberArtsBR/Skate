@@ -81,6 +81,11 @@ jobs:
         env:
           HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
         run: npm run check:browser:release
+      - name: Run V16 title selection and backflip regressions
+        if: always()
+        env:
+          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
+        run: npm run check:v16:browser
       - name: Run deep browser smoke
         if: always()
         env:
