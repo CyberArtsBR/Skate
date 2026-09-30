@@ -1,7 +1,10 @@
 export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   launch: Object.freeze({
     thresholdSpeed: 1.2,
-    visiblePopVelocity: 8.5,
+    // V9 removes the 1.19 -> 1.20 launch cliff. computeLaunchVelocity already
+    // uses smoothstep from threshold to maximum speed; starting that curve at
+    // zero makes the takeoff continuous while preserving momentum-earned air.
+    visiblePopVelocity: 0,
     speedForMaximumVelocity: 22,
     maximumVerticalVelocity: 27,
   }),
@@ -25,9 +28,18 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     rhythmBoostWeak: 0.0055,
     rhythmBoostPenalty: 0.02,
     rhythmBoostMax: 0.085,
+    lowEnergyRecovery: Object.freeze({
+      referenceSpeed: 3.2,
+      minimumSpeed: 0.18,
+      acceleration: 2.1,
+      eligibleRatings: Object.freeze(['PERFECT', 'GOOD', 'WEAK']),
+    }),
   }),
   aerial: Object.freeze({
-    rotationDegreesPerSecond: 600,
+    // Maximum-air airtime is ~1.08 simulation seconds. 900 deg/s makes 900
+    // mechanically reachable only when the player has earned near-maximum air,
+    // while reversible steering preserves correction authority for lower tiers.
+    rotationDegreesPerSecond: 900,
     targetStepDegrees: 180,
     maximumDegrees: 900,
     validErrorDegrees: 48,
@@ -40,7 +52,9 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     overturnDegrees: 972,
   }),
   backflip: Object.freeze({
-    rotationDegreesPerSecond: 500,
+    // A double still requires the existing high-launch gate. At 720 deg/s the
+    // full 720 fits inside maximum-air airtime without increasing air height.
+    rotationDegreesPerSecond: 720,
     singleDegrees: 360,
     doubleDegrees: 720,
     validErrorDegrees: 42,
@@ -80,5 +94,6 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     handPlantMinimumHoldSeconds: 1 / 120,
     handPlantIdealHoldSeconds: 0.28,
     handPlantMaximumQualityHoldSeconds: 0.52,
+    kickTurnBufferSeconds: 0.13,
   }),
 });
