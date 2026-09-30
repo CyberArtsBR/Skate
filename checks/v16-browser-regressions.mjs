@@ -46,17 +46,32 @@ try {
   ));
 
   const startHero = await selectedId();
+  const startIndex = await selectedIndex();
+  const columnCount = await page.evaluate(() => {
+    const grid = document.querySelector('.hero-grid');
+    return getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length;
+  });
   assert.equal(startHero, 'heretic');
-  assert.equal(await selectedIndex(), 0);
+  assert.equal(startIndex, 1, 'Heretic is the second rider in the current roster');
+  assert.equal(columnCount, 5, 'desktop rider select must render five columns');
 
   // Ten riders render as two rows of five on desktop. Down must move to the
-  // same column of row two, and Up must return to the original row.
+  // same column of row two, and Up must return to the actual starting rider.
+  const expectedDownIndex = startIndex + columnCount;
   await page.keyboard.press('ArrowDown');
   assert.notEqual(await selectedId(), startHero, 'ArrowDown must move to another rider row');
-  assert.equal(await selectedIndex(), 5, 'ArrowDown from rider 0 must select rider 5');
+  assert.equal(
+    await selectedIndex(),
+    expectedDownIndex,
+    'ArrowDown must preserve the rider column while moving to row two',
+  );
 
   await page.keyboard.press('ArrowUp');
-  assert.equal(await selectedIndex(), 0, 'ArrowUp must return to the same column on row one');
+  assert.equal(
+    await selectedIndex(),
+    startIndex,
+    'ArrowUp must return to the same rider column on row one',
+  );
   assert.equal(await selectedId(), startHero);
 
   // Exercise the installed V16 presentation patch without changing physics.
