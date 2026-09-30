@@ -19,14 +19,17 @@ export class OutdoorEnvironment {
     this.hdriTarget = null;
     this.texture = null;
     this.disposed = false;
-    this._loadPromise = this.url ? this._loadHdri(this.url) : null;
+    this.loadGeneration = 0;
+    this.loadingUrl = null;
+    this._loadPromise = this.url ? this._loadHdri(this.url, ++this.loadGeneration) : null;
   }
 
-  async _loadHdri(url) {
+  async _loadHdri(url, generation = this.loadGeneration) {
     let source = null;
+    this.loadingUrl = url;
     try {
       source = await new RGBELoader().loadAsync(url);
-      if (this.disposed) {
+      if (this.disposed || generation !== this.loadGeneration) {
         source.dispose();
         return null;
       }
@@ -36,7 +39,7 @@ export class OutdoorEnvironment {
       source.dispose();
       source = null;
 
-      if (this.disposed) {
+      if (this.disposed || generation !== this.loadGeneration) {
         nextTarget.dispose();
         return null;
       }
@@ -46,15 +49,47 @@ export class OutdoorEnvironment {
       this.fallbackTarget?.dispose();
       this.fallbackTarget = null;
       this.texture = nextTarget.texture;
+      this.loadingUrl = null;
       this.onReady?.(this.texture);
       return this.texture;
     } catch (error) {
       source?.dispose?.();
-      if (!this.disposed) {
-        console.warn('[Halfpipe] HDRI environment failed to load; retaining fallback environment.', error);
+      if (generation === this.loadGeneration) this.loadingUrl = null;
+      if (!this.disposed && generation === this.loadGeneration) {
+        console.warn('[Halfpipe] HDRI environment failed to load; retaining previous environment.', error);
       }
       return null;
     }
+  }
+
+  async setUrl(url = null) {
+    if (this.disposed) return null;
+    const nextUrl = url ? String(url) : null;
+    if (nextUrl === this.url && this.hdriTarget?.texture) {
+      this.texture = this.hdriTarget.texture;
+      this.onReady?.(this.texture);
+      return this.texture;
+    }
+    if (nextUrl === this.url && this.loadingUrl === nextUrl && this._loadPromise) {
+      return this._loadPromise;
+    }
+
+    this.url = nextUrl;
+    const generation = ++this.loadGeneration;
+
+    if (!nextUrl) {
+      this.loadingUrl = null;
+      this.hdriTarget?.dispose();
+      this.hdriTarget = null;
+      this.texture = this._buildFallback();
+      this.onReady?.(this.texture);
+      return this.texture;
+    }
+
+    // Keep the current PMREM active until the replacement has finished loading.
+    // This prevents a black/reflectionless frame when switching maps.
+    this._loadPromise = this._loadHdri(nextUrl, generation);
+    return this._loadPromise;
   }
 
   _buildFallback({ quality = 'high', sigma = 0.05 } = {}) {
@@ -137,11 +172,14 @@ export class OutdoorEnvironment {
       this.texture = this.hdriTarget.texture;
       return this.texture;
     }
+    if (this.texture?.isTexture && this.fallbackTarget) return this.texture;
     return this._buildFallback(options);
   }
 
   dispose() {
     this.disposed = true;
+    this.loadGeneration += 1;
+    this.loadingUrl = null;
     this.fallbackTarget?.dispose();
     this.fallbackTarget = null;
     this.hdriTarget?.dispose();

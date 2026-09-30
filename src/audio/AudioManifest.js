@@ -5,14 +5,17 @@ const placeholder = (kind, options = {}) => Object.freeze({
   ...options,
 });
 
+const PIXEL_RAMPAGE = '/audio/music/Pixel%20Rampage.mp3';
+
 export const AUDIO_MANIFEST = Object.freeze({
-  version: 3,
+  version: 4,
   music: Object.freeze({
-    // All three states have a functional original/procedural fallback. External
-    // licensed assets can still override these descriptors later.
-    menu: placeholder('procedural-32bit-hard-rock', { loop: true, gain: 0.42 }),
-    gameplay: placeholder('procedural-32bit-hard-rock', { loop: true, gain: 0.72 }),
-    results: placeholder('procedural-32bit-hard-rock', { loop: true, gain: 0.50 }),
+    // User-supplied Halfpipe theme. Browsers may require the first user gesture
+    // before audible playback; once audio is unlocked this is the menu/theme
+    // track and gameplay restarts it from the beginning for each new run.
+    menu: Object.freeze({ url: PIXEL_RAMPAGE, loop: true, gain: 0.48 }),
+    gameplay: Object.freeze({ url: PIXEL_RAMPAGE, loop: true, gain: 0.72 }),
+    results: Object.freeze({ url: PIXEL_RAMPAGE, loop: true, gain: 0.50 }),
   }),
   continuous: Object.freeze({
     wheelRoll: placeholder('skate-wheel-roll-loop', { loop: true, gain: 1 }),
@@ -20,8 +23,6 @@ export const AUDIO_MANIFEST = Object.freeze({
     wind: placeholder('procedural-wind', { loop: true, gain: 1 }),
   }),
   ambience: Object.freeze({
-    // `main.js` calls `playAmbience('outdoor')`; V9 supplies a procedural
-    // layered fallback for this semantic entry when no external loop exists.
     outdoor: placeholder('procedural-california-outdoor', { loop: true, gain: 0.18 }),
     california: placeholder('filtered-noise', { loop: true, gain: 0.18 }),
     city: placeholder('filtered-noise', { loop: true, gain: 0.08 }),
@@ -53,7 +54,7 @@ export const AUDIO_MANIFEST = Object.freeze({
 });
 
 export const AUDIO_ASSET_REQUIREMENTS = Object.freeze([
-  'Menu/gameplay/results music may use the built-in original 32-bit hard-rock loop or licensed/original replacements',
+  'Primary menu/gameplay/results theme: public/audio/music/Pixel Rampage.mp3',
   'Optional California outdoor ambience loop',
   'Optional distant-city ambience loop',
   'Optional restrained crowd ambience loop',
