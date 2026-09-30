@@ -59,7 +59,9 @@ export class OutdoorEnvironment {
           float horizon = exp(-abs(up) * 9.0);
           sky = mix(sky, uWarmHorizon, horizon * 0.22);
 
-          float groundMix = smoothstep(-0.02, -0.72, min(up, 0.0));
+          // GLSL smoothstep requires edge0 < edge1. Preserve the old visual
+          // intent (more ground toward -Y) without relying on undefined order.
+          float groundMix = 1.0 - smoothstep(-0.72, -0.02, min(up, 0.0));
           vec3 baseColor = mix(sky, uGround, groundMix);
 
           float azimuth = atan(dir.z, dir.x);
