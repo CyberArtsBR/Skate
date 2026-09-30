@@ -20,15 +20,17 @@ export const GAME_CONFIG = Object.freeze({
       outerOpacity: 0.01,
     }),
     frontMetal: Object.freeze({
+      // V9 asset audit of public/models/halfpipe/halfpipe.glb resolves the
+      // generic material name "Material" to exactly one source mesh Object_0,
+      // instantiated by the GLTF node Object_4. Match the runtime node AND the
+      // material so no unrelated future "Material" can be made metallic.
+      nodeName: 'Object_4',
       materialName: 'Material',
       metalness: 1,
       envMapIntensity: 2.4,
     }),
   }),
   skateboard: Object.freeze({
-    // Keep the board deliberately substantial next to the 2.32m rider.
-    // Uniform scale keeps trucks/wheels/contact geometry coherent; the deck
-    // receives a small extra X extension for a full-size street/vert silhouette.
     scale: 0.155,
     deckLengthScale: 1.18,
     wheelRadius: 0.05,
@@ -63,24 +65,10 @@ export const GAME_CONFIG = Object.freeze({
     presentationSpeedReference: 17,
     presentationVerticalEpsilon: 0.02,
   }),
-  session: Object.freeze({
-    durationSeconds: 75,
-  }),
-  gameplay: Object.freeze({
-    // Run the authoritative motion at three-quarter real-time speed. This preserves the
-    // established ramp trajectories, aerial heights and trick rules while
-    // giving the player more real-world time to read and control them than the original 1.0x pace.
-    motionTimeScale: 0.75,
-  }),
-  arcadeMotion: Object.freeze({
-    downhillGravityScale: 1.12,
-    uphillGravityScale: 1.6,
-  }),
-  pumping: Object.freeze({
-    acceleration: 8.5,
-    upperWallRetention: 0.75,
-    minimumSpeed: 0.65,
-  }),
+  session: Object.freeze({ durationSeconds: 75 }),
+  gameplay: Object.freeze({ motionTimeScale: 0.75 }),
+  arcadeMotion: Object.freeze({ downhillGravityScale: 1.12, uphillGravityScale: 1.6 }),
+  pumping: Object.freeze({ acceleration: 8.5, upperWallRetention: 0.75, minimumSpeed: 0.65 }),
   turning: Object.freeze({
     kickTurnMinFraction: 0.78,
     kickTurnRetention: 0.93,
@@ -94,8 +82,6 @@ export const GAME_CONFIG = Object.freeze({
   scoring: Object.freeze({
     kickTurn: Object.freeze({ min: 100, max: 300 }),
     handPlant: Object.freeze({ min: 400, max: 700 }),
-    // Rotation tiers reward the additional airtime/risk instead of treating
-    // every landed aerial as the legacy 180-point band.
     aerial180: Object.freeze({ min: 400, max: 700 }),
     aerial360: Object.freeze({ min: 750, max: 1150 }),
     aerial540: Object.freeze({ min: 1250, max: 1800 }),
@@ -103,7 +89,6 @@ export const GAME_CONFIG = Object.freeze({
     aerial900: Object.freeze({ min: 2800, max: 4000 }),
     backflip: Object.freeze({ min: 1600, max: 2400 }),
     doubleBackflip: Object.freeze({ min: 3200, max: 5000 }),
-    // Compatibility fallback for older replay/state labels.
     aerialTurn: Object.freeze({ min: 400, max: 999 }),
   }),
   trickPresentation: Object.freeze({
@@ -135,10 +120,6 @@ export const GAME_CONFIG = Object.freeze({
     position: Object.freeze([0, 6.0, 24.5]),
     target: Object.freeze([0, 3.9, 0]),
     dynamicAirTracking: Object.freeze({
-      // Keep the California Games-style camera angle and FOV fixed. Once the
-      // rider gets high enough, move the whole camera rig upward instead of
-      // zooming out. Camera position and look target move by the same Y offset,
-      // so pitch/angle never changes.
       enterHeight: 7.4,
       exitHeight: 6.8,
       maxTrackedHeight: 22,
