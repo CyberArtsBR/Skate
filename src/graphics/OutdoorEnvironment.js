@@ -6,6 +6,7 @@ const QUALITY_SEGMENTS = Object.freeze({
   medium: [32, 16],
   high: [48, 24],
   ultra: [64, 32],
+  cinematic: [80, 40],
 });
 
 export class OutdoorEnvironment {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/gameConfig.js';
+import { CinematicPostProcessing } from '../graphics/CinematicPostProcessing.js';
 import { OutdoorEnvironment } from '../graphics/OutdoorEnvironment.js';
 import { quality } from '../graphics/RenderQualityManager.js';
 
@@ -23,6 +24,7 @@ export function createScene(canvas) {
   // The supplied HDRI is reflection/IBL only. The approved photographic DOM
   // background stays visible and is never replaced by scene.background.
   quality.attachRenderer(renderer, scene);
+  const postProcessing = new CinematicPostProcessing(renderer, scene, quality);
   let disposed = false;
   const outdoorEnvironment = new OutdoorEnvironment(renderer, {
     url: GAME_CONFIG.assets.environment,
@@ -38,8 +40,10 @@ export function createScene(canvas) {
     scene,
     renderer,
     quality,
+    postProcessing,
     disposeEnvironment() {
       disposed = true;
+      postProcessing.dispose();
       if (scene.environment === outdoorEnvironment.texture) scene.environment = null;
       quality.detachEnvironment(outdoorEnvironment);
       outdoorEnvironment.dispose();
