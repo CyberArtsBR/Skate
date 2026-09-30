@@ -118,6 +118,8 @@ export function installHalfpipeV9GameplayPatches() {
     this.state.kickTurnBufferRemaining = 0;
     this.state.kickTurnBufferedIntent = 0;
     this.state.airEntrySurfaceSpeed = 0;
+    this.state.lastPumpImpulse = 0;
+    this.state.pumpBoosts = 0;
     return this.snapshot();
   };
 
@@ -300,6 +302,7 @@ export function installHalfpipeV9GameplayPatches() {
   proto.stepFixed = function stepFixedV9() {
     const beforeHandPlantBuffer = Number(this.handPlantBufferRemaining) || 0;
     const beforeKickTurnBuffer = Number(this._v9KickTurnBufferRemaining) || 0;
+    const beforePumpAttempts = Number(this.state?.pumpAttempts) || 0;
     const wasKickTurnActive = Boolean(
       this.state?.surfaceTrickActive && this.state?.surfaceTrickType === 'kick-turn',
     );
@@ -359,7 +362,6 @@ export function installHalfpipeV9GameplayPatches() {
     }
 
     const recovery = PHASE4_GAMEPLAY_CONFIG.pumping.lowEnergyRecovery;
-    const speed = Math.abs(Number(this.state.tangentVelocity) || 0);
     const rating = String(this.state.pumpRating || '').toUpperCase();
     const ratingWeight = {
       PERFECT: 1,
@@ -375,6 +377,62 @@ export function installHalfpipeV9GameplayPatches() {
       && this.state.pumpIntent === this.state.pumpDesiredIntent
       && ratingWeight > 0
     );
+
+    this.state.lastPumpImpulse = 0;
+
+    let speed = Math.abs(Number(this.state.tangentVelocity) || 0);
+    const pumpAttemptedThisStep = (
+      Number(this.state.pumpAttempts) || 0
+    ) > beforePumpAttempts;
+    const rewardTargetSpeed = Math.max(
+      recovery.referenceSpeed,
+      Number(recovery.rewardTargetSpeed) || recovery.referenceSpeed,
+    );
+    const baseImpulse = Math.max(
+      0,
+      Number(recovery.attemptImpulseByRating?.[rating]) || 0,
+    );
+
+    if (
+      pumpAttemptedThisStep
+      && correctPump
+      && baseImpulse > 0
+      && speed >= recovery.minimumSpeed
+      && speed < rewardTargetSpeed
+    ) {
+      const deficit = clamp01(1 - speed / rewardTargetSpeed);
+      const minimumScale = clamp01(recovery.minimumImpulseScale);
+      const impulseScale = minimumScale + (1 - minimumScale) * deficit;
+      const requestedImpulse = baseImpulse * impulseScale;
+      const impulse = Math.min(
+        requestedImpulse,
+        Math.max(0, rewardTargetSpeed - speed),
+      );
+      const direction = Math.sign(this.state.tangentVelocity)
+        || Math.sign(this.state.pumpDesiredIntent)
+        || 1;
+      const speedBeforeImpulse = speed;
+
+      this.state.tangentVelocity += impulse * direction;
+      speed = Math.abs(Number(this.state.tangentVelocity) || 0);
+      const impulseWork = Math.max(
+        0,
+        0.5 * (speed * speed - speedBeforeImpulse * speedBeforeImpulse),
+      );
+      this.state.lastPumpImpulse = impulse;
+      this.state.pumpBoosts = (Number(this.state.pumpBoosts) || 0) + 1;
+      this.state.lastPumpWork += impulseWork;
+      this.state.pumpWorkTotal += impulseWork;
+      this.state.pumpActive = true;
+      this._emit('PUMP_BOOST', {
+        rating,
+        impulse,
+        speedBefore: speedBeforeImpulse,
+        speedAfter: speed,
+        boosts: this.state.pumpBoosts,
+      });
+      this._refreshDerivedState();
+    }
 
     if (
       correctPump

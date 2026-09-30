@@ -41,6 +41,8 @@ jobs:
         run: npm run check:gameplay
       - name: V9 regressions
         run: npm run check:v9
+      - name: V15 pump energy regression
+        run: npm run check:v15
       - name: Rig compatibility
         run: npm run check:rigs
       - name: Character tricks
