@@ -23,7 +23,34 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run check:release
+      - name: Static and release contracts
+        run: npm run check:static
+      - name: Passive physics
+        run: npm run check:physics
+      - name: Contact clearance
+        run: npm run check:contact
+      - name: Session flow
+        run: npm run check:session
+      - name: Controller input
+        run: npm run check:controller
+      - name: Camera framing
+        run: npm run check:camera
+      - name: Trick presentation
+        run: npm run check:tricks
+      - name: Gameplay core
+        run: npm run check:gameplay
+      - name: V9 regressions
+        run: npm run check:v9
+      - name: Rig compatibility
+        run: npm run check:rigs
+      - name: Character tricks
+        run: npm run check:character
+      - name: UI flow
+        run: npm run check:ui
+      - name: Integration
+        run: npm run check:integration
+      - name: Production build
+        run: npm run build
 
   browser:
     name: Browser and visual contact
