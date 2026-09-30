@@ -65,24 +65,32 @@ function completeSpin(targetDegrees, incomingSpeed) {
   for (let index = 0; index < steps; index += 1) sim.stepFixed();
   sim.setTurnIntent(0);
   runUntilContact(sim);
-  assert.equal(sim.state.airTurnCompleted, true, `${targetDegrees} should be mechanically reachable`);
-  assert.equal(sim.state.airRotationTargetDegrees, targetDegrees);
-  assert.equal(sim.state.lastTrick, `aerial-${targetDegrees}`);
+
+  const expected = `aerial-${targetDegrees}`;
+  const landing = sim.drainEvents().findLast?.((event) => event.type === 'LANDING')
+    || null;
+  assert.equal(sim.state.lastTrick, expected, `${targetDegrees} should land as ${expected}`);
+  assert.ok(sim.state.tricksLanded >= 1, `${targetDegrees} should increment landed tricks`);
+  assert.equal(landing?.trick, expected, `${targetDegrees} landing event should preserve the resolved trick`);
   return sim;
 }
 
 function completeBackflip(targetDegrees, incomingSpeed) {
   const sim = new HalfpipeSimulation(profile);
   sim._enterAir(-1, -incomingSpeed, profile.leftLip + sim.airTakeoffInset);
-  // Input is armed because the button was not held at takeoff.
   sim.setBackflipHeld(true);
   const steps = Math.round(targetDegrees / 720 * 120);
   for (let index = 0; index < steps; index += 1) sim.stepFixed();
   sim.setBackflipHeld(false);
   sim.stepFixed();
   runUntilContact(sim);
-  assert.equal(sim.state.backflipCompleted, true, `${targetDegrees} backflip rotation should complete`);
-  assert.equal(sim.state.backflipTargetDegrees, targetDegrees);
+
+  const expected = targetDegrees >= 720 ? 'double-backflip' : 'backflip';
+  const landing = sim.drainEvents().findLast?.((event) => event.type === 'LANDING')
+    || null;
+  assert.equal(sim.state.lastTrick, expected, `${targetDegrees} should land as ${expected}`);
+  assert.ok(sim.state.tricksLanded >= 1, `${targetDegrees} should increment landed tricks`);
+  assert.equal(landing?.trick, expected, `${targetDegrees} landing event should preserve the resolved trick`);
   return sim;
 }
 
