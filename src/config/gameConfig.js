@@ -4,6 +4,7 @@ export const GAME_CONFIG = Object.freeze({
     skateboard: '/models/skateboard/skateboard.glb',
     chimpion: '/models/characters/The%20Heretic.glb',
     background: '/images/backgrounds/halfpipe-chimpions-merch.jpg',
+    environment: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr',
   }),
   renderer: Object.freeze({
     maxPixelRatio: 2,
