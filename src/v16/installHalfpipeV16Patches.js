@@ -36,12 +36,10 @@ function moveHeroGrid(screen, deltaX, deltaY) {
     const column = next % columns;
     const rows = Math.ceil(count / columns);
     const row = Math.floor(next / columns);
-    let targetRow = (row + Math.sign(deltaY) + rows) % rows;
+    const targetRow = row + Math.sign(deltaY);
+    if (targetRow < 0 || targetRow >= rows) return screen.selectedHero;
     next = targetRow * columns + column;
-    if (next >= count) {
-      targetRow = Math.max(0, targetRow - 1);
-      next = Math.min(count - 1, targetRow * columns + column);
-    }
+    if (next >= count) next = count - 1;
   }
 
   return screen.selectHero(next);
@@ -72,9 +70,19 @@ function patchHeroSelect() {
     } else if (event.code === 'ArrowRight' || event.code === 'KeyD') {
       this.moveHeroGrid(1, 0);
     } else if (event.code === 'ArrowUp' || event.code === 'KeyW') {
+      const previous = this.selectedHeroIndex;
       this.moveHeroGrid(0, -1);
+      // Preserve the legacy ArrowUp board-color shortcut only at the top edge.
+      // W and controller Up remain pure 2D rider navigation.
+      if (event.code === 'ArrowUp' && previous === this.selectedHeroIndex) {
+        this.selectBoardColor(this.selectedBoardIndex + 1);
+      }
     } else if (event.code === 'ArrowDown' || event.code === 'KeyS') {
+      const previous = this.selectedHeroIndex;
       this.moveHeroGrid(0, 1);
+      if (event.code === 'ArrowDown' && previous === this.selectedHeroIndex) {
+        this.selectBoardColor(this.selectedBoardIndex - 1);
+      }
     } else if (event.code === 'KeyQ' || event.code === 'BracketLeft') {
       this.selectBoardColor(this.selectedBoardIndex - 1);
     } else if (event.code === 'KeyE' || event.code === 'BracketRight') {
