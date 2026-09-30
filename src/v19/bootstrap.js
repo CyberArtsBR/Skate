@@ -26,3 +26,4 @@ await import('../main.js');
 // Load after main.js/style.css and V18 CSS so V19 remains a small, reversible
 // presentation layer rather than forking the working UI/gameplay architecture.
 await import('./v19.css');
+await import('./v19-motion.css');
