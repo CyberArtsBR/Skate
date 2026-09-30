@@ -78,7 +78,19 @@ export class RenderQualityManager {
 
   resolvePixelRatio(devicePixelRatio = 1) {
     const device = Number.isFinite(devicePixelRatio) ? devicePixelRatio : 1;
-    return Math.max(0.5, Math.min(device, this.pixelRatio));
+    let resolved = Math.min(device, this.pixelRatio);
+
+    const maxTextureSize = Number(this.renderer?.capabilities?.maxTextureSize) || 0;
+    const width = Number(this.renderer?.domElement?.clientWidth) || 0;
+    const height = Number(this.renderer?.domElement?.clientHeight) || 0;
+    if (maxTextureSize > 0 && width > 0 && height > 0) {
+      const textureSafeRatio = Math.min(maxTextureSize / width, maxTextureSize / height);
+      if (Number.isFinite(textureSafeRatio) && textureSafeRatio > 0) {
+        resolved = Math.min(resolved, textureSafeRatio);
+      }
+    }
+
+    return Math.max(0.5, resolved);
   }
 
   setPreset(name) {
