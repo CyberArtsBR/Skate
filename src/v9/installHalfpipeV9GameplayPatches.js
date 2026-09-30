@@ -37,6 +37,61 @@ function emitRejected(simulation, trick, reason, payload = {}) {
   });
 }
 
+function applyV9AirRateDelta(simulation, dt) {
+  if (simulation.state.mode !== 'airborne') return;
+
+  const aerial = PHASE4_GAMEPLAY_CONFIG.aerial;
+  const aerialExtra = Math.max(
+    0,
+    Number(aerial.v9RotationDegreesPerSecond || aerial.rotationDegreesPerSecond)
+      - Number(aerial.rotationDegreesPerSecond || 0),
+  );
+  if (
+    aerialExtra > 0
+    && simulation.state.airTurnAttempted
+    && !simulation.state.airTurnFailedReason
+    && simulation.turnIntent !== 0
+  ) {
+    const direction = simulation._visualTurnDirectionForInput(simulation.turnIntent);
+    simulation.state.airRotationSignedDegrees += direction * aerialExtra * dt;
+    simulation.state.airRotationDegrees = Math.abs(simulation.state.airRotationSignedDegrees);
+    simulation.state.airTurnDirection = Math.sign(simulation.state.airRotationSignedDegrees)
+      || direction
+      || simulation.state.airTurnDirection
+      || 1;
+    simulation.state.trickProgress = (
+      (simulation.state.airRotationDegrees % aerial.targetStepDegrees)
+      / aerial.targetStepDegrees
+    );
+  }
+
+  const backflip = PHASE4_GAMEPLAY_CONFIG.backflip;
+  const backflipExtra = Math.max(
+    0,
+    Number(backflip.v9RotationDegreesPerSecond || backflip.rotationDegreesPerSecond)
+      - Number(backflip.rotationDegreesPerSecond || 0),
+  );
+  if (
+    backflipExtra > 0
+    && simulation.state.backflipAttempted
+    && !simulation.state.backflipFailedReason
+    && simulation.backflipHeld
+  ) {
+    simulation.state.backflipRotationDegrees += backflipExtra * dt;
+    simulation.state.trickProgress = (
+      (simulation.state.backflipRotationDegrees % backflip.singleDegrees)
+      / backflip.singleDegrees
+    );
+
+    const maximum = simulation._backflipMaximumDegrees();
+    if (simulation.state.backflipRotationDegrees > maximum + backflip.hardOverrunDegrees) {
+      simulation.state.backflipActive = false;
+      simulation.state.backflipFailedReason = 'OVER_FLIPPED';
+      simulation._failTrick('backflip', 'OVER_FLIPPED');
+    }
+  }
+}
+
 export function installHalfpipeV9GameplayPatches() {
   const proto = HalfpipeSimulation.prototype;
   if (proto[INSTALLED]) return false;
@@ -220,9 +275,6 @@ export function installHalfpipeV9GameplayPatches() {
 
   proto._enterAir = function enterAirV9(side, incomingVelocity, anchorX) {
     const result = originalEnterAir.call(this, side, incomingVelocity, anchorX);
-    // The compact air model stores only vertical velocity. Keep the earned
-    // surface speed separately so a tiny, continuous pop cannot collapse all
-    // momentum when it returns to the ramp one or two frames later.
     this.state.airEntrySurfaceSpeed = Math.abs(Number(incomingVelocity) || 0);
     return result;
   };
@@ -255,6 +307,8 @@ export function installHalfpipeV9GameplayPatches() {
     originalStepFixed.call(this);
 
     const dt = this.fixedDt;
+    applyV9AirRateDelta(this, dt);
+
     const kickTurnActive = Boolean(
       this.state.surfaceTrickActive && this.state.surfaceTrickType === 'kick-turn',
     );
