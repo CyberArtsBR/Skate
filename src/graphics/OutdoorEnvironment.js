@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
 const QUALITY_SEGMENTS = Object.freeze({
   low: [24, 12],
@@ -8,14 +9,54 @@ const QUALITY_SEGMENTS = Object.freeze({
 });
 
 export class OutdoorEnvironment {
-  constructor(renderer) {
+  constructor(renderer, { url = null, onReady = null } = {}) {
     this.renderer = renderer;
     this.pmrem = new THREE.PMREMGenerator(renderer);
-    this.target = null;
+    this.url = url;
+    this.onReady = typeof onReady === 'function' ? onReady : null;
+    this.fallbackTarget = null;
+    this.hdriTarget = null;
     this.texture = null;
+    this.disposed = false;
+    this._loadPromise = this.url ? this._loadHdri(this.url) : null;
   }
 
-  build({ quality = 'high', sigma = 0.05 } = {}) {
+  async _loadHdri(url) {
+    let source = null;
+    try {
+      source = await new RGBELoader().loadAsync(url);
+      if (this.disposed) {
+        source.dispose();
+        return null;
+      }
+
+      source.mapping = THREE.EquirectangularReflectionMapping;
+      const nextTarget = this.pmrem.fromEquirectangular(source);
+      source.dispose();
+      source = null;
+
+      if (this.disposed) {
+        nextTarget.dispose();
+        return null;
+      }
+
+      this.hdriTarget?.dispose();
+      this.hdriTarget = nextTarget;
+      this.fallbackTarget?.dispose();
+      this.fallbackTarget = null;
+      this.texture = nextTarget.texture;
+      this.onReady?.(this.texture);
+      return this.texture;
+    } catch (error) {
+      source?.dispose?.();
+      if (!this.disposed) {
+        console.warn('[Halfpipe] HDRI environment failed to load; retaining fallback environment.', error);
+      }
+      return null;
+    }
+  }
+
+  _buildFallback({ quality = 'high', sigma = 0.05 } = {}) {
     const [widthSegments, heightSegments] = QUALITY_SEGMENTS[quality]
       || QUALITY_SEGMENTS.high;
     const environmentScene = new THREE.Scene();
@@ -59,8 +100,6 @@ export class OutdoorEnvironment {
           float horizon = exp(-abs(up) * 9.0);
           sky = mix(sky, uWarmHorizon, horizon * 0.22);
 
-          // GLSL smoothstep requires edge0 < edge1. Preserve the old visual
-          // intent (more ground toward -Y) without relying on undefined order.
           float groundMix = 1.0 - smoothstep(-0.72, -0.02, min(up, 0.0));
           vec3 baseColor = mix(sky, uGround, groundMix);
 
@@ -86,16 +125,26 @@ export class OutdoorEnvironment {
     geometry.dispose();
     material.dispose();
 
-    const previousTarget = this.target;
-    this.target = nextTarget;
+    this.fallbackTarget?.dispose();
+    this.fallbackTarget = nextTarget;
     this.texture = nextTarget.texture;
-    previousTarget?.dispose();
     return this.texture;
   }
 
+  build(options = {}) {
+    if (this.hdriTarget) {
+      this.texture = this.hdriTarget.texture;
+      return this.texture;
+    }
+    return this._buildFallback(options);
+  }
+
   dispose() {
-    this.target?.dispose();
-    this.target = null;
+    this.disposed = true;
+    this.fallbackTarget?.dispose();
+    this.fallbackTarget = null;
+    this.hdriTarget?.dispose();
+    this.hdriTarget = null;
     this.texture = null;
     this.pmrem.dispose();
   }
