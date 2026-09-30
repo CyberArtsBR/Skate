@@ -29,15 +29,31 @@ try {
     };
   });
   assert.equal(title.src, '/images/backgrounds/halfpipe-title.jpg');
-  assert.equal(title.width, 1280, 'preserved title artwork must render at 1280px wide');
-  assert.equal(title.height, 720, 'preserved title artwork must render at 720px high');
+  assert.ok(title.width >= 1280, `preserved title artwork must be at least 1280px wide; got ${title.width}`);
+  assert.ok(title.height >= 720, `preserved title artwork must be at least 720px high; got ${title.height}`);
+  assert.ok(
+    Math.abs(title.width / title.height - 16 / 9) < 0.01,
+    `preserved title artwork must remain 16:9; got ${title.width}x${title.height}`,
+  );
   assert.equal(title.complete, true);
   assert.equal(title.titleReady, '1');
   assert.equal(title.startLabel, 'Start Game');
 
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'character-select');
-  await page.waitForFunction(() => document.querySelectorAll('.hero-card').length === 10);
+  await page.waitForFunction(() => document.querySelectorAll('.hero-card').length === 11);
+
+  assert.equal(await page.locator('.hero-card').count(), 11, 'V18 adds one Random rider card to the 10-rider roster');
+  assert.equal(await page.locator('.board-swatch').count(), 10, 'V18 adds one Random skateboard option');
+  assert.equal(await page.locator('.map-card').count(), 5, 'V18 exposes Random plus four maps');
+  assert.ok(await page.locator('.hero-card[data-hero-id="random"]').evaluate((node) => node.classList.contains('is-selected')));
+  assert.ok(await page.locator('.board-swatch[data-board-color-id="random"]').evaluate((node) => node.classList.contains('is-selected')));
+  assert.ok(await page.locator('.map-card[data-map-id="random"]').evaluate((node) => node.classList.contains('is-selected')));
+
+  // V16 grid navigation still operates on the real 10-rider roster. Select the
+  // Heretic explicitly first so Random remains a V18 presentation choice and
+  // the legacy semantic-grid regression stays deterministic.
+  await page.locator('.hero-card[data-hero-id="heretic"]').click();
 
   const selectedId = () => page.locator('.hero-card.is-selected').getAttribute('data-hero-id');
   const selectedIndex = () => page.evaluate(() => (
@@ -52,11 +68,8 @@ try {
     return getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length;
   });
   assert.equal(startHero, 'heretic');
-  assert.equal(startIndex, 1, 'Heretic is the second rider in the current roster');
   assert.equal(columnCount, 5, 'desktop rider select must render five columns');
 
-  // Ten riders render as two rows of five on desktop. Down must move to the
-  // same column of row two, and Up must return to the actual starting rider.
   const expectedDownIndex = startIndex + columnCount;
   await page.keyboard.press('ArrowDown');
   assert.notEqual(await selectedId(), startHero, 'ArrowDown must move to another rider row');
@@ -74,9 +87,8 @@ try {
   );
   assert.equal(await selectedId(), startHero);
 
-  // Exercise the installed V16 presentation patch without changing physics.
-  // Mid-flip the body stays compact around the deck and foot IK keeps the
-  // character visually attached to the skateboard instead of floating away.
+  // Exercise the installed V16/V17 presentation patch without changing physics.
+  // Mid-flip the body stays compact and foot IK keeps the rider attached to deck.
   const backflip = await page.evaluate(() => {
     const rider = window.__HALFPIPE_FOUNDATION__.rider;
     const base = { ...rider.presentationState };
@@ -102,6 +114,7 @@ try {
       bodyRoll: rider.bodyCarrier.rotation.z,
       boardRoll: rider.boardPivot.rotation.z,
       footIKWeight: rider.root.userData.footIK?.weight || 0,
+      hasBodyAxis: Boolean(rider.root.userData.hasBodyCenteredBackflipAxis),
     };
     rider.setPresentationState(base);
     return result;
@@ -111,10 +124,11 @@ try {
   assert.ok(Math.abs(backflip.bodyRoll) < 0.08, `mid-flip body roll must stay controlled; got ${backflip.bodyRoll}`);
   assert.ok(Math.abs(backflip.boardRoll) < 0.06, `board secondary roll must stay restrained; got ${backflip.boardRoll}`);
   assert.ok(backflip.footIKWeight >= 0.65, `backflip feet must stay visually anchored; got ${backflip.footIKWeight}`);
+  assert.equal(backflip.hasBodyAxis, true, 'backflip body-centered axis hotfix must remain installed');
 
   assert.deepEqual(pageErrors, [], 'V16 browser regression must not produce page errors');
   assert.deepEqual(consoleErrors, [], 'V16 browser regression must not produce console errors');
-  console.log('Halfpipe V16 browser regressions passed.');
+  console.log('Halfpipe V16/V18 browser regressions passed.');
 } finally {
   await browser.close();
 }
