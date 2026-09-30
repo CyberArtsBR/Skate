@@ -1,7 +1,8 @@
 export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   launch: Object.freeze({
     thresholdSpeed: 1.2,
-    visiblePopVelocity: 8.5,
+    // Continuous V9 launch: exactly zero at threshold, then eased upward.
+    visiblePopVelocity: 0,
     speedForMaximumVelocity: 22,
     maximumVerticalVelocity: 27,
   }),
@@ -25,9 +26,18 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
     rhythmBoostWeak: 0.0055,
     rhythmBoostPenalty: 0.02,
     rhythmBoostMax: 0.085,
+    lowEnergyRecovery: Object.freeze({
+      referenceSpeed: 3.2,
+      minimumSpeed: 0.18,
+      acceleration: 2.1,
+      eligibleRatings: Object.freeze(['PERFECT', 'GOOD', 'WEAK']),
+    }),
   }),
   aerial: Object.freeze({
+    // Retain the audited legacy presentation rate for non-V9 consumers. The
+    // V9 bootstrap applies the explicit higher deterministic rate below.
     rotationDegreesPerSecond: 600,
+    v9RotationDegreesPerSecond: 900,
     targetStepDegrees: 180,
     maximumDegrees: 900,
     validErrorDegrees: 48,
@@ -41,6 +51,7 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   }),
   backflip: Object.freeze({
     rotationDegreesPerSecond: 500,
+    v9RotationDegreesPerSecond: 720,
     singleDegrees: 360,
     doubleDegrees: 720,
     validErrorDegrees: 42,
@@ -49,9 +60,6 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   }),
   landing: Object.freeze({
     activeSeconds: 0.28,
-    // The reduced-height V7 air model caps around 27 units/s vertically.
-    // Correctly timed returns remain landable; rotation/flip timing stays the
-    // primary bail criterion for 540/720/900 and backflip attempts.
     impactPerfectMax: 24,
     impactCleanMax: 40,
     impactSketchyMax: 46,
@@ -64,21 +72,17 @@ export const PHASE4_GAMEPLAY_CONFIG = Object.freeze({
   crash: Object.freeze({
     recoverySeconds: 1.1,
     bailMomentumRetention: 0.90,
-
-    // A bail should interrupt the rider briefly, not disable pumping for the
-    // entire recovery animation. Re-enable pump input quickly and give it a
-    // temporary recovery assist so the player can rebuild amplitude.
     pumpLockSeconds: 0.18,
     recoveryPumpAccelerationMultiplier: 1.5,
     recoveryMinimumPumpMultiplier: 0.55,
     recoveryWrongPumpPenaltyMultiplier: 0.35,
     recoveryPumpMinimumSpeed: 0.20,
-
     technicalBounceSpeed: 2.4,
   }),
   surfaceTricks: Object.freeze({
     handPlantMinimumHoldSeconds: 1 / 120,
     handPlantIdealHoldSeconds: 0.28,
     handPlantMaximumQualityHoldSeconds: 0.52,
+    kickTurnBufferSeconds: 0.13,
   }),
 });

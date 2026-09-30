@@ -7,10 +7,19 @@ const smoothstep = (value) => {
 };
 
 export class TrickPoseController {
-  constructor({ stance = 'regular', stanceHalfLength = 0.24 } = {}) {
+  constructor({
+    stance = 'regular',
+    stanceHalfLength = 0.24,
+    rearAxleX = null,
+  } = {}) {
     this.stance = stance === 'goofy' ? 'goofy' : 'regular';
     this.stanceHalfLength = Math.max(0.05, Number(stanceHalfLength) || 0.24);
-    this.rearPivotX = (this.stance === 'goofy' ? 1 : -1) * this.stanceHalfLength;
+    this.rearPivotSource = Number.isFinite(Number(rearAxleX))
+      ? 'measured-rear-axle'
+      : 'stance-fallback';
+    this.rearPivotX = this.rearPivotSource === 'measured-rear-axle'
+      ? Number(rearAxleX)
+      : (this.stance === 'goofy' ? 1 : -1) * this.stanceHalfLength;
   }
 
   evaluate(state = {}) {
@@ -21,6 +30,7 @@ export class TrickPoseController {
     const dropFollow = smoothstep(1 - clamp01(state.dropInProgress));
     const output = {
       rearPivotX: this.rearPivotX,
+      rearPivotSource: this.rearPivotSource,
       boardYaw: 0,
       boardRoll: drop,
       bodyYaw: 0,
@@ -31,7 +41,7 @@ export class TrickPoseController {
 
     if (state.trickVisualActive && state.trickType === 'kick-turn') {
       // Main 180 stays on trickCarrier. Shoulders/body lead, deck follows from
-      // a weighted rear-truck pivot with a restrained nose lift.
+      // the measured rear axle/truck pivot with a restrained nose lift.
       output.bodyYaw = direction * 0.12 * envelope;
       output.boardYaw = -direction * 0.07 * envelope;
       output.boardRoll += (this.stance === 'goofy' ? -1 : 1) * 0.18 * envelope;
@@ -43,10 +53,6 @@ export class TrickPoseController {
       output.bodyY = 0.04 * envelope;
       output.bodyX = -(Number(state.wallSide) || 1) * 0.035 * envelope;
     } else if (state.airborne && state.trickType === 'backflip') {
-      // Backside-invert presentation: body leads into a compact upside-down
-      // tuck while the deck trails slightly. The main 360/720 is performed by
-      // the camera-plane trick carrier; these offsets stop rider + board from
-      // looking like one rigid spinning object.
       const tuck = Math.max(0.72, clamp01(state.airTuck));
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
       const flipDirection = Math.sign(Number(state.trickRoll) || 0) || side;
@@ -61,19 +67,10 @@ export class TrickPoseController {
         * clamp01(state.airTuck);
       output.bodyYaw = Number(state.secondaryLag) || 0;
     } else if (String(state.landingQuality || '').toLowerCase() === 'bail') {
-      // Keep the rider physically connected to the deck during a bail.
-      // The impact should read through the skeleton/pose system, not by
-      // pulling the body carrier away from foot targets on the skateboard.
       const bail = clamp01(state.landing);
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
-
-      // Small deck wobble only: enough to sell instability without forcing
-      // either planted foot beyond its reachable IK range.
       output.boardYaw = side * direction * 0.035 * bail;
       output.boardRoll += side * 0.045 * bail;
-
-      // Restrained body carrier reaction. Most of the visible bail response is
-      // handled by SkatePoseController so both feet can remain deck-locked.
       output.bodyYaw = -side * direction * 0.045 * bail;
       output.bodyRoll = -side * 0.075 * bail;
       output.bodyX = -side * 0.012 * bail;

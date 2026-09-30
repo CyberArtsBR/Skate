@@ -34,13 +34,16 @@ export class RiderController {
 
     this.poseController = new SkatePoseController({ stance: GAME_CONFIG.rider.stance });
     this.animationController = new SkateAnimationController();
+    const measuredRearAxleX = Number(skateboard.rearContact?.position?.x);
     this.trickPoseController = new TrickPoseController({
       stance: GAME_CONFIG.rider.stance,
       stanceHalfLength: skateboard.stanceHalfLength,
+      rearAxleX: Number.isFinite(measuredRearAxleX) ? measuredRearAxleX : null,
     });
 
     // Keep neutral board world transform unchanged while moving the local pivot
-    // to the rear truck. During kick turns the nose can lift around this point.
+    // to the measured rear axle/truck. The controller falls back to the old
+    // stance-based estimate only if semantic wheel measurements are unavailable.
     this.boardPivot.position.x = this.trickPoseController.rearPivotX;
     skateboard.root.position.x = -this.trickPoseController.rearPivotX;
 
@@ -52,6 +55,8 @@ export class RiderController {
     this.root.userData.stance = GAME_CONFIG.rider.stance;
     this.root.userData.hasTrickCarrier = true;
     this.root.userData.hasRearTruckPivot = true;
+    this.root.userData.rearTruckPivotX = this.trickPoseController.rearPivotX;
+    this.root.userData.rearTruckPivotSource = this.trickPoseController.rearPivotSource;
     this.root.userData.hasHandPlantIK = true;
   }
 

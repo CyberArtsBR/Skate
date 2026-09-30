@@ -14,7 +14,7 @@ export function normalizeResultsStats(stats = {}) {
     finalScore: Math.max(0, Math.round(Number(stats.finalScore ?? stats.score) || 0)),
     bestTrick: String(stats.bestTrick || '—'),
     highestAir: formatMeasure(stats.highestAir, 'm'),
-    longestCombo: formatCombo(stats.longestCombo),
+    longestCombo: formatComboCount(stats.longestCombo),
     tricksLanded: Math.max(0, Math.round(Number(stats.tricksLanded) || 0)),
     perfectLandings: Math.max(0, Math.round(Number(stats.perfectLandings) || 0)),
     crashes: Math.max(0, Math.round(Number(stats.crashes) || 0)),
@@ -173,9 +173,9 @@ function formatMeasure(value, suffix) {
   return Number.isFinite(number) ? number.toFixed(2) + suffix : '—';
 }
 
-function formatCombo(value) {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 1 ? '×' + number.toFixed(2).replace(/0+$/, '').replace(/\.$/, '') : '×1';
+function formatComboCount(value) {
+  const number = Math.max(0, Math.round(Number(value) || 0));
+  return number + (number === 1 ? ' TRICK' : ' TRICKS');
 }
 
 function formatPercent(value) {

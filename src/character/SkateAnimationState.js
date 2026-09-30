@@ -43,6 +43,17 @@ export function resolveSkateAnimationState(state = {}) {
   const quality = normalizeLandingQuality(state.landingQuality);
   const trickType = String(state.trickType || '');
   const wallFraction = clamp01(state.wallFraction);
+  const crashStage = String(state.crashStage || '').toUpperCase();
+
+  // V9 exposes authoritative crash lifecycle directly to the procedural
+  // animation layer. Early crash stages read as a bail/impact; late stages
+  // transition into recovery instead of depending on a stale landingQuality.
+  if (state.crashActive) {
+    if (['RECOVER', 'RETURN_TO_RIDING'].includes(crashStage)) {
+      return SKATE_ANIMATION_STATE.RECOVER;
+    }
+    return SKATE_ANIMATION_STATE.BAIL;
+  }
 
   if (quality === LANDING_QUALITY.BAIL) return SKATE_ANIMATION_STATE.BAIL;
   if (state.trickVisualActive && trickType === 'hand-plant') {

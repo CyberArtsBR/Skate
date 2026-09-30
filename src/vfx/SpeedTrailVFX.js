@@ -24,8 +24,9 @@ function setVector(target, value) {
 }
 
 export class SpeedTrailVFX {
-  constructor(scene, { reducedMotion = false } = {}) {
+  constructor(scene, { reducedMotion = false, scale = 1 } = {}) {
     this.reducedMotion = Boolean(reducedMotion);
+    this.scale = THREE.MathUtils.clamp(Number(scale) || 1, 0.35, 1.25);
     this.comboBoost = 0;
     this.emitAccumulator = 0;
     this._position = new THREE.Vector3();
@@ -55,13 +56,18 @@ export class SpeedTrailVFX {
     if (this.reducedMotion) this.comboBoost *= 0.35;
   }
 
+  setScale(scale) {
+    this.scale = THREE.MathUtils.clamp(Number(scale) || 1, 0.35, 1.25);
+    return this.scale;
+  }
+
   setCombo(value) {
     const numeric = Math.max(0, Number(value) || 0);
     this.comboBoost = THREE.MathUtils.clamp(numeric / 8, 0, 0.35);
   }
 
   pulse({ position, velocity, intensity = 0.5 } = {}) {
-    if (this.reducedMotion) return;
+    if (this.reducedMotion || this.scale < 0.5) return;
     const pos = setVector(this._position, position);
     const vel = setVector(this._velocity, velocity);
     if (vel.lengthSq() < 0.01) vel.set(0, 1, 0);
@@ -71,7 +77,8 @@ export class SpeedTrailVFX {
       position: pos,
       velocity: this._emitVelocity,
       lifetime: 0.11,
-      startSize: 0.35 + THREE.MathUtils.clamp(Number(intensity) || 0, 0, 1) * 0.18,
+      startSize: (0.35 + THREE.MathUtils.clamp(Number(intensity) || 0, 0, 1) * 0.18)
+        * THREE.MathUtils.lerp(0.85, 1.06, this.scale / 1.25),
       endSize: 0.05,
       aspect: 3.2,
       drag: 6,
@@ -95,7 +102,12 @@ export class SpeedTrailVFX {
     const intensity = Math.max(verticalGate, heightGate) + this.comboBoost;
     if (intensity < 0.35) return;
 
-    const interval = THREE.MathUtils.lerp(0.105, 0.055, THREE.MathUtils.clamp(intensity, 0, 1));
+    const baseInterval = THREE.MathUtils.lerp(
+      0.105,
+      0.055,
+      THREE.MathUtils.clamp(intensity, 0, 1),
+    );
+    const interval = baseInterval / THREE.MathUtils.clamp(this.scale, 0.55, 1.15);
     this.emitAccumulator += step;
     if (this.emitAccumulator < interval) return;
     this.emitAccumulator %= interval;

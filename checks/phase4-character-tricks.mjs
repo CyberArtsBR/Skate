@@ -62,7 +62,9 @@ const heavyLanding = simulationToPresentationState(profile, {
   ...baseSimulation,
   pipeX: wallX(0.25),
   tangentVelocity: 6,
-  landingImpact: 0.9,
+  landingActive: true,
+  landingRemaining: 0.14,
+  landingImpact: 40,
   landingQuality: 'HEAVY',
 });
 assert.equal(heavyLanding.landingQuality, 'heavy');

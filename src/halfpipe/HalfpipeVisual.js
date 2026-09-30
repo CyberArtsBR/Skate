@@ -123,9 +123,6 @@ function createCopingGlowShell(mesh, sourceMaterials, expansion, opacity) {
 function findRidingSurface(root) {
   for (const name of RIDING_SURFACE_NAMES) {
     const exact = root.getObjectByName(name);
-    // Some exported GLBs wrap the riding geometry in a named Object3D/Group.
-    // Astra's mesh audit identified Object_4 as the riding-surface subtree,
-    // so preserve that anchor even when the named node itself is not a Mesh.
     if (exact && hasVisibleMesh(exact)) return exact;
   }
 
@@ -149,9 +146,6 @@ function findRidingSurface(root) {
     return namedCandidates[0];
   }
 
-  // Asset-fallback only: the riding skin spans both walls and therefore has
-  // a large X/Y footprint. Gameplay never depends on this heuristic; it only
-  // establishes visual alignment for replacement art assets.
   const candidates = [];
   root.traverse((object) => {
     if (
@@ -170,6 +164,14 @@ function findRidingSurface(root) {
   });
   candidates.sort((a, b) => b.score - a.score);
   return candidates[0]?.object || null;
+}
+
+function isAuditedFrontMetalObject(object, frontMetal) {
+  return Boolean(
+    frontMetal?.nodeName
+    && frontMetal?.materialName
+    && object?.name === frontMetal.nodeName,
+  );
 }
 
 export class HalfpipeVisual {
@@ -208,16 +210,15 @@ export class HalfpipeVisual {
         let preparedMaterials = sourceMaterials;
 
         if (
-          frontMetal?.materialName
+          isAuditedFrontMetalObject(object, frontMetal)
           && sourceMaterials.some((material) => material?.name === frontMetal.materialName)
         ) {
           preparedMaterials = sourceMaterials.map((material) => {
             if (material?.name !== frontMetal.materialName) return material;
 
-            // Maximize metallic/environment response while preserving the GLB's
-            // authored roughness exactly. This keeps the front U reflective
-            // without repeating the earlier regression that made it unnaturally
-            // matte by rewriting roughness.
+            // V9 audit maps Material -> source mesh Object_0 -> runtime node
+            // Object_4 uniquely. Preserve authored roughness/maps exactly and
+            // adjust only approved metallic/environment response.
             const reflective = material.clone();
             reflective.name = `${material.name}-max-reflective`;
             if ('metalness' in reflective) reflective.metalness = frontMetal.metalness;
@@ -232,6 +233,7 @@ export class HalfpipeVisual {
             ? preparedMaterials
             : preparedMaterials[0];
           object.userData.maxReflectiveFront = true;
+          object.userData.frontMetalMatch = `${frontMetal.nodeName}:${frontMetal.materialName}`;
         }
 
         const hasCopingMaterial = sourceMaterials.some(
@@ -243,9 +245,6 @@ export class HalfpipeVisual {
           preparedMaterials = preparedMaterials.map((material) => {
             if (material?.name !== COPING_MATERIAL_NAME) return material;
 
-            // Preserve the authored GLB material exactly except for a restrained
-            // emissive lift on the white coping. In particular, do not touch
-            // roughness, metalness, maps, or shell materials.
             const coping = material.clone();
             coping.name = `${material.name}-soft-emissive`;
             if (coping.emissive?.set) {
@@ -294,21 +293,7 @@ export class HalfpipeVisual {
     const ridingBoxBeforeAlignment = worldBounds(this.ridingSurface);
     const ridingBoundsCenterBefore = ridingBoxBeforeAlignment.getCenter(new THREE.Vector3());
 
-    // IMPORTANT VISUAL CONTRACT:
-    // HalfpipeProfile uses world X=0 as the gameplay center. The source GLB was
-    // authored with its riding channel aligned to that origin. Astra's direct
-    // mesh/raycast audit proved that changing model.position.x from the authored
-    // value to a full-model-bounds center introduced the right-wall penetration:
-    // UPPER RIGHT ~= -0.354 and RIGHT LIP ~= -0.715. Restoring the authored X
-    // transform made left/right support distances nearly identical and positive.
-    //
-    // Therefore X is an authored riding-origin contract, NOT a bounds-centering
-    // problem. Decorative/support geometry may be asymmetric, and even the
-    // riding-surface subtree can have asymmetric bounds that are not a safe
-    // centerline proxy. Never recenter X from geometry bounds here.
     this.model.position.x = authoredPositionX;
-
-    // Preserve the established presentation framing on the other axes.
     this.model.position.z -= fullCenter.z;
     this.model.position.y -= fullBoxBeforeAlignment.min.y;
 

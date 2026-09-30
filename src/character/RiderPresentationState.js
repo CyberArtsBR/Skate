@@ -37,8 +37,13 @@ export const DEFAULT_RIDER_PRESENTATION_STATE = Object.freeze({
   dropInRoll: 0,
   dropInProgress: 1,
   landing: 0,
+  landingImpact: 0,
   landingQuality: 'none',
   landingAnticipation: 0,
+  crashActive: false,
+  crashReason: null,
+  crashStage: null,
+  recoveryProgress: 0,
   recovery: 0,
   trickType: null,
   trickProgress: 0,
@@ -83,7 +88,12 @@ export function createRiderPresentationState(overrides = {}) {
   state.airborne = Boolean(state.airborne);
   state.pumpCompression = clamp01(state.pumpCompression);
   state.landing = clamp01(state.landing);
+  state.landingImpact = Math.max(0, Number(state.landingImpact) || 0);
   state.landingAnticipation = clamp01(state.landingAnticipation);
+  state.crashActive = Boolean(state.crashActive);
+  state.crashReason = state.crashReason ? String(state.crashReason) : null;
+  state.crashStage = state.crashStage ? String(state.crashStage).toUpperCase() : null;
+  state.recoveryProgress = clamp01(state.recoveryProgress);
   state.recovery = clamp01(state.recovery);
   state.trickProgress = clamp01(state.trickProgress);
   state.speedNormalized = clamp01(state.speedNormalized);

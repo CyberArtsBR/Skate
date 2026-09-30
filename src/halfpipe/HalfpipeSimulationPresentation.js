@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/gameConfig.js';
+import { PHASE4_GAMEPLAY_CONFIG } from '../gameplay/phase4GameplayConfig.js';
 import {
   normalizeLandingQuality,
   resolveSkateAnimationState,
@@ -28,15 +29,60 @@ function easeInOut(value) {
 }
 
 function explicitLanding(simulationState) {
-  return clamp01(
-    simulationState.landing
-    ?? simulationState.landingImpact
-    ?? simulationState.landingProgress
-    ?? 0,
-  );
+  // landingImpact is a physical velocity-derived magnitude (commonly 20-50),
+  // never a normalized pose weight. V9 derives the animation envelope only
+  // from the explicit normalized value or the active landing timer.
+  if (!simulationState.landingActive) return 0;
+  if (Number.isFinite(Number(simulationState.landingProgress))) {
+    return clamp01(simulationState.landingProgress);
+  }
+  if (Number.isFinite(Number(simulationState.landingEnvelope))) {
+    return clamp01(simulationState.landingEnvelope);
+  }
+  const duration = Math.max(1e-4, PHASE4_GAMEPLAY_CONFIG.landing.activeSeconds);
+  return clamp01((Number(simulationState.landingRemaining) || 0) / duration);
 }
 
-function explicitLandingQuality(simulationState) {
+function crashPresentation(simulationState) {
+  if (!simulationState.crashActive) {
+    return {
+      active: false,
+      progress: 0,
+      recovery: 0,
+      stage: null,
+    };
+  }
+
+  const duration = Math.max(1e-4, PHASE4_GAMEPLAY_CONFIG.crash.recoverySeconds);
+  const remaining = Math.max(0, Number(simulationState.recoveryRemaining) || 0);
+  const progress = clamp01(1 - remaining / duration);
+  let stage = 'BAIL';
+  if (progress >= 0.12) stage = 'IMPACT';
+  if (progress >= 0.28) stage = 'SLIDE';
+  if (progress >= 0.52) stage = 'RECOVER';
+  if (progress >= 0.88) stage = 'RETURN_TO_RIDING';
+
+  // Recovery is a pose envelope, not elapsed time: rise after the impact and
+  // naturally return toward neutral before authoritative crash state ends.
+  const rise = smoothstep01((progress - 0.35) / 0.35);
+  const fall = 1 - smoothstep01((progress - 0.84) / 0.16);
+  return {
+    active: true,
+    progress,
+    recovery: clamp01(rise * fall),
+    stage,
+  };
+}
+
+function explicitLandingQuality(simulationState, crash) {
+  if (crash.active && crash.progress < 0.28) {
+    return normalizeLandingQuality(
+      simulationState.landingQuality
+      ?? simulationState.lastLandingQuality
+      ?? 'bail',
+    );
+  }
+  if (!simulationState.landingActive) return normalizeLandingQuality('none');
   return normalizeLandingQuality(
     simulationState.landingQuality
     ?? simulationState.lastLandingQuality
@@ -161,10 +207,6 @@ export function simulationToPresentationState(profile, simulationState) {
     const segment = (flipDegrees % 360) / 360;
     const invertEnvelope = Math.sin(Math.PI * segment);
 
-    // V7 keeps the reference's readable camera-plane inversion, but reverses
-    // the rotation direction so the rider travels BACK over the shoulders
-    // instead of reading as a front flip. Mirroring by wall keeps the same
-    // backward body-relative rotation on both sides of the halfpipe.
     const invertDirection = currentSide;
     trickRoll = invertDirection * flipRadians;
     trickPitch = invertDirection * 0.055 * invertEnvelope;
@@ -215,8 +257,6 @@ export function simulationToPresentationState(profile, simulationState) {
     const envelope = Math.sin(Math.PI * trickProgress);
 
     trickType = simulationState.surfaceTrickType;
-    // finalFacingYaw contains the completed 180. Start from the previous facing
-    // and honor the gameplay-provided direction when present.
     facingYaw = finalFacingYaw
       - turnDirection * Math.PI * (1 - trickProgress);
 
@@ -250,8 +290,9 @@ export function simulationToPresentationState(profile, simulationState) {
   const airTuck = airborne && trickType === 'backflip'
     ? Math.max(0.82, baseAirTuck)
     : baseAirTuck;
+  const crash = crashPresentation(simulationState);
   const landing = explicitLanding(simulationState);
-  const landingQuality = explicitLandingQuality(simulationState);
+  const landingQuality = explicitLandingQuality(simulationState, crash);
 
   const presentation = {
     time: dropTime,
@@ -279,9 +320,14 @@ export function simulationToPresentationState(profile, simulationState) {
     dropInRoll,
     dropInProgress,
     landing,
+    landingImpact: Math.max(0, Number(simulationState.landingImpact) || 0),
     landingQuality,
     landingAnticipation,
-    recovery: 0,
+    crashActive: crash.active,
+    crashReason: simulationState.crashReason || null,
+    crashStage: crash.stage,
+    recoveryProgress: crash.progress,
+    recovery: crash.recovery,
     trickType,
     trickProgress,
     speedNormalized,

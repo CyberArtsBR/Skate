@@ -75,8 +75,8 @@ const launch = new HalfpipeSimulation(profile);
 assert.equal(launch.computeLaunchVelocity(1.19), 0);
 const atThreshold = launch.computeLaunchVelocity(1.2);
 const justAbove = launch.computeLaunchVelocity(1.21);
-assert.ok(atThreshold > 8 && atThreshold < 9);
-assert.ok(justAbove - atThreshold < 0.05);
+assert.equal(atThreshold, 0);
+assert.ok(justAbove >= 0 && justAbove < 0.01);
 assert.ok(launch.computeLaunchVelocity(18) > 20);
 assert.ok(launch.computeLaunchVelocity(18) <= 27 + 1e-9);
 const maxLaunchVelocity = launch.computeLaunchVelocity(22);
@@ -84,7 +84,7 @@ assert.ok(Math.abs(maxLaunchVelocity - 27) < 1e-9);
 const maxAirHeight = (maxLaunchVelocity * maxLaunchVelocity) / (2 * launch.airGravity);
 assert.ok(
   maxAirHeight > 7 && maxAirHeight < 7.5,
-  `V7 maximum air height should be roughly half the previous ~14.4m: ${maxAirHeight}`,
+  `V9 preserves the reduced-height maximum air envelope: ${maxAirHeight}`,
 );
 
 launch._enterAir(-1, -12, profile.leftLip + launch.airTakeoffInset);
@@ -114,7 +114,7 @@ assert.equal(tap.state.airTurnActive, false);
 const clean = new HalfpipeSimulation(profile);
 clean._enterAir(-1, -16, profile.leftLip + clean.airTakeoffInset);
 clean.setTurnIntent(-1);
-for (let i=0;i<36;i++) clean.stepFixed();
+for (let i=0;i<24;i++) clean.stepFixed();
 clean.setTurnIntent(0);
 clean.stepFixed();
 assert.equal(clean.state.airTurnCompleted, false);
@@ -128,7 +128,7 @@ assert.equal(clean.state.airTurnDirection, 1);
 const spin360 = new HalfpipeSimulation(profile);
 spin360._enterAir(1, 22, profile.rightLip - spin360.airTakeoffInset);
 spin360.setTurnIntent(-1);
-for (let i=0;i<72;i++) spin360.stepFixed();
+for (let i=0;i<48;i++) spin360.stepFixed();
 spin360.setTurnIntent(0);
 spin360.stepFixed();
 spin360._finishAirTurnFromInput();
@@ -138,12 +138,12 @@ assert.equal(spin360.state.airRotationTargetDegrees, 360);
 const over = new HalfpipeSimulation(profile);
 over._enterAir(-1, -30, profile.leftLip + over.airTakeoffInset);
 over.setTurnIntent(-1);
-for (let i=0;i<50;i++) over.stepFixed();
-assert.ok(over.state.airRotationDegrees > 240);
+for (let i=0;i<32;i++) over.stepFixed();
+assert.ok(over.state.airRotationDegrees > 230);
 
 // Correct the over-turn before landing by steering in the opposite direction.
 over.setTurnIntent(1);
-for (let i=0;i<14;i++) over.stepFixed();
+for (let i=0;i<8;i++) over.stepFixed();
 assert.ok(
   over.state.airRotationDegrees >= 175 && over.state.airRotationDegrees <= 185,
   `opposite in-air input should rewind rotation toward 180: ${over.state.airRotationDegrees}`,
@@ -157,7 +157,7 @@ assert.equal(over.state.airTurnFailedReason, null);
 const backflip = new HalfpipeSimulation(profile);
 backflip._enterAir(-1, -24, profile.leftLip + backflip.airTakeoffInset);
 backflip.setBackflipHeld(true);
-for (let i=0;i<86;i++) backflip.stepFixed();
+for (let i=0;i<60;i++) backflip.stepFixed();
 backflip.setBackflipHeld(false);
 backflip.stepFixed();
 assert.equal(backflip.state.backflipCompleted, true);
