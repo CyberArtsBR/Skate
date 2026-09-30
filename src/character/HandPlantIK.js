@@ -56,11 +56,16 @@ export class HandPlantIK {
   constructor({ rigAdapter, riderRoot }) {
     this.rigAdapter = rigAdapter;
     this.riderRoot = riderRoot;
+    this.selectedPlantHand = null;
     this.result = {
       active: false,
       side: null,
+      selectedPlantHand: null,
       weight: 0,
       error: 0,
+      contactError: 0,
+      plantHandWorldPosition: null,
+      plantTargetWorldPosition: null,
       degraded: false,
     };
   }
@@ -103,17 +108,28 @@ export class HandPlantIK {
     this.result.active = false;
     this.result.weight = 0;
     this.result.error = 0;
+    this.result.contactError = 0;
+    this.result.plantHandWorldPosition = null;
+    this.result.plantTargetWorldPosition = null;
     this.result.degraded = false;
 
-    if (!active || !this.rigAdapter || !this.riderRoot) return this.result;
+    if (!active || !this.rigAdapter || !this.riderRoot) {
+      this.selectedPlantHand = null;
+      this.result.side = null;
+      this.result.selectedPlantHand = null;
+      return this.result;
+    }
 
     const target = targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
-    // A very small camera-depth offset keeps the palm readable on top of the
-    // coping rather than visually disappearing through it.
     target.z += Math.cos(Number(facingYaw) || 0) * 0.018;
     this.riderRoot.updateWorldMatrix(true, true);
 
-    const plantSide = this._selectSide(target, side);
+    // Select exactly once at maneuver start. Never switch hands during the
+    // inverted pose even if the other hand becomes momentarily closer.
+    if (!this.selectedPlantHand) {
+      this.selectedPlantHand = this._selectSide(target, side);
+    }
+    const plantSide = this.selectedPlantHand;
     if (!plantSide) {
       this.result.degraded = true;
       return this.result;
@@ -142,11 +158,16 @@ export class HandPlantIK {
       this.riderRoot.updateWorldMatrix(true, true);
     }
 
-    const error = hand.getWorldPosition(new THREE.Vector3()).distanceTo(target);
+    const handWorld = hand.getWorldPosition(new THREE.Vector3());
+    const error = handWorld.distanceTo(target);
     this.result.active = weight > 0.001;
     this.result.side = plantSide;
+    this.result.selectedPlantHand = plantSide;
     this.result.weight = weight;
     this.result.error = Number.isFinite(error) ? error : 0;
+    this.result.contactError = this.result.error;
+    this.result.plantHandWorldPosition = handWorld.clone();
+    this.result.plantTargetWorldPosition = target.clone();
     return this.result;
   }
 }
