@@ -120,8 +120,16 @@ export class HandPlantIK {
       return this.result;
     }
 
+    const t = clamp01(progress);
+    // Reach the coping earlier, hold a true planted phase through the middle of
+    // the maneuver, then release late. This produces a clear contact beat and
+    // prevents the hand from visibly floating away while the body is inverted.
+    const reach = smoothstep(t / 0.26);
+    const release = t <= 0.84 ? 1 : 1 - smoothstep((t - 0.84) / 0.16);
+    const weight = clamp01(reach * release);
+
     const target = targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
-    target.z += Math.cos(Number(facingYaw) || 0) * 0.018;
+    target.z += Math.cos(Number(facingYaw) || 0) * (0.012 + 0.008 * weight);
     this.riderRoot.updateWorldMatrix(true, true);
 
     // Select exactly once at maneuver start. Never switch hands during the
@@ -144,17 +152,15 @@ export class HandPlantIK {
       return this.result;
     }
 
-    const t = clamp01(progress);
-    const reach = smoothstep(t / 0.34);
-    const release = t <= 0.72 ? 1 : 1 - smoothstep((t - 0.72) / 0.28);
-    const weight = clamp01(reach * release);
-
-    for (let iteration = 0; iteration < 6; iteration += 1) {
-      rotateJointToward(forearm, hand, target, weight, 0.22);
+    // Extra low-cost CCD passes plus slightly wider safe joint limits make the
+    // arm settle on the coping rather than oscillating around it. The shoulder
+    // remains restrained so different Chimpion rigs keep a believable silhouette.
+    for (let iteration = 0; iteration < 8; iteration += 1) {
+      rotateJointToward(forearm, hand, target, weight, 0.26);
       this.riderRoot.updateWorldMatrix(true, true);
-      rotateJointToward(upperArm, hand, target, weight, 0.18);
+      rotateJointToward(upperArm, hand, target, weight, 0.21);
       this.riderRoot.updateWorldMatrix(true, true);
-      rotateJointToward(shoulder, hand, target, weight * 0.55, 0.08);
+      rotateJointToward(shoulder, hand, target, weight * 0.62, 0.095);
       this.riderRoot.updateWorldMatrix(true, true);
     }
 

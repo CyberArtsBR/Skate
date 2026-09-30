@@ -68,7 +68,9 @@ export const GAME_CONFIG = Object.freeze({
   session: Object.freeze({ durationSeconds: 75 }),
   gameplay: Object.freeze({ motionTimeScale: 0.75 }),
   arcadeMotion: Object.freeze({ downhillGravityScale: 1.12, uphillGravityScale: 1.6 }),
-  pumping: Object.freeze({ acceleration: 8.5, upperWallRetention: 0.75, minimumSpeed: 0.65 }),
+  // Pumping remains timing/direction based, but it is now eligible essentially
+  // from rest so a low-energy run can always be rebuilt by player input.
+  pumping: Object.freeze({ acceleration: 8.5, upperWallRetention: 0.75, minimumSpeed: 0.05 }),
   turning: Object.freeze({
     kickTurnMinFraction: 0.78,
     kickTurnRetention: 0.93,
