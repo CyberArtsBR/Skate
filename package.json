@@ -18,7 +18,7 @@
     "check:controller": "node checks/controller-input.mjs",
     "check:camera": "node checks/camera-framing.mjs",
     "check:tricks": "node checks/trick-presentation.mjs",
-    "check:gameplay": "node checks/phase4-gameplay-core.mjs",
+    "check:gameplay": "node --import ./checks/v9-runtime-preload.mjs checks/phase4-gameplay-core.mjs",
     "check:v9": "node checks/v9-gameplay-regressions.mjs",
     "check:character": "node checks/phase4-character-tricks.mjs",
     "check:ui": "node checks/ui-flow.mjs",
