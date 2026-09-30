@@ -23,7 +23,7 @@ function visitMaterials(root, callback) {
       ? object.material
       : [object.material];
     for (const material of materials) {
-      if (material) callback(material);
+      if (material) callback(material, object);
     }
   });
 }
@@ -70,6 +70,8 @@ export class RenderQualityManager {
       shadowSize: this._resolveShadowSize(this.shadowSize),
       anisotropy: this.anisotropy,
       environmentQuality: this.environmentQuality,
+      environmentIntensity: this.preset.environmentIntensity,
+      frontMetalEnvMapIntensity: this.preset.frontMetalEnvMapIntensity,
       vfxScale: this.vfxScale,
     });
   }
@@ -125,7 +127,7 @@ export class RenderQualityManager {
   registerObject(root) {
     if (!root) return () => {};
     this.managedObjects.add(root);
-    this._applyAnisotropy(root);
+    this._applyManagedObject(root);
     return () => this.unregisterObject(root);
   }
 
@@ -152,7 +154,7 @@ export class RenderQualityManager {
       }
     }
     for (const light of this.shadowLights) this._applyShadowLight(light);
-    for (const root of this.managedObjects) this._applyAnisotropy(root);
+    for (const root of this.managedObjects) this._applyManagedObject(root);
     if (rebuildEnvironment) this._applyEnvironment(true);
 
     const state = this.snapshot();
@@ -181,6 +183,11 @@ export class RenderQualityManager {
     light.shadow.needsUpdate = true;
   }
 
+  _applyManagedObject(root) {
+    this._applyAnisotropy(root);
+    this._applyMaterialQuality(root);
+  }
+
   _applyAnisotropy(root) {
     const target = this.anisotropy;
     const visited = new Set();
@@ -193,6 +200,17 @@ export class RenderQualityManager {
         texture.anisotropy = target;
         texture.needsUpdate = true;
       }
+    });
+  }
+
+  _applyMaterialQuality(root) {
+    const frontMetalIntensity = Number(this.preset.frontMetalEnvMapIntensity);
+    if (!Number.isFinite(frontMetalIntensity)) return;
+
+    visitMaterials(root, (material, object) => {
+      if (!object?.userData?.maxReflectiveFront) return;
+      if (!('envMapIntensity' in material)) return;
+      material.envMapIntensity = frontMetalIntensity;
     });
   }
 
