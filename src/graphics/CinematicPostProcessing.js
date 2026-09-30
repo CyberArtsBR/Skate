@@ -49,6 +49,9 @@ function createCompositeMaterial() {
       }
     `,
     fragmentShader: `
+      #include <tonemapping_pars_fragment>
+      #include <colorspace_pars_fragment>
+
       uniform sampler2D tBase;
       uniform sampler2D tBloom;
       uniform vec2 uTexelSize;
@@ -65,12 +68,14 @@ function createCompositeMaterial() {
         vec3 sharpened = base.rgb + (base.rgb - localAverage) * uSharpen;
         vec3 bloom = texture2D(tBloom, vUv).rgb;
         gl_FragColor = vec4(max(vec3(0.0), sharpened + bloom), base.a);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
       }
     `,
     transparent: true,
     depthTest: false,
     depthWrite: false,
-    toneMapped: false,
+    toneMapped: true,
   });
 }
 
