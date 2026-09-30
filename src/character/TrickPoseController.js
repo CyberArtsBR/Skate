@@ -6,6 +6,15 @@ const smoothstep = (value) => {
   return t * t * (3 - 2 * t);
 };
 
+function phaseEnvelope(progress, enterEnd, exitStart) {
+  const t = clamp01(progress);
+  const enter = smoothstep(t / Math.max(0.001, enterEnd));
+  const exit = t <= exitStart
+    ? 1
+    : 1 - smoothstep((t - exitStart) / Math.max(0.001, 1 - exitStart));
+  return clamp01(enter * exit);
+}
+
 export class TrickPoseController {
   constructor({
     stance = 'regular',
@@ -47,20 +56,35 @@ export class TrickPoseController {
       output.boardRoll += (this.stance === 'goofy' ? -1 : 1) * 0.18 * envelope;
       output.bodyY = -0.035 * envelope;
     } else if (state.trickVisualActive && state.trickType === 'hand-plant') {
-      output.boardYaw = -direction * 0.05 * envelope;
-      output.boardRoll += (Number(state.wallSide) || 1) * 0.2 * envelope;
-      output.bodyYaw = direction * 0.08 * envelope;
-      output.bodyY = 0.04 * envelope;
-      output.bodyX = -(Number(state.wallSide) || 1) * 0.035 * envelope;
+      const side = Math.sign(Number(state.wallSide) || 0) || 1;
+      const plant = phaseEnvelope(progress, 0.26, 0.82);
+      const settle = phaseEnvelope(progress, 0.38, 0.76);
+
+      // V14 hand plant: travel into the coping first, settle the shoulder/hip
+      // stack while the hand is planted, then release the body before the deck.
+      // This avoids the old symmetric "rock over and rock back" look.
+      output.boardYaw = -direction * (0.035 + 0.035 * settle) * plant;
+      output.boardRoll += side * (0.16 + 0.08 * settle) * plant;
+      output.bodyYaw = direction * (0.07 + 0.09 * settle) * plant;
+      output.bodyRoll = -side * 0.075 * settle;
+      output.bodyY = 0.025 * plant + 0.045 * settle;
+      output.bodyX = -side * (0.025 * plant + 0.055 * settle);
     } else if (state.airborne && state.trickType === 'backflip') {
-      const tuck = Math.max(0.72, clamp01(state.airTuck));
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
       const flipDirection = Math.sign(Number(state.trickRoll) || 0) || side;
-      output.boardRoll += -flipDirection * 0.09 * envelope;
-      output.bodyRoll = flipDirection * 0.16 * envelope;
-      output.bodyY = -0.18 * tuck * (0.62 + 0.38 * envelope);
-      output.bodyX = -side * 0.065 * envelope;
-      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.18;
+      const tuck = phaseEnvelope(progress, 0.2, 0.7);
+      const open = smoothstep((progress - 0.68) / 0.32);
+      const takeoff = 1 - smoothstep(progress / 0.16);
+
+      // Main 360/720 rotation remains on trickCarrier. These are secondary
+      // body/deck offsets that create a readable takeoff -> tuck -> spot-landing
+      // sequence instead of rotating a rigid rider-and-board silhouette.
+      output.boardRoll += -flipDirection * (0.055 * envelope + 0.055 * tuck);
+      output.bodyRoll = flipDirection * (0.11 * envelope + 0.12 * tuck);
+      output.bodyY = -0.08 * takeoff - 0.24 * tuck + 0.035 * open;
+      output.bodyX = -side * (0.035 * envelope + 0.045 * tuck - 0.02 * open);
+      output.bodyYaw = (Number(state.secondaryLag) || 0) * 0.16
+        - flipDirection * 0.045 * tuck;
     } else if (state.airborne) {
       output.boardRoll += (this.stance === 'goofy' ? -1 : 1)
         * 0.035
