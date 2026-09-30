@@ -203,6 +203,12 @@ function pointVector(point) {
   return null;
 }
 
+function pointObject(point) {
+  const vector = pointVector(point);
+  if (!vector) return null;
+  return { x: vector.x, y: vector.y, z: vector.z };
+}
+
 function installVisualCopingPatch() {
   const visualProto = HalfpipeVisual.prototype;
   if (!visualProto[COPING_INSTALLED]) {
@@ -266,15 +272,35 @@ function installVisualCopingPatch() {
       );
       if (projected) {
         // Presentation/VFX only. Physics remains the mathematical profile.
-        nextState.copingWorldPoint = {
-          x: projected.x,
-          y: projected.y,
-          z: projected.z,
-        };
-        nextState.plantTargetWorldPosition = nextState.copingWorldPoint;
+        nextState.copingWorldPoint = pointObject(projected);
+        nextState.plantTargetWorldPosition = pointObject(projected);
       }
     }
-    return originalApply.call(this, nextState);
+
+    const result = originalApply.call(this, nextState);
+    const ik = this.rider?.root?.userData?.handPlantIK;
+    if (ik?.active && ik.plantHandWorldPosition) {
+      this._v9LastPlantHandWorldPosition = pointObject(ik.plantHandWorldPosition);
+      this._v9LastPlantTargetWorldPosition = pointObject(ik.plantTargetWorldPosition);
+      this._v9LastPlantContactError = Number(ik.contactError) || 0;
+    }
+
+    // The TRICK_COMPLETED event is emitted on the frame the surface trick
+    // becomes inactive, so preserve the last actual IK contact for one-shot VFX.
+    // main.js already forwards presentationState.copingWorldPoint as the Hand
+    // Plant contact; replacing it here makes that existing bridge use the real
+    // hand position rather than the mathematical/profile target.
+    if (this._v9LastPlantHandWorldPosition) {
+      nextState.plantHandWorldPosition = { ...this._v9LastPlantHandWorldPosition };
+      nextState.plantTargetWorldPosition = this._v9LastPlantTargetWorldPosition
+        ? { ...this._v9LastPlantTargetWorldPosition }
+        : nextState.plantTargetWorldPosition;
+      nextState.contactError = this._v9LastPlantContactError || 0;
+      if (!nextState.trickVisualActive) {
+        nextState.copingWorldPoint = { ...this._v9LastPlantHandWorldPosition };
+      }
+    }
+    return result;
   };
   return true;
 }
