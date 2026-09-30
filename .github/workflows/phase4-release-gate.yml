@@ -123,3 +123,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "${{ needs.asset_audit.outputs.candidate }}"
+
+  physics_audit:
+    name: V9 physics metrics audit
+    runs-on: ubuntu-latest
+    outputs:
+      summary: ${{ steps.audit.outputs.summary }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: audit
+        run: node tools/v9-physics-audit.mjs
+
+  physics_report:
+    needs: physics_audit
+    name: V9 physics ${{ needs.physics_audit.outputs.summary }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ needs.physics_audit.outputs.summary }}"
