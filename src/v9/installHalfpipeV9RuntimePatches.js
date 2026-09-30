@@ -1,8 +1,12 @@
+import * as THREE from 'three';
 import { HalfpipeAudio } from '../audio/HalfpipeAudio.js';
 import { HalfpipePumpInput } from '../input/HalfpipePumpInput.js';
+import { HalfpipeVisual } from '../halfpipe/HalfpipeVisual.js';
+import { HalfpipePresentationBinder } from '../halfpipe/HalfpipePresentationBinder.js';
 
 const AUDIO_INSTALLED = Symbol.for('chimpions.halfpipe.v9.audio-patches');
 const UI_INSTALLED = Symbol.for('chimpions.halfpipe.v9.ui-patches');
+const COPING_INSTALLED = Symbol.for('chimpions.halfpipe.v9.coping-contact-patches');
 const menuSelections = new WeakMap();
 
 function neutralActions(actions) {
@@ -123,6 +127,8 @@ function buildProceduralOutdoorVoice(audio, descriptor, gainScale = 1) {
   );
   groupGain.connect(destination);
 
+  // Three restrained filtered-noise layers stand in for California air,
+  // distant city wash and a very subtle crowd bed. No copyrighted source audio.
   const layers = [
     { type: 'lowpass', frequency: 780, q: 0.35, gain: 0.72, rate: 0.91, offset: 0.08 },
     { type: 'bandpass', frequency: 1450, q: 0.28, gain: 0.22, rate: 1.07, offset: 0.31 },
@@ -189,9 +195,94 @@ function installAudioPatch() {
   return true;
 }
 
+function pointVector(point) {
+  if (point?.isVector3) return point.clone();
+  if (point && [point.x, point.y, point.z].every(Number.isFinite)) {
+    return new THREE.Vector3(point.x, point.y, point.z);
+  }
+  return null;
+}
+
+function installVisualCopingPatch() {
+  const visualProto = HalfpipeVisual.prototype;
+  if (!visualProto[COPING_INSTALLED]) {
+    Object.defineProperty(visualProto, COPING_INSTALLED, { value: true });
+    visualProto.projectCopingPoint = function projectCopingPoint(worldPoint, wallSide = 0) {
+      const target = pointVector(worldPoint);
+      if (!target || !this.model) return null;
+
+      if (!this._v9CopingMeshes) {
+        this._v9CopingMeshes = [];
+        this.model.traverse((object) => {
+          if (object.isMesh && object.userData?.copingContactZone) {
+            this._v9CopingMeshes.push(object);
+          }
+        });
+      }
+      if (!this._v9CopingMeshes.length) return null;
+
+      this.root.updateWorldMatrix(true, true);
+      const side = Math.sign(Number(wallSide) || target.x) || 1;
+      const rays = [
+        { origin: target.clone().add(new THREE.Vector3(0, 1.5, 0)), direction: new THREE.Vector3(0, -1, 0) },
+        { origin: target.clone().add(new THREE.Vector3(side * 1.5, 0, 0)), direction: new THREE.Vector3(-side, 0, 0) },
+        { origin: target.clone().add(new THREE.Vector3(0, 0, 1.5)), direction: new THREE.Vector3(0, 0, -1) },
+        { origin: target.clone().add(new THREE.Vector3(0, 0, -1.5)), direction: new THREE.Vector3(0, 0, 1) },
+      ];
+      const raycaster = this._v9CopingRaycaster ||= new THREE.Raycaster();
+      let best = null;
+      let bestError = Infinity;
+
+      for (const ray of rays) {
+        raycaster.set(ray.origin, ray.direction);
+        raycaster.near = 0;
+        raycaster.far = 3;
+        const hit = raycaster.intersectObjects(this._v9CopingMeshes, true)[0];
+        if (!hit?.point) continue;
+        const error = hit.point.distanceToSquared(target);
+        if (error < bestError) {
+          bestError = error;
+          best = hit.point.clone();
+        }
+      }
+      return best;
+    };
+  }
+
+  const binderProto = HalfpipePresentationBinder.prototype;
+  if (binderProto[COPING_INSTALLED]) return true;
+  Object.defineProperty(binderProto, COPING_INSTALLED, { value: true });
+  const originalApply = binderProto.apply;
+  binderProto.apply = function applyV9VisualCoping(nextState = {}) {
+    if (
+      nextState.trickVisualActive
+      && nextState.trickType === 'hand-plant'
+      && nextState.copingWorldPoint
+      && this.visualSurface?.projectCopingPoint
+    ) {
+      const projected = this.visualSurface.projectCopingPoint(
+        nextState.copingWorldPoint,
+        nextState.wallSide,
+      );
+      if (projected) {
+        // Presentation/VFX only. Physics remains the mathematical profile.
+        nextState.copingWorldPoint = {
+          x: projected.x,
+          y: projected.y,
+          z: projected.z,
+        };
+        nextState.plantTargetWorldPosition = nextState.copingWorldPoint;
+      }
+    }
+    return originalApply.call(this, nextState);
+  };
+  return true;
+}
+
 export function installHalfpipeV9RuntimePatches() {
   return {
     controllerMenus: installControllerMenuPatch(),
     audio: installAudioPatch(),
+    visualCoping: installVisualCopingPatch(),
   };
 }
