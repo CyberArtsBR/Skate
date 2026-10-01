@@ -1,3 +1,5 @@
+import './results.css';
+
 const STAT_ROWS = Object.freeze([
   ['finalScore', 'FINAL SCORE'],
   ['bestTrick', 'BEST TRICK'],
@@ -5,8 +7,7 @@ const STAT_ROWS = Object.freeze([
   ['longestCombo', 'LONGEST COMBO'],
   ['tricksLanded', 'TRICKS LANDED'],
   ['perfectLandings', 'PERFECT LANDINGS'],
-  ['crashes', 'CRASHES'],
-  ['pumpAccuracy', 'PUMP ACCURACY'],
+  ['crashes', 'BAILS'],
 ]);
 
 export function normalizeResultsStats(stats = {}) {
@@ -41,7 +42,9 @@ export class ResultsScreen {
       '<div class="menu-card results-card">',
       '<p class="menu-eyebrow">RUN COMPLETE</p>',
       '<h1>RESULTS</h1>',
+      '<div class="results-content">',
       '<div class="results-grid" data-results-grid></div>',
+      '</div>',
       '<div class="menu-actions" data-actions></div>',
       '</div>',
     ].join('');
@@ -90,6 +93,7 @@ export class ResultsScreen {
       + escapeText(key === 'finalScore' ? normalized[key].toLocaleString('en-US') : normalized[key]) + '</strong></div>'
     )).join('');
     this.root.querySelector('[data-standings]')?.remove();
+    this.root.classList.toggle('has-standings', Boolean(standings.length));
     if (standings.length) {
       const ranking = document.createElement('div');
       ranking.dataset.standings = '';
@@ -102,6 +106,7 @@ export class ResultsScreen {
         row.className = 'standing-row' + (entry.isPlayer ? ' is-player' : '');
         const label = document.createElement('span');
         label.textContent = `${index + 1}. ${entry.isPlayer ? 'YOU · ' : ''}${entry.name}`;
+        label.title = label.textContent;
         const score = document.createElement('strong');
         score.textContent = entry.score.toLocaleString('en-US');
         row.append(label, score);

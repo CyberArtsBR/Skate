@@ -725,12 +725,7 @@ function routeGameplayEvents(events, state, presentationState) {
     if (vfxResult.cameraImpact) cameraController.addImpact(vfxResult.cameraImpact);
     audio.handleEvent(event);
 
-    if (type === 'PUMP_RATING') {
-      const rating = String(event.rating || '').toUpperCase();
-      if (rating === 'PERFECT' || rating === 'GOOD') {
-        hud.showActionFeedback(rating, { text: rating + ' PUMP', duration: 650 });
-      }
-    } else if (type === 'TRICK_STARTED') {
+    if (type === 'TRICK_STARTED') {
       hud.showActionFeedback('trick', {
         text: String(event.trick || 'TRICK').replaceAll('-', ' ').toUpperCase(),
         duration: 650,
@@ -742,11 +737,12 @@ function routeGameplayEvents(events, state, presentationState) {
       hud.showActionFeedback(event.reason || 'MISSED', {
         text: String(event.reason || 'MISSED').replaceAll('_', ' '),
         duration: 900,
+        tone: 'bad',
       });
     } else if (type === 'LANDING') {
       hud.showLanding(event.quality || 'CLEAN', { multiplier: event.scoreMultiplier });
     } else if (type === 'BAIL') {
-      hud.showActionFeedback('bail', { text: 'NO POINTS · −20% SPEED', duration: 1100 });
+      hud.showActionFeedback('bail', { text: 'NO POINTS · −20% SPEED', duration: 1100, tone: 'bad' });
     } else if (type === 'COMBO_CHANGED') {
       integrationStats.longestCombo = Math.max(
         integrationStats.longestCombo,

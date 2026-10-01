@@ -17,6 +17,9 @@ const SOURCE_PLATFORMS = Object.freeze([
 
 const ORIGINAL_PODIUM_WIDTH = 4.5;
 const PODIUM_HEIGHT_SCALE = 1.15;
+const TROPHY_HEIGHT = 0.75;
+const TROPHY_FRONT_OFFSET = 0.65;
+const TROPHY_PLATFORM_CLEARANCE = 0.015;
 
 const STANDING_POSE = Object.freeze({
   facingSign: 1,
@@ -35,6 +38,7 @@ export class WinnersPodium {
     floorY = 0,
     width = ORIGINAL_PODIUM_WIDTH * 1.25,
     url = '/models/podium/winner_podium.glb',
+    trophyUrl = '/models/podium/trophy.glb',
   } = {}) {
     this.root = new THREE.Group();
     this.root.name = 'winners-podium-presentation';
@@ -42,10 +46,12 @@ export class WinnersPodium {
     this.root.visible = false;
     scene.add(this.root);
     this.url = url;
+    this.trophyUrl = trophyUrl;
     this.floorY = floorY;
     this.profile = new HalfpipeProfile();
     this.width = Math.max(Number(width) || ORIGINAL_PODIUM_WIDTH * 1.25, 3.5);
     this.podium = null;
+    this.trophy = null;
     this.platforms = [];
     this.actors = [];
     this._labelAnchors = [];
@@ -57,9 +63,9 @@ export class WinnersPodium {
 
   preload() {
     if (this._disposed) return Promise.reject(new Error('Podium has been disposed.'));
-    if (this.podium) return Promise.resolve(this);
     if (this._preloadPromise) return this._preloadPromise;
-    this._preloadPromise = new GLTFLoader().loadAsync(this.url).then((gltf) => {
+    if (this.podium) return Promise.resolve(this);
+    this._preloadPromise = new GLTFLoader().loadAsync(this.url).then(async (gltf) => {
       const podium = gltf.scene;
       if (this._disposed) {
         disposeObject3D(podium);
@@ -109,12 +115,58 @@ export class WinnersPodium {
       this._localBounds.setFromObject(podium, true);
       // Store a root-local box, independent of ramp floor elevation.
       this._localBounds.applyMatrix4(this.root.matrixWorld.clone().invert());
+      await this._preloadTrophy();
+      if (this._disposed) throw new Error('Podium was disposed while loading.');
       return this;
     }).catch((error) => {
       this._preloadPromise = null;
       throw error;
     });
     return this._preloadPromise;
+  }
+
+  async _preloadTrophy() {
+    let trophyModel = null;
+    try {
+      const gltf = await new GLTFLoader().loadAsync(this.trophyUrl);
+      trophyModel = gltf.scene;
+      if (this._disposed) {
+        disposeObject3D(trophyModel);
+        return;
+      }
+      trophyModel.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(trophyModel, true);
+      const height = bounds.max.y - bounds.min.y;
+      if (!Number.isFinite(height) || height <= 0.001) {
+        throw new Error('Supplied trophy has no usable upright geometry.');
+      }
+      const center = bounds.getCenter(new THREE.Vector3());
+      const scale = TROPHY_HEIGHT / height;
+      // The asset is authored far from its origin. Normalize a parent group
+      // instead of changing its embedded transforms or textured PBR materials.
+      const normalized = new THREE.Group();
+      normalized.scale.setScalar(scale);
+      normalized.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
+      normalized.add(trophyModel);
+      const trophy = new THREE.Group();
+      trophy.name = 'first-place-trophy';
+      trophy.add(normalized);
+      const winnerPlatform = this.platforms.find((platform) => platform.rank === 1);
+      trophy.position.copy(winnerPlatform.position);
+      trophy.position.y += TROPHY_PLATFORM_CLEARANCE;
+      trophy.position.z += TROPHY_FRONT_OFFSET;
+      trophyModel.traverse((object) => {
+        if (!object.isMesh) return;
+        object.castShadow = true;
+        object.receiveShadow = true;
+      });
+      this.trophy = trophy;
+      this.root.add(trophy);
+    } catch (error) {
+      disposeObject3D(trophyModel);
+      // Trophy failure is cosmetic: the ranked competitors can still appear.
+      if (!this._disposed) console.warn('Unable to load the winners podium trophy.', error);
+    }
   }
 
   async show(entries) {
@@ -254,7 +306,9 @@ export class WinnersPodium {
     this._disposed = true;
     this.hide();
     disposeObject3D(this.podium);
+    disposeObject3D(this.trophy);
     this.podium = null;
+    this.trophy = null;
     this.root.removeFromParent();
   }
 }
