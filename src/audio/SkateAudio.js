@@ -96,6 +96,14 @@ export class SkateAudio {
     if (wind) this._replaceLoopSource('windSource', wind, this.windFilter);
   }
 
+  setDeckImpactBuffer(buffer) {
+    if (!buffer || this.disposed) return;
+    // Keep the existing impact intensity, voice limit and pitch response.
+    // The recording replaces synthetic wood/truck tones for all board contacts.
+    this.impactBank = [buffer];
+    this.impactIndex = 0;
+  }
+
   playDeckImpact(intensity = 0.5, { delay = 0, gainScale = 1, pitch = 1 } = {}) {
     if (this.disposed || this.paused || this.impactVoices.size >= SKATE_SOUND.maxImpactVoices) return;
     const amount = clamp01(intensity);

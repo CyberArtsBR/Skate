@@ -8,7 +8,7 @@ const placeholder = (kind, options = {}) => Object.freeze({
 const PIXEL_RAMPAGE = '/audio/music/Pixel%20Rampage.mp3';
 
 export const AUDIO_MANIFEST = Object.freeze({
-  version: 4,
+  version: 5,
   music: Object.freeze({
     // User-supplied Halfpipe theme. Browsers may require the first user gesture
     // before audible playback; once audio is unlocked this is the menu/theme
@@ -18,8 +18,8 @@ export const AUDIO_MANIFEST = Object.freeze({
     results: Object.freeze({ url: PIXEL_RAMPAGE, loop: true, gain: 0.50 }),
   }),
   continuous: Object.freeze({
-    wheelRoll: placeholder('skate-wheel-roll-loop', { loop: true, gain: 1 }),
-    rampTexture: placeholder('procedural-ramp-texture', { loop: true, gain: 1 }),
+    wheelRoll: Object.freeze({ url: '/audio/skate/raw-street-roll.wav', loop: true, gain: 1 }),
+    rampTexture: Object.freeze({ url: '/audio/skate/raw-street-roll.wav', loop: true, gain: 1 }),
     wind: placeholder('procedural-wind', { loop: true, gain: 1 }),
   }),
   ambience: Object.freeze({
@@ -35,7 +35,8 @@ export const AUDIO_MANIFEST = Object.freeze({
     copingHit: placeholder('metal-hit', { gain: 0.64 }),
     kickTurn: placeholder('metal-scrape', { gain: 0.76 }),
     handPlant: placeholder('handplant-accent', { gain: 0.82 }),
-    takeoff: placeholder('takeoff-pop', { gain: 0.62 }),
+    takeoff: Object.freeze({ url: '/audio/skate/raw-street-takeoff.wav', gain: 0.7 }),
+    deckImpact: Object.freeze({ url: '/audio/skate/raw-street-impact.wav', gain: 1 }),
     landingPerfect: placeholder('landing-perfect', { gain: 0.72 }),
     landingClean: placeholder('landing-clean', { gain: 0.66 }),
     landingSketchy: placeholder('landing-sketchy', { gain: 0.74 }),

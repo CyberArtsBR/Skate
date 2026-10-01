@@ -260,6 +260,7 @@ export class HalfpipeAudio {
       rampTexture: this.buffers.get('continuous.rampTexture'),
       wind: this.buffers.get('continuous.wind'),
     });
+    this.skate?.setDeckImpactBuffer(this.buffers.get('sfx.deckImpact'));
 
     return results;
   }
@@ -617,7 +618,7 @@ export class HalfpipeAudio {
         gain: 0.035 + intensity * 0.015,
         type: 'triangle',
       });
-    });
+    }, { gain: 0.65 + intensity * 0.35, rate: 1.04 - intensity * 0.08 });
 
     this._haptic({
       weakMagnitude: 0.18 + intensity * 0.12,
