@@ -5,7 +5,7 @@ const placeholder = (kind, options = {}) => Object.freeze({
   ...options,
 });
 
-const PIXEL_RAMPAGE = '/audio/music/Pixel%20Rampage.mp3';
+const PIXEL_RAMPAGE = '/audio/music/Pixel_Rampage.mp3';
 
 export const AUDIO_MANIFEST = Object.freeze({
   version: 5,
@@ -55,7 +55,7 @@ export const AUDIO_MANIFEST = Object.freeze({
 });
 
 export const AUDIO_ASSET_REQUIREMENTS = Object.freeze([
-  'Primary menu/gameplay/results theme: public/audio/music/Pixel Rampage.mp3',
+  'Primary menu/gameplay/results theme: public/audio/music/Pixel_Rampage.mp3',
   'Optional California outdoor ambience loop',
   'Optional distant-city ambience loop',
   'Optional restrained crowd ambience loop',

@@ -31,7 +31,8 @@
     "check:release:browser": "node checks/run-npm-suite.mjs check:browser:release check:v16:browser check:browser check:visual-contact",
     "check:release": "node tools/run-release.mjs",
     "check:security": "npm audit --audit-level=high",
-    "prebuild": "npm run verify:characters",
+    "check:portals-assets": "node tools/check-portals-assets.mjs",
+    "prebuild": "npm run verify:characters && npm run check:portals-assets",
     "predev": "npm run verify:characters",
     "verify:characters": "node tools/verify-chimpion-roster.mjs",
     "check:rigs": "node checks/rig-compatibility.mjs"
