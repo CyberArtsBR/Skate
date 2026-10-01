@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ChimpionLoader } from '../character/ChimpionLoader.js';
 import { RiderFootIK } from '../character/RiderFootIK.js';
 import { GAME_CONFIG } from '../config/gameConfig.js';
+import { HalfpipeProfile } from '../halfpipe/HalfpipeProfile.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
 
 // These are the three actual horizontal standing surfaces in the supplied
@@ -13,6 +14,9 @@ const SOURCE_PLATFORMS = Object.freeze([
   Object.freeze({ rank: 2, z: -2.028502189, y: 2.032979103 }),
   Object.freeze({ rank: 3, z: 2.028501785, y: 1.708770135 }),
 ]);
+
+const ORIGINAL_PODIUM_WIDTH = 4.5;
+const PODIUM_HEIGHT_SCALE = 1.15;
 
 const STANDING_POSE = Object.freeze({
   facingSign: 1,
@@ -29,7 +33,7 @@ const STANDING_POSE = Object.freeze({
 export class WinnersPodium {
   constructor(scene, {
     floorY = 0,
-    width = 4.5,
+    width = ORIGINAL_PODIUM_WIDTH * 1.25,
     url = '/models/podium/winner_podium.glb',
   } = {}) {
     this.root = new THREE.Group();
@@ -38,9 +42,9 @@ export class WinnersPodium {
     this.root.visible = false;
     scene.add(this.root);
     this.url = url;
-    // Fit completely inside the existing half-pipe's central flat floor.
-    this.width = Math.min(Math.max(Number(width) || 4.5, 3.5),
-      GAME_CONFIG.halfpipeProfile.flatHalfWidth * 2 - 0.1);
+    this.floorY = floorY;
+    this.profile = new HalfpipeProfile();
+    this.width = Math.max(Number(width) || ORIGINAL_PODIUM_WIDTH * 1.25, 3.5);
     this.podium = null;
     this.platforms = [];
     this.actors = [];
@@ -70,12 +74,22 @@ export class WinnersPodium {
         disposeObject3D(podium);
         throw new Error('Supplied podium has no usable standing geometry.');
       }
-      const scale = this.width / size.x;
-      podium.scale.setScalar(scale);
+      const scale = ORIGINAL_PODIUM_WIDTH / size.x;
+      const widthScale = this.width / size.x;
+      const heightScale = scale * PODIUM_HEIGHT_SCALE;
+      // The model's local Z becomes world X after its quarter turn. Scale the
+      // podium alone so the competitors retain their existing body size.
+      podium.scale.set(heightScale, heightScale, widthScale);
       podium.updateMatrixWorld(true);
       bounds.setFromObject(podium, true);
       const center = bounds.getCenter(new THREE.Vector3());
       podium.position.set(-center.x, -bounds.min.y, -center.z);
+      // The wider base extends slightly into each curved transition. Raise it
+      // to the ramp at its outer edge instead of clipping or shrinking it.
+      const baseHalfWidth = Math.max(
+        Math.abs(bounds.min.x - center.x), Math.abs(bounds.max.x - center.x),
+      );
+      this.root.position.y = this.floorY + this.profile.sample(baseHalfWidth).y + 0.01;
       podium.traverse((object) => {
         if (!object.isMesh) return;
         object.castShadow = true;
@@ -84,8 +98,8 @@ export class WinnersPodium {
       this.platforms = SOURCE_PLATFORMS.map((surface) => ({
         rank: surface.rank,
         position: new THREE.Vector3(
-          surface.z * scale - center.x,
-          surface.y * scale - bounds.min.y,
+          surface.z * widthScale - center.x,
+          surface.y * heightScale - bounds.min.y,
           -center.z,
         ),
       }));
@@ -200,16 +214,19 @@ export class WinnersPodium {
   }
 
   getCameraFraming(aspect = 16 / 9, fov = GAME_CONFIG.camera.fov) {
-    const bounds = this.getWorldBounds();
-    const center = bounds.getCenter(new THREE.Vector3());
-    const size = bounds.getSize(new THREE.Vector3());
     const vertical = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
-    const distance = Math.max(size.y / 2 / vertical,
-      size.x / 2 / (vertical * Math.max(0.25, aspect))) * 1.3 + size.z / 2;
-    // Keep the center of the half-pipe on the viewing axis; a mild elevation
-    // makes all three standing surfaces readable without changing the arena.
-    const target = new THREE.Vector3(0, center.y + 0.1, 0);
-    return { target, position: new THREE.Vector3(0, target.y + distance * 0.12, distance) };
+    const target = new THREE.Vector3().fromArray(GAME_CONFIG.camera.target);
+    const position = new THREE.Vector3().fromArray(GAME_CONFIG.camera.position);
+    // Preserve the normal centered arena view, without moving in for avatars.
+    // On narrow screens, pull back only as much as the ceremony needs rather
+    // than squeezing the competitors and their labels to fit the whole ramp.
+    const ceremonyWidth = this.getWorldBounds().getSize(new THREE.Vector3()).x;
+    const halfWidth = Math.max(this.width / 2 + GAME_CONFIG.rider.targetHeight * 0.15,
+      ceremonyWidth / 2);
+    const minimumDistance = halfWidth * 1.15 / (vertical * Math.max(0.25, aspect));
+    const distanceScale = Math.max(1, minimumDistance / position.z);
+    position.sub(target).multiplyScalar(distanceScale).add(target);
+    return { target, position };
   }
 
   update() {
