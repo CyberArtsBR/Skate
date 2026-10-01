@@ -230,17 +230,28 @@ export class SkateboardVisual {
   }
 
   _prepareDeckColorMaterials() {
-    if (!this.deck || this.deckColorMaterials) return;
-    const original = Array.isArray(this.deck.material)
-      ? this.deck.material
-      : [this.deck.material];
-    this.deckColorMaterials = original.map((material) => material?.clone?.() || material);
-    this.deck.material = Array.isArray(this.deck.material)
-      ? this.deckColorMaterials
-      : this.deckColorMaterials[0];
-    this.deckColorOriginals = this.deckColorMaterials.map((material) => (
-      material?.color?.clone?.() || null
-    ));
+    if (this.deckColorMaterials) return;
+    this.deckColorMaterials = [];
+    this.deckColorOriginals = [];
+    const wheels = new Set(this.wheels);
+    const sources = new Set();
+    this.root.traverse(object => {
+      if (!object.isMesh || wheels.has(object)) return;
+      const original = Array.isArray(object.material) ? object.material : [object.material];
+      const owned = original.map(material => {
+        if (!material?.color) return material;
+        sources.add(material);
+        const finish = material.clone();
+        this.deckColorMaterials.push(finish);
+        this.deckColorOriginals.push({ color: material.color.clone(), map: material.map,
+          vertexColors: material.vertexColors });
+        return finish;
+      });
+      object.material = Array.isArray(object.material) ? owned : owned[0];
+    });
+    // Textures remain shared with the cloned finishes; only replaced material
+    // instances are released. Wheels own separate glow materials already.
+    for (const material of sources) material.dispose();
   }
 
   _prepareWheelGlowMaterials() {
@@ -301,9 +312,17 @@ export class SkateboardVisual {
       if (!material?.color) return;
       if (this.deckColor === null) {
         const original = this.deckColorOriginals[index];
-        if (original) material.color.copy(original);
+        if (original) {
+          material.color.copy(original.color);
+          material.map = original.map;
+          material.vertexColors = original.vertexColors;
+        }
       } else {
         material.color.setHex(this.deckColor);
+        // A solid finish covers grip, artwork, deck edges and trucks alike.
+        // Keep normal/roughness/metalness detail, without tinting the wheels.
+        material.map = null;
+        material.vertexColors = false;
       }
       material.needsUpdate = true;
     });
@@ -356,6 +375,9 @@ export class SkateboardVisual {
     // Runtime wheel meshes are reparented under dedicated pivots on root, so
     // disposing only the original GLB scene would leak their geometry/materials.
     disposeObject3D(this.root);
+    for (const map of new Set((this.deckColorOriginals || []).map(entry => entry.map))) {
+      map?.dispose?.();
+    }
     this.root.removeFromParent();
   }
 }

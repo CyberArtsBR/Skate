@@ -25,14 +25,6 @@ export const HALFPIPE_MAPS = Object.freeze([
     coherence: Object.freeze({ brightness: 0.98, saturation: 1.0, contrast: 0.98, gradeOpacity: 0.38 }),
   }),
   Object.freeze({
-    id: 'tournament',
-    name: 'Tournament',
-    imageUrl: '/images/maps/tournament.jpg',
-    environmentUrl: BASE_ENVIRONMENT,
-    position: 'center center',
-    coherence: Object.freeze({ brightness: 0.99, saturation: 0.98, contrast: 0.98, gradeOpacity: 0.34 }),
-  }),
-  Object.freeze({
     id: 'cyber-night',
     name: 'Cyber Night',
     imageUrl: '/images/maps/cyber-night.jpg',
@@ -240,14 +232,13 @@ function ensureMapUI(screen) {
   section.className = 'map-customizer';
   section.innerHTML = [
     '<div class="map-customizer-heading">',
-    '<div><p class="menu-eyebrow">MAP</p><strong data-map-name>Random</strong></div>',
+    '<div><p class="menu-eyebrow">03 · YOUR PARK</p><strong data-map-name>Random</strong></div>',
     '<small> Z / C · MAP &nbsp;|&nbsp; GAMEPAD Y · NEXT MAP </small>',
     '</div>',
     '<div class="map-grid" data-map-grid></div>',
   ].join('');
 
-  const footer = screen.root.querySelector('.hero-select-footer');
-  footer?.before(section);
+  screen.root.querySelector('.hero-select-body')?.append(section);
   screen.mapRoot = section.querySelector('[data-map-grid]');
   screen.mapName = section.querySelector('[data-map-name]');
 
@@ -362,7 +353,10 @@ function patchHeroSelect() {
     const mapLabel = state.mapMode === 'random'
       ? 'RANDOM MAP'
       : (HALFPIPE_MAPS[state.mapIndex]?.name || 'City').toUpperCase();
-    if (this.confirmButton) this.confirmButton.textContent = `RIDE · ${heroLabel} · ${mapLabel}`;
+    if (this.confirmButton) {
+      this.confirmButton.textContent = 'CONFIRM RIDER & PARK →';
+      this.confirmButton.title = `${heroLabel} · ${mapLabel}`;
+    }
   };
 
   const originalSelectHero = proto.selectHero;
@@ -373,7 +367,8 @@ function patchHeroSelect() {
     if (!preserveRandom) {
       state.heroMode = 'explicit';
       state.resolvedHero = null;
-      writeStored(STORAGE.rider, heroDescriptor.get.call(this)?.id || 'random');
+      const selectedHero = heroDescriptor.get.call(this);
+      if (!selectedHero?.custom) writeStored(STORAGE.rider, selectedHero?.id || 'random');
       this.renderSelection();
     }
     return result;
@@ -438,11 +433,16 @@ function patchHeroSelect() {
 
   const originalConfirm = proto._confirm;
   proto._confirm = async function confirmV18() {
-    if (this.busy) return false;
-    const state = resolveRandomSelections(this);
-    const map = state.resolvedMap || HALFPIPE_MAPS[0];
-    await applyMapToRuntime(this, map);
-    return originalConfirm.call(this);
+    if (this.busy || this._confirmationPending) return false;
+    this._confirmationPending = true;
+    try {
+      const state = resolveRandomSelections(this);
+      const map = state.resolvedMap || HALFPIPE_MAPS[0];
+      await applyMapToRuntime(this, map);
+      return await originalConfirm.call(this);
+    } finally {
+      this._confirmationPending = false;
+    }
   };
 }
 

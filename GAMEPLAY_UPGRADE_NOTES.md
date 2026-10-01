@@ -72,3 +72,13 @@ Rendered appearance, timing feel, avatar-specific Hand Plant clearance, swept co
 - Audio/effects: `src/audio/HalfpipeAudio.js`, `src/vfx/ArcadeFeedbackTuning.js`, `src/vfx/HalfpipeVFX.js`, `src/vfx/ImpactVFX.js`, `src/vfx/ParticlePool.js`, `src/vfx/SpeedTrailVFX.js`, `src/vfx/crash.css`.
 - UI: `src/style.css`, `src/ui/ResultsScreen.js`, `src/ui/TrickFeedback.js`.
 - Documentation: `GAMEPLAY_UPGRADE_NOTES.md`.
+
+## Rider workshop and aerial feedback
+
+- Hero selection is a compact workshop with six-column desktop rider cards, three-column mobile cards, a local GLB upload action, board finish swatches and small park previews. The body scrolls separately from the fixed confirmation footer.
+- Uploads stay in the browser for the current session. Self-contained GLB 2.0 files up to 40 MB are loaded through the existing Chimpion loader, normalized to rider height and checked for the existing humanoid hips/leg/foot rig slots. Unsupported files report a message and preserve the selected rider. A ready asset is reused when the player confirms; its object URL and unused GPU resources are released when replaced or closed.
+- Clicking a rider selects it. Enter/Space activates the focused menu button rather than globally confirming the selection. Only the final Confirm Rider & Park action proceeds into the tutorial/run flow; the existing gamepad confirmation mapping remains available. Duplicate asynchronous confirmations are guarded.
+- The chosen board finish recolors every non-wheel mesh, including grip, deck edges and trucks. Base artwork/vertex colors are removed for a solid chosen finish; normal, roughness and metalness details remain. Original restores authored colors and maps. Wheels keep their original colors and speed bloom.
+- Aerials and backflips leave brighter, wider paired world-space wind traces and rotating crescents, following actual airborne state and rotation progress. Two fixed instanced pools (64 streaks and 16 arcs) bound allocations and draw calls. Effects fade after landing and respect reduced motion; they do not enter the bloom mask.
+- The start prompt reads “Press to Start” with outlined, angled graffiti lettering. Center HUD messages use red for failure/heavy impacts, yellow for intermediate/active-trick information, and green for successful tricks, clean landings and combos.
+- No tests, benchmarks or local build were run. Render performs the deployment build; gameplay and visual playtesting remain with the owner.

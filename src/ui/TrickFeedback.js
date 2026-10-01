@@ -35,7 +35,8 @@ export class TrickFeedback {
     else if (breakdown?.quality >= 0.9) details.push('GREAT EXECUTION');
     const detailLabel = details.length ? '<small>' + escapeText(details.join(' · ')) + '</small>' : '';
     this._show(this.trick, '<strong class="trick-award-name">' + label + '</strong>'
-      + pointsLabel + detailLabel, duration, 'is-trick');
+      + pointsLabel + detailLabel, duration, 'is-trick',
+      Number(points) > 0 && (!Number.isFinite(breakdown?.quality) || breakdown.quality >= 0.65) ? 'good' : 'ok');
   }
 
   showLanding(result, {
@@ -52,6 +53,8 @@ export class TrickFeedback {
       escapeText(label) + multiplierLabel,
       duration,
       'is-' + key,
+      ['perfect', 'clean', 'good'].includes(key) ? 'good'
+        : ['bail', 'bad', 'heavy', 'failed'].includes(key) ? 'bad' : 'ok',
     );
   }
 
@@ -61,7 +64,9 @@ export class TrickFeedback {
   } = {}) {
     const key = normalizeKey(type);
     const label = text || ACTION_LABELS[key] || String(type || '').toUpperCase();
-    this._show(this.status, escapeText(label), duration, 'is-action');
+    const tone = ['perfect', 'good', 'great', 'clean'].includes(key) ? 'good'
+      : ['trick', 'ok', 'weak', 'early', 'late'].includes(key) ? 'ok' : 'bad';
+    this._show(this.status, escapeText(label), duration, 'is-action', tone);
   }
 
   setCombo(multiplier = 1) {
@@ -73,6 +78,7 @@ export class TrickFeedback {
       return;
     }
     this.combo.hidden = false;
+    this.combo.dataset.tone = 'good';
     this.combo.textContent = 'COMBO ×' + trimMultiplier(value);
   }
 
@@ -102,12 +108,13 @@ export class TrickFeedback {
     this.clear();
   }
 
-  _show(element, html, duration, className) {
+  _show(element, html, duration, className, tone = 'ok') {
     if (!element) return;
     const previous = this.timers.get(element);
     if (previous) clearTimeout(previous);
 
     element.innerHTML = html;
+    element.dataset.tone = tone;
     element.hidden = false;
     element.classList.remove('is-visible', 'is-leaving', 'is-perfect', 'is-clean', 'is-heavy', 'is-sketchy', 'is-bail');
     // Restart the short pop for successive awards, including identical tricks.

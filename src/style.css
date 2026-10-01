@@ -510,14 +510,21 @@ button:focus-visible {
 
 .countdown-overlay.is-prompt .countdown-label {
   width: min(92vw, 980px);
-  color: #fff;
-  font-size: clamp(28px, 4.4vw, 68px);
+  color: #ffcf35;
+  font-family: Impact, 'Arial Black', sans-serif;
+  font-size: clamp(40px, 7vw, 112px);
   font-style: italic;
   line-height: 1.06;
-  letter-spacing: 0.055em;
+  letter-spacing: -0.035em;
   text-align: center;
   text-wrap: balance;
   animation: none;
+  transform: rotate(-5deg) skewX(-8deg);
+  -webkit-text-stroke: 3px #101f27;
+  paint-order: stroke fill;
+  text-shadow: 3px 4px 0 #fc7434, 6px 7px 0 #101f27,
+    -4px 7px 0 #45c7cc, 0 12px 28px rgb(0 0 0 / 45%);
+  filter: drop-shadow(0 3px 0 #101f27);
 }
 
 #loading-state {
@@ -828,4 +835,76 @@ button:focus-visible {
   .hero-select-footer {
     grid-template-columns: 1fr;
   }
+}
+
+/* Compact rider workshop: the confirmation actions stay outside the scroller. */
+.game-ui-layer.hero-select-screen { padding: 12px; overflow: hidden; }
+.game-ui-layer.hero-select-screen .hero-select-shell {
+  display: flex; flex-direction: column; gap: 10px;
+  width: min(1080px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  overflow: hidden; padding: clamp(14px, 2vw, 24px); border-radius: 20px;
+  border: 1px solid #c9a963;
+  background: radial-gradient(ellipse at top right, rgb(205 148 60 / 12%), transparent 55%),
+    linear-gradient(145deg, #10242bea, #071118f5);
+  box-shadow: inset 0 1px 0 rgb(255 239 195 / 15%), 0 24px 70px #0009;
+}
+.hero-select-screen .hero-select-header { text-align: left; flex: 0 0 auto; }
+.hero-select-screen .hero-select-header h1 { font-size: clamp(24px, 3vw, 36px); line-height: 1; color: #ffde91; }
+.hero-select-screen .hero-select-header .menu-eyebrow { margin: 0 0 5px; font-size: 9px; letter-spacing: .22em; }
+.hero-select-screen .hero-select-help { margin: 7px 0 0; font-size: 9px; letter-spacing: .055em; }
+.hero-select-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 3px 6px 5px; scrollbar-color: #ad9256 #101e26; }
+.hero-roster-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hero-roster-heading > strong { font-size: 10px; letter-spacing: .15em; color: #e8d5a9; }
+.avatar-upload-button { padding: 8px 12px; min-height: 34px; border: 1px solid #8eabaf80; border-radius: 8px; background: #79c7d916; color: #b6e9f1; font: 900 10px / 1.2 sans-serif; letter-spacing: .07em; cursor: pointer; }
+.avatar-upload-button:hover { background: #79c7d930; border-color: #aee7ed; }
+.avatar-upload-hint { margin: 5px 0 10px; color: #a0afb2; font: 500 10px / 1.4 sans-serif; }
+.hero-select-screen .hero-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.game-ui-layer.hero-select-screen .hero-grid .hero-card-image-wrap { aspect-ratio: auto; height: clamp(56px, 10vh, 84px); min-height: 0; }
+.hero-select-screen .hero-card-copy { gap: 2px; padding: 7px 8px; }
+.hero-select-screen .hero-card-copy strong { font-size: 11px; }
+.hero-select-screen .hero-card-copy small { font-size: 8px; }
+.game-ui-layer.hero-select-screen .hero-card.is-selected { transform: none; border-color: #ffdf8a; box-shadow: inset 0 0 0 1px #ffdf8a, 0 0 18px #ffdc7130; }
+.hero-select-screen .hero-card { position: relative; border-radius: 9px; }
+.hero-select-screen .hero-card.is-selected::after { content: '✓'; position: absolute; top: 5px; right: 5px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: #15232a; background: #ffdf8a; font-weight: 900; }
+.hero-select-screen .hero-card:focus-visible, .hero-select-screen button:focus-visible { outline: 2px solid #aee7ed; outline-offset: 2px; }
+.hero-select-screen .board-customizer { flex-direction: row; align-items: center; gap: 12px; margin-top: 12px; padding: 9px 12px; border-color: #dec99226; background: #f3dba008; }
+.hero-select-screen .board-customizer strong { font-size: 12px; }
+.hero-select-screen .board-swatches { justify-content: flex-end; gap: 7px; }
+.hero-select-screen .board-swatch { width: 27px; height: 27px; }
+.hero-select-screen .map-customizer { margin-top: 10px; padding: 10px 12px; gap: 8px; border-color: #dec99226; border-radius: 10px; background: #f3dba008; }
+.hero-select-screen .map-customizer-heading { flex-direction: row; align-items: center; gap: 12px; }
+.hero-select-screen .map-customizer-heading strong { font-size: 12px; }
+.hero-select-screen .map-customizer-heading small { font-size: 8px; }
+.hero-select-screen .map-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.hero-select-screen .map-card { padding: 5px; gap: 4px; }
+.hero-select-screen .map-card-preview { height: clamp(38px, 7vh, 58px); aspect-ratio: auto; }
+.hero-select-screen .map-card strong { font-size: 9px; }
+.hero-select-screen .hero-select-footer { flex: 0 0 auto; grid-template-columns: minmax(90px, .22fr) 1fr; margin: 0; padding-top: 8px; border-top: 1px solid #c9a96330; }
+.hero-select-screen .hero-select-footer .menu-button { min-height: 42px; padding: 10px 14px; font-size: 12px; }
+.hero-select-screen .hero-confirm { color: #14242b; background: linear-gradient(130deg, #ffe9ad, #e1b95d); border: 1px solid #ffe4a1; box-shadow: 0 4px 16px #0005; }
+.hero-select-screen .hero-load-state { flex: 0 0 auto; min-height: 0; margin: 0; font-size: 10px; letter-spacing: .03em; }
+.hero-select-screen .hero-load-state:empty { display: none; }
+.hero-select-screen .is-busy .avatar-upload-button { cursor: wait; }
+
+/* Performance feedback has the same meaning everywhere in the center HUD. */
+.halfpipe-hud [data-tone='bad'] { --feedback-color: #ff554c; }
+.halfpipe-hud [data-tone='ok'] { --feedback-color: #ffe165; }
+.halfpipe-hud [data-tone='good'] { --feedback-color: #83ed79; }
+.halfpipe-hud [data-tone], .halfpipe-hud [data-tone] .trick-award-name,
+.halfpipe-hud [data-tone] > span { color: var(--feedback-color); }
+.halfpipe-hud .hud-action-feedback[data-tone] { border-color: var(--feedback-color); background: #08151de8; }
+.halfpipe-hud .trick-award-name { text-shadow: 3px 4px 0 #172731, 5px 6px 0 #0008; }
+.halfpipe-hud .hud-landing-feedback[data-tone] { text-shadow: 1px 2px 0 #10202a, 0 2px 8px #000; }
+
+@media (max-width: 700px) {
+  .hero-select-screen .hero-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .game-ui-layer.hero-select-screen .hero-grid .hero-card-image-wrap { height: 66px; }
+  .hero-select-screen .board-customizer { flex-wrap: wrap; }
+  .hero-select-screen .map-customizer-heading small { display: none; }
+  .hero-select-screen .map-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-select-screen .map-card-preview { height: 44px; }
+  .hero-roster-heading { align-items: center; }
+  .hero-roster-heading > strong { font-size: 9px; letter-spacing: .06em; }
+  .avatar-upload-button { padding: 8px; font-size: 9px; }
+  .hero-select-screen .hero-select-footer .menu-button { font-size: 10px; }
 }

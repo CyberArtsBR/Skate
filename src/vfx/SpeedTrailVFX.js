@@ -46,19 +46,30 @@ export class SpeedTrailVFX {
     this.pool = new ParticlePool(scene, {
       capacity: ARCADE_FEEDBACK.trajectoryCapacity,
       name: 'halfpipe-vfx-speed-trails',
-      geometry: new THREE.PlaneGeometry(1, 0.045),
+      geometry: new THREE.PlaneGeometry(1, 0.14),
       material: new THREE.MeshBasicMaterial({
-        color: 0x8fdaeb,
+        color: 0xffffff,
         transparent: true,
-        opacity: 0.36,
+        opacity: 0.78,
         depthWrite: false,
         blending: THREE.NormalBlending,
-        toneMapped: true,
+        toneMapped: false,
+        side: THREE.DoubleSide,
       }),
       orientToVelocity: true,
     });
     this.pool.ownsGeometry = true;
     this.pool.ownsMaterial = true;
+    this.pool.mesh.renderOrder = 4;
+    this.arcPool = new ParticlePool(scene, {
+      capacity: 16, name: 'halfpipe-vfx-air-wind-arcs',
+      geometry: new THREE.RingGeometry(0.88, 1, 24, 1, 0, Math.PI * 0.75),
+      material: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true,
+        opacity: 0.66, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
+    });
+    this.arcPool.ownsGeometry = true;
+    this.arcPool.ownsMaterial = true;
+    this.arcPool.mesh.renderOrder = 4;
   }
 
   setReducedMotion(enabled) {
@@ -112,6 +123,7 @@ export class SpeedTrailVFX {
   } = {}) {
     const step = THREE.MathUtils.clamp(Number(dt) || 0, 0, 0.1);
     this.pool.update(step);
+    this.arcPool.update(step);
     const pos = setVector(this._position, position);
     if (velocity) setVector(this._velocity, velocity);
     else if (this._hasPreviousPosition && step > 0) {
@@ -138,20 +150,26 @@ export class SpeedTrailVFX {
       THREE.MathUtils.smoothstep(Number(height) || 0, 0.7, 2.8),
       THREE.MathUtils.smoothstep(Number(speedRatio) || 0, 0.55, 0.95),
     ) + this.comboBoost, 0, 1);
-    const interval = THREE.MathUtils.lerp(0.1, 0.048, intensity)
+    const interval = THREE.MathUtils.lerp(0.06, 0.032, intensity)
       / THREE.MathUtils.clamp(this.scale, 0.55, 1.15);
     this.emitAccumulator += step;
-    if (intensity > 0.25 && speed > 0.8 && this.emitAccumulator >= interval) {
+    if (intensity > 0.15 && speed > 0.8 && this.emitAccumulator >= interval) {
       this.emitAccumulator %= interval;
       // Leave a short world-space ribbon along the real velocity vector.
       // It fades behind the rider rather than being a screen-space sticker.
       this._emitVelocity.copy(this._velocity).multiplyScalar(-0.018);
-      this.pool.emit({
-        position: pos, velocity: this._emitVelocity,
-        rotation: Math.atan2(this._velocity.y, this._velocity.x),
-        lifetime: 0.2, startSize: 0.48 + intensity * 0.28,
-        endSize: 0.12, drag: 4, color: 0x88d9e9,
-      });
+      for (const side of [-1, 1]) {
+        this._rotationPosition.copy(pos);
+        this._rotationPosition.x += side * 0.32;
+        this._rotationPosition.y += 0.42;
+        this._rotationPosition.z += 0.18;
+        this.pool.emit({
+          position: this._rotationPosition, velocity: this._emitVelocity,
+          rotation: Math.atan2(this._velocity.y, this._velocity.x),
+          lifetime: 0.42, startSize: 0.85 + intensity * 0.5,
+          endSize: 0.06, drag: 4, color: side < 0 ? 0xe5faff : 0x9de4ee,
+        });
+      }
     }
 
     const flipping = String(trickType).toLowerCase().includes('backflip') || aerialBackflip;
@@ -159,8 +177,8 @@ export class SpeedTrailVFX {
     // A reset/completed revolution must not emit a spurious full-circle arc.
     if (Math.abs(rotationDelta) < 1 || Math.abs(rotationDelta) > 150) return;
     this.rotationAccumulator += Math.abs(rotationDelta);
-    if (this.rotationAccumulator < 12 / this.scale) return;
-    this.rotationAccumulator %= 12 / this.scale;
+    if (this.rotationAccumulator < 24 / this.scale) return;
+    this.rotationAccumulator %= 24 / this.scale;
     if (boardQuaternion?.isQuaternion) this._boardQuaternion.copy(boardQuaternion);
     else if (Array.isArray(boardQuaternion)) this._boardQuaternion.fromArray(boardQuaternion);
     else this._boardQuaternion.setFromAxisAngle(
@@ -174,14 +192,24 @@ export class SpeedTrailVFX {
     this.pool.emit({
       position: this._rotationPosition, velocity: this._emitVelocity,
       rotation: Math.atan2(this._rotationTangent.y, this._rotationTangent.x),
-      lifetime: aerialBackflip ? 0.24 : 0.19,
-      startSize: 0.43, endSize: 0.04, drag: 4,
-      color: aerialBackflip ? 0xffc675 : 0x8bdcec,
+      lifetime: aerialBackflip ? 0.42 : 0.36,
+      startSize: 0.85, endSize: 0.04, drag: 4,
+      color: aerialBackflip ? 0xffe5a8 : 0xc6f4ff,
     });
+    // Camera-facing crescent follows real rotation progress, with an airborne
+    // lifetime and real world position rather than a persistent HUD sticker.
+    this._rotationPosition.copy(pos);
+    this._rotationPosition.y += 0.55;
+    this._rotationPosition.z += 0.26;
+    this.arcPool.emit({ position: this._rotationPosition,
+      rotation: THREE.MathUtils.degToRad(flipping ? flipDegrees : aerialDegrees),
+      lifetime: 0.3, startSize: flipping ? 0.95 : 1.12, endSize: 0.35,
+      color: aerialBackflip ? 0xffdf9b : flipping ? 0xd5f9ff : 0x90e8f5 });
   }
 
   reset() {
     this.pool.clear();
+    this.arcPool.clear();
     this.emitAccumulator = 0;
     this.rotationAccumulator = 0;
     this.comboBoost = 0;
@@ -192,5 +220,6 @@ export class SpeedTrailVFX {
 
   dispose() {
     this.pool.dispose();
+    this.arcPool.dispose();
   }
 }

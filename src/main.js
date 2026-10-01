@@ -247,7 +247,7 @@ const heroSelectScreen = new HeroSelectScreen(stage, {
   selectedBoardColorId,
   onHeroChange(hero) {
     selectedHeroId = hero?.id || 'heretic';
-    persistSetting(RIDER_STORAGE_KEY, selectedHeroId);
+    if (!hero?.custom) persistSetting(RIDER_STORAGE_KEY, selectedHeroId);
   },
   onBoardColorChange(boardColor) {
     selectedBoardColorId = boardColor?.id || 'original';
@@ -255,7 +255,7 @@ const heroSelectScreen = new HeroSelectScreen(stage, {
     skateboardVisual?.setDeckColor(boardColor?.color ?? null);
   },
   onConfirm() {
-    void beginControlsFromCharacter();
+    return beginControlsFromCharacter();
   },
   onBack() {
     gameFlow.transitionTo(HALFPIPE_FLOW_STATE.TITLE);
@@ -320,17 +320,18 @@ async function applySelectedCustomization() {
 
   selectedHeroId = hero.id;
   selectedBoardColorId = boardColor.id;
-  persistSetting(RIDER_STORAGE_KEY, selectedHeroId);
+  if (!hero.custom) persistSetting(RIDER_STORAGE_KEY, selectedHeroId);
   persistSetting(BOARD_COLOR_STORAGE_KEY, selectedBoardColorId);
   skateboardVisual?.setDeckColor(boardColor.color);
 
   if (!rider || currentHeroId === hero.id) return true;
 
   heroSelectScreen.setBusy(true, 'LOADING ' + hero.name.toUpperCase() + '...');
-  const nextChimpion = new ChimpionLoader(hero.modelUrl);
+  const nextChimpion = hero.preloadedAsset || new ChimpionLoader(hero.modelUrl);
   try {
-    await nextChimpion.load();
+    if (!nextChimpion.model) await nextChimpion.load();
     rider.replaceChimpion(nextChimpion);
+    if (hero.custom) hero.preloadedAsset = null;
     currentHeroId = hero.id;
     unregisterRiderQuality?.();
     unregisterRiderQuality = quality.registerObject(rider.root);
@@ -342,6 +343,7 @@ async function applySelectedCustomization() {
     return true;
   } catch (error) {
     nextChimpion.dispose();
+    if (hero.custom) hero.preloadedAsset = null;
     heroSelectScreen.setBusy(false, 'RIDER LOAD FAILED · TRY ANOTHER CHIMPION');
     console.error('[Halfpipe] Rider load failed', error);
     return false;
@@ -399,7 +401,7 @@ function startCountdown() {
     return false;
   }
 
-  countdown.showPrompt('PRESS ANY BUTTON TO START');
+  countdown.showPrompt('Press to Start');
   hud.setStatus('', 'ready');
   audio.resetSessionAudioState();
   audio.setPaused(true);
@@ -604,7 +606,7 @@ function vfxMotionState(state, presentationState) {
     surfaceNormal: { x: sample.normal.x, y: sample.normal.y, z: 0 },
     boardQuaternion,
     backflipRotationDegrees: state.backflipRotationDegrees || 0,
-    aerialRotationDegrees: state.airRotationDegrees || 0,
+    aerialRotationDegrees: state.airRotationSignedDegrees ?? state.airRotationDegrees ?? 0,
     trickType: presentationState?.trickType,
     aerialBackflip: Boolean(presentationState?.aerialBackflip),
   };

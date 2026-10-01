@@ -112,7 +112,7 @@ export class CountdownOverlay {
     return snapshot;
   }
 
-  showPrompt(label = 'PRESS ANY BUTTON TO START') {
+  showPrompt(label = 'Press to Start') {
     this.timer.reset();
     this.root.hidden = false;
     this.root.classList.remove('is-go');

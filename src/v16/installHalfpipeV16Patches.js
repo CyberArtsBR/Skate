@@ -69,6 +69,7 @@ function patchHeroSelect() {
 
   proto.handleKeyboardEvent = function handleKeyboardEventV16(event) {
     if (this.root.hidden || this.busy) return false;
+    if (this.handleButtonKey(event)) return true;
     if (event.code === 'ArrowLeft' || event.code === 'KeyA') {
       this.moveHeroGrid(-1, 0);
     } else if (event.code === 'ArrowRight' || event.code === 'KeyD') {
@@ -89,8 +90,6 @@ function patchHeroSelect() {
       this.selectBoardColor(this.selectedBoardIndex - 1);
     } else if (event.code === 'KeyE' || event.code === 'BracketRight') {
       this.selectBoardColor(this.selectedBoardIndex + 1);
-    } else if (event.code === 'Enter' || event.code === 'Space') {
-      this._confirm();
     } else if (event.code === 'Escape' || event.code === 'Backspace') {
       this.onBack?.();
     } else {

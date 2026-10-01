@@ -8,6 +8,9 @@ function fitModel(model, targetHeight) {
   model.updateWorldMatrix(true, true);
   let box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
+  if (!Number.isFinite(size.y) || size.y <= 0.001) {
+    throw new Error('Avatar has no visible geometry or usable height.');
+  }
   model.scale.setScalar(targetHeight / Math.max(0.001, size.y));
   model.updateWorldMatrix(true, true);
   box = new THREE.Box3().setFromObject(model);

@@ -85,6 +85,8 @@ export class HalfpipeHUD {
     const element = this.root.querySelector('[data-status]');
     element.textContent = String(text || '');
     element.dataset.phase = String(phase || '');
+    element.dataset.tone = ['error', 'failed', 'bail'].includes(phase) ? 'bad'
+      : ['finished', 'running'].includes(phase) ? 'good' : 'ok';
     element.hidden = !text;
   }
 
