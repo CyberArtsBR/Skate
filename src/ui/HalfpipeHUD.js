@@ -1,4 +1,5 @@
 import { TrickFeedback } from './TrickFeedback.js';
+import './graffiti-hud.css';
 
 export function resolveDebugMode(search = globalThis.location?.search || '') {
   try {
