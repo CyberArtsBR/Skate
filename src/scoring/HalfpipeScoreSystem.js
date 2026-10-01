@@ -15,27 +15,37 @@ export function repetitionMultiplier(repeatCount) {
 }
 
 export function scoreRangeForTrick(scoringConfig, type) {
-  const combined = /^aerial-(180|360|540|720)-(backflip|double-backflip)$/.exec(String(type || ''));
+  const normalizedType = String(type || '');
+  const fakie = normalizedType.startsWith('fakie-');
+  const baseType = fakie ? normalizedType.slice('fakie-'.length) : normalizedType;
+  const fakieMultiplier = fakie
+    ? Math.max(1, Number(scoringConfig.fakieAerialMultiplier) || 1.1)
+    : 1;
+  const applyFakie = range => ({
+    min: Math.round(range.min * fakieMultiplier),
+    max: Math.round(range.max * fakieMultiplier),
+  });
+  const combined = /^aerial-(180|360|540|720)-(backflip|double-backflip)$/.exec(baseType);
   if (combined) {
     const aerial = scoreRangeForTrick(scoringConfig, 'aerial-' + combined[1]);
     const flip = scoreRangeForTrick(scoringConfig, combined[2]);
     const difficulty = Math.max(1, Number(scoringConfig.airCombinationMultiplier) || 1.1);
-    return {
+    return applyFakie({
       min: Math.round((aerial.min + flip.min) * difficulty),
       max: Math.round((aerial.max + flip.max) * difficulty),
-    };
+    });
   }
-  if (type === 'kick-turn') return scoringConfig.kickTurn;
-  if (type === 'hand-plant') return scoringConfig.handPlant;
-  if (type === 'backflip') return scoringConfig.backflip || scoringConfig.aerialTurn;
-  if (type === 'double-backflip') {
+  if (baseType === 'kick-turn') return scoringConfig.kickTurn;
+  if (baseType === 'hand-plant') return scoringConfig.handPlant;
+  if (baseType === 'backflip') return scoringConfig.backflip || scoringConfig.aerialTurn;
+  if (baseType === 'double-backflip') {
     return scoringConfig.doubleBackflip || scoringConfig.backflip || scoringConfig.aerialTurn;
   }
 
-  const aerialMatch = /^aerial-(180|360|540|720|900)$/.exec(String(type || ''));
+  const aerialMatch = /^aerial-(180|360|540|720|900)$/.exec(baseType);
   if (aerialMatch) {
     const key = 'aerial' + aerialMatch[1];
-    return scoringConfig[key] || scoringConfig.aerialTurn;
+    return applyFakie(scoringConfig[key] || scoringConfig.aerialTurn);
   }
 
   return scoringConfig.aerialTurn;
@@ -57,7 +67,8 @@ export function describeTrickScore(config, state, event, flowMultiplier = 1) {
       : Math.abs(Number(state.airRotationDegrees) || 0),
     aerialRotationDegrees: Math.abs(Number(state.airRotationDegrees) || 0),
     backflipRotationDegrees: Math.abs(Number(state.backflipRotationDegrees) || 0),
-    combinedTrick: /^aerial-\d+-(?:double-)?backflip$/.test(event.trick),
+    combinedTrick: /^(?:fakie-)?aerial-\d+-(?:double-)?backflip$/.test(event.trick),
+    fakieTakeoff: /^fakie-aerial-/.test(event.trick),
     landingMultiplier: Number(event.landingScoreMultiplier) || 1,
     comboMultiplier: Number(event.comboMultiplier) || 1,
     varietyMultiplier: Number(event.varietyMultiplier) || 1,
