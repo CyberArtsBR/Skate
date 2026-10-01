@@ -73,9 +73,9 @@ export const GAME_CONFIG = Object.freeze({
     presentationVerticalEpsilon: 0.02,
   }),
   session: Object.freeze({ durationSeconds: 75 }),
-  // Motion runs 20% slower than the previous 0.75 pace. The round countdown
+  // Motion runs 10% slower than the previous 0.75 pace. The round countdown
   // remains in real time and existing controls/physics tuning stay intact.
-  gameplay: Object.freeze({ motionTimeScale: 0.60 }),
+  gameplay: Object.freeze({ motionTimeScale: 0.675 }),
   arcadeMotion: Object.freeze({ downhillGravityScale: 1.12, uphillGravityScale: 1.6 }),
   // Pumping remains timing/direction based, but it is now eligible essentially
   // from rest so a low-energy run can always be rebuilt by player input.
