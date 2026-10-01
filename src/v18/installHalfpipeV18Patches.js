@@ -2,6 +2,7 @@ import { HeroSelectScreen } from '../ui/HeroSelectScreen.js';
 import { HalfpipeAudio } from '../audio/HalfpipeAudio.js';
 import { HalfpipePumpInput } from '../input/HalfpipePumpInput.js';
 import { quality } from '../graphics/RenderQualityManager.js';
+import { MAP_IMAGES } from '../config/mapAssets.js';
 import './v18.css';
 
 const BASE_ENVIRONMENT = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr';
@@ -10,8 +11,8 @@ const CYBER_ENVIRONMENT = '/hdri/cyber-night-shanghai-bund-1k.hdr';
 export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
     id: 'city',
-    name: 'City',
-    imageUrl: '/images/backgrounds/halfpipe-chimpions-merch.jpg',
+    name: 'Tournament',
+    imageUrl: MAP_IMAGES.tournament,
     environmentUrl: BASE_ENVIRONMENT,
     position: 'center center',
     coherence: Object.freeze({ brightness: 0.96, saturation: 0.98, contrast: 0.98, gradeOpacity: 0.5 }),
@@ -19,7 +20,7 @@ export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
     id: 'tree-house',
     name: 'Tree House',
-    imageUrl: '/images/maps/tree-house.jpg',
+    imageUrl: MAP_IMAGES.treeHouse,
     environmentUrl: BASE_ENVIRONMENT,
     position: 'center center',
     coherence: Object.freeze({ brightness: 0.98, saturation: 1.0, contrast: 0.98, gradeOpacity: 0.38 }),
@@ -27,7 +28,7 @@ export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
     id: 'cyber-night',
     name: 'Cyber Night',
-    imageUrl: '/images/maps/cyber-night.jpg',
+    imageUrl: MAP_IMAGES.cyberNight,
     environmentUrl: CYBER_ENVIRONMENT,
     position: 'center center',
     coherence: Object.freeze({ brightness: 0.94, saturation: 1.03, contrast: 1.01, gradeOpacity: 0.24 }),

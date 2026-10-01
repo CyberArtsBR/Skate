@@ -1,0 +1,13 @@
+const versions = typeof __HALFPIPE_MAP_VERSIONS__ === 'undefined'
+  ? {} : __HALFPIPE_MAP_VERSIONS__;
+
+function mapImage(file) {
+  const version = versions[file];
+  return '/images/maps/' + file + (version ? '?v=' + version : '');
+}
+
+export const MAP_IMAGES = Object.freeze({
+  tournament: mapImage('tournament.jpg'),
+  treeHouse: mapImage('tree-house.jpg'),
+  cyberNight: mapImage('cyber-night.png'),
+});

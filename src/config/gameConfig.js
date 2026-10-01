@@ -1,9 +1,11 @@
+import { MAP_IMAGES } from './mapAssets.js';
+
 export const GAME_CONFIG = Object.freeze({
   assets: Object.freeze({
     halfpipe: '/models/halfpipe/halfpipe.glb',
     skateboard: '/models/skateboard/skateboard.glb',
     chimpion: '/models/characters/The%20Heretic.glb',
-    background: '/images/backgrounds/halfpipe-chimpions-merch.jpg',
+    background: MAP_IMAGES.tournament,
     environment: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr',
   }),
   renderer: Object.freeze({
