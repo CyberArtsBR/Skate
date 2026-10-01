@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101820" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23ffde80' d='M7 43c9 0 12-8 12-20h26c0 12 3 20 12 20v7H7z'/%3E%3C/svg%3E" />
-    <link rel="preload" href="./audio/music/Pixel_Rampage.mp3" as="audio" type="audio/mpeg" />
     <title>Chimpions Half-Pipe — Rider Integration</title>
-    <link rel="preload" href="./images/backgrounds/halfpipe-opening.jpg" as="image" fetchpriority="high" />
     <style>
       html, body { margin: 0; background: #050505; }
       #loading-state.boot-cover { position: fixed; inset: 0; transform: none; z-index: 100; background: #050505; }
       #loading-state.boot-cover img { width: 100%; height: 100%; object-fit: contain; }
+      #loading-state.boot-cover img:not([src]) { visibility: hidden; }
       #loading-state.boot-cover span { position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%); padding: 6px 12px; background: #050505cc; color: #fff0a8; font: bold 12px sans-serif; }
       #loading-state.boot-cover::after { display: none; }
       #game-stage:not(.is-ready) .california-background { visibility: hidden; }
@@ -22,7 +21,7 @@
       <section id="game-stage" aria-label="Half-pipe preview">
         <canvas id="game-canvas" aria-label="3D half-pipe scene"></canvas>
         <div id="scene-overlay" aria-hidden="true"></div>
-        <div id="loading-state" class="boot-cover" role="status"><img src="./images/backgrounds/halfpipe-opening.jpg" alt="Halfpipe Chimp" fetchpriority="high" /><span>LOADING HALF-PIPE</span></div>
+        <div id="loading-state" class="boot-cover" role="status"><img data-opening-image alt="Halfpipe Chimp" fetchpriority="high" /><span>LOADING HALF-PIPE</span></div>
       </section>
     </main>
     <script type="module" src="./src/v18/bootstrap.js"></script>

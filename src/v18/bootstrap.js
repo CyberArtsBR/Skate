@@ -1,3 +1,4 @@
+import { publicAssetUrl } from '../config/publicAssetUrl.js';
 import { installHalfpipeV9GameplayPatches } from '../v9/installHalfpipeV9GameplayPatches.js';
 import { installHalfpipeV9EventPatches } from '../v9/installHalfpipeV9EventPatches.js';
 import { installHalfpipeV9RuntimePatches } from '../v9/installHalfpipeV9RuntimePatches.js';
@@ -14,9 +15,17 @@ try {
   globalThis.localStorage?.setItem('chimpions-halfpipe.v18.map-selection', 'random');
 } catch {}
 
+// The HTML shell cannot safely know Portals' effective nested asset root when
+// the preview URL has no trailing slash. Resolve the opening artwork from the
+// already-loaded JS bundle location before the main game bootstrap starts.
+const openingImage = document.querySelector('[data-opening-image]');
+if (openingImage) {
+  openingImage.src = publicAssetUrl('images/backgrounds/halfpipe-opening.jpg');
+}
+
 // Portals serves the built game from a nested route. Install this before any
 // runtime loaders are created so legacy/root-absolute Three.js URLs are rebased
-// to Vite's configured public base instead of the host application's root.
+// to the actual built-game root instead of the host application's root.
 installPortalsAssetBase();
 installHalfpipeV9GameplayPatches();
 installHalfpipeV9EventPatches();

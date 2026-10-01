@@ -1,4 +1,5 @@
 import { CONTROLLER_FAMILY, glyphFor } from './ControllerGlyphs.js';
+import { publicAssetUrl } from '../config/publicAssetUrl.js';
 import './controls-tutorial.css';
 
 export class ControlsScreen {
@@ -10,6 +11,8 @@ export class ControlsScreen {
     this.family = family;
     this.onBack = onBack;
     this.inputTarget = inputTarget;
+
+    const tutorialUrl = publicAssetUrl('images/tutorials/halfpipe-how-to-ride.jpg');
 
     this.root = document.createElement('section');
     this.root.className = 'game-ui-layer menu-screen controls-screen';
@@ -23,9 +26,9 @@ export class ControlsScreen {
         </header>
         <div class="controls-tutorial-layout" data-tutorial-layout>
           <figure class="controls-tutorial-poster" data-tutorial-poster>
-            <a href="/images/tutorials/halfpipe-how-to-ride.jpg" target="_blank" rel="noopener"
+            <a href="${tutorialUrl}" target="_blank" rel="noopener"
               aria-label="Open the tutorial at full size">
-            <img src="/images/tutorials/halfpipe-how-to-ride.jpg"
+            <img src="${tutorialUrl}"
               alt="Pump up while climbing, down while descending. Rotate with left or right, hold K at the coping for Hand Plant, or hold Space in the air for Backflip. A missed trick gives no points and loses 20 percent speed. Full controls are in the expandable guide below."
               decoding="async" fetchpriority="high" data-tutorial-image>
             </a>
