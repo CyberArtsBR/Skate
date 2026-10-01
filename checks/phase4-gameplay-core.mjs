@@ -284,16 +284,30 @@ assert.equal(failedHandPlant.state.crashReason, 'HAND_PLANT_TIMING');
 const score180 = new HalfpipeSimulation(profile)._awardValidatedTrick('aerial-180', 1, 1, -1);
 const score360 = new HalfpipeSimulation(profile)._awardValidatedTrick('aerial-360', 1, 1, -1);
 const score540 = new HalfpipeSimulation(profile)._awardValidatedTrick('aerial-540', 1, 1, -1);
+const scoreFakie540 = new HalfpipeSimulation(profile)._awardValidatedTrick('fakie-aerial-540', 1, 1, -1);
 const score720 = new HalfpipeSimulation(profile)._awardValidatedTrick('aerial-720', 1, 1, -1);
 const score900 = new HalfpipeSimulation(profile)._awardValidatedTrick('aerial-900', 1, 1, -1);
 const scoreBackflip = new HalfpipeSimulation(profile)._awardValidatedTrick('backflip', 1, 1, -1);
 const scoreDoubleBackflip = new HalfpipeSimulation(profile)._awardValidatedTrick('double-backflip', 1, 1, -1);
 assert.ok(score360 > score180);
 assert.ok(score540 > score360);
+assert.equal(scoreFakie540, Math.round(score540 * 1.1));
 assert.ok(score720 > score540);
 assert.ok(score900 > score720);
 assert.ok(scoreBackflip > score360);
 assert.ok(scoreDoubleBackflip > scoreBackflip);
+
+const fakieIdentity = new HalfpipeSimulation(profile);
+fakieIdentity.state.facingTurns = 1;
+fakieIdentity._enterAir(-1, 12, profile.leftLip);
+assert.equal(fakieIdentity.state.airTakeoffFakie, true);
+assert.equal(fakieIdentity.drainEvents().find(event => event.type === 'TAKEOFF')?.fakie, true);
+
+const varietyIdentity = new HalfpipeSimulation(profile);
+varietyIdentity._awardValidatedTrick('aerial-540', 1, 1, -1);
+varietyIdentity._awardValidatedTrick('fakie-aerial-540', 1, 1, 1);
+assert.equal(varietyIdentity.state.repeatedTrickCount, 1,
+  'fakie aerial should be a distinct variety entry');
 
 const scoring = new HalfpipeSimulation(profile);
 const first = scoring._awardValidatedTrick('kick-turn',1,1,-1);

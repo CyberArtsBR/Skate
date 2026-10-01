@@ -178,8 +178,11 @@ export class TrickFeedback {
 
 export function formatTrickName(name) {
   return String(name || '')
-    .replace(/^aerial-(\d+)-(double-)?backflip$/, (_, rotation, double) =>
-      'AERIAL ' + rotation + '° + ' + (double ? 'DOUBLE ' : '') + 'BACKFLIP')
+    .replace(/^(fakie-)?aerial-(\d+)-(double-)?backflip$/, (_, fakie, rotation, double) =>
+      (fakie ? 'FAKIE ' : '') + 'AERIAL ' + rotation + '° + '
+        + (double ? 'DOUBLE ' : '') + 'BACKFLIP')
+    .replace(/^(fakie-)?aerial-(\d+)$/, (_, fakie, rotation) =>
+      (fakie ? 'FAKIE ' : '') + 'AERIAL ' + rotation + '°')
     .replace(/[-_]+/g, ' ')
     .trim()
     .toUpperCase();

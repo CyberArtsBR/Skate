@@ -211,6 +211,7 @@ export class HalfpipeSimulation {
       surfaceTrickAnchorX: null,
 
       airSide: 0,
+      airTakeoffFakie: false,
       airAnchorX: null,
       airBaseY: null,
       currentAirBaseY: null,
@@ -880,6 +881,9 @@ export class HalfpipeSimulation {
     this.state.tangentVelocity = 0;
     this.state.tangentialAcceleration = -this.airGravity;
     this.state.airSide = side;
+    // Snapshot stance before any aerial half-turns change facingTurns. Trick
+    // identity and scoring therefore describe the actual takeoff orientation.
+    this.state.airTakeoffFakie = this._isFacingBack();
     this.state.airAnchorX = anchorX;
     this.state.airBaseY = takeoff.y;
     this.state.currentAirBaseY = takeoff.y;
@@ -923,6 +927,7 @@ export class HalfpipeSimulation {
     });
     this._emit('TAKEOFF', {
       side,
+      fakie: this.state.airTakeoffFakie,
       incomingSpeed: Math.abs(launchSpeed),
       verticalVelocity,
       baseY: takeoff.y,
@@ -1224,7 +1229,8 @@ export class HalfpipeSimulation {
           Math.round(this.state.airRotationTargetDegrees / PHASE4_GAMEPLAY_CONFIG.aerial.targetStepDegrees),
         );
         this.state.facingTurns += halfTurns * (this.state.airTurnDirection || 1);
-        const aerialTrick = 'aerial-' + this.state.airRotationTargetDegrees;
+        const aerialTrick = (this.state.airTakeoffFakie ? 'fakie-' : '')
+          + 'aerial-' + this.state.airRotationTargetDegrees;
         landedTrick = combinedTrick ? aerialTrick + '-' + landedTrick : aerialTrick;
       }
 
@@ -1250,6 +1256,7 @@ export class HalfpipeSimulation {
       backflipRotationDegrees: this.state.backflipRotationDegrees,
       combinedTrick,
       trick: landedTrick,
+      fakieTakeoff: this.state.airTakeoffFakie,
     });
 
     if (landing.quality === LANDING_QUALITIES.BAIL) {
@@ -1271,6 +1278,7 @@ export class HalfpipeSimulation {
     // middle of the pipe, matching the requested slide-down recovery.
     this.state.tangentVelocity = side < 0 ? landingSpeed : -landingSpeed;
     this.state.airSide = 0;
+    this.state.airTakeoffFakie = false;
     this.state.airAnchorX = null;
     this.state.airBaseY = null;
     this.state.currentAirBaseY = null;
