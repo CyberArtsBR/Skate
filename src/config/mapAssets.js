@@ -8,6 +8,6 @@ function mapImage(file) {
 
 export const MAP_IMAGES = Object.freeze({
   tournament: mapImage('tournament.jpg'),
-  treeHouse: mapImage('tree-house.jpg'),
+  treeHouse: mapImage('treehouse.jpg'),
   cyberNight: mapImage('cyber-night.png'),
 });

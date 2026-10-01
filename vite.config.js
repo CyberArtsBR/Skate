@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 
-const mapFiles = ['tournament.jpg', 'tree-house.jpg', 'cyber-night.png'];
+const mapFiles = ['tournament.jpg', 'treehouse.jpg', 'cyber-night.png'];
 const mapVersions = Object.fromEntries(mapFiles.map((file) => [
   file,
   createHash('sha256')
