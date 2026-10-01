@@ -1,0 +1,311 @@
+/* Local font: Luckiest Guy, Apache 2.0; see public/fonts/LuckiestGuy-LICENSE.txt. */
+@font-face {
+  font-family: 'Halfpipe Graffiti';
+  src: url('/fonts/LuckiestGuy-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+.halfpipe-hud {
+  --graffiti-ink: #080f18;
+  --graffiti-cyan: #68e8ff;
+  --graffiti-pink: #ed3bc0;
+  --graffiti-depth: 2px 3px 0 var(--graffiti-ink), 4px 5px 0 var(--graffiti-ink),
+    -2px 4px 0 #15b9d4, 4px 7px 0 #bb2692, 5px 8px 0 var(--graffiti-ink);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr);
+  column-gap: clamp(12px, 1.7vw, 28px);
+  padding: calc(clamp(12px, 1.9vw, 30px) * var(--ui-scale))
+    calc(clamp(14px, 2.2vw, 38px) * var(--ui-scale));
+}
+
+.halfpipe-hud .hud-block,
+.halfpipe-hud .hud-context {
+  min-width: 0;
+}
+
+.halfpipe-hud .hud-block {
+  position: relative;
+  isolation: isolate;
+  gap: 0;
+  max-width: 100%;
+  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
+  border: 0;
+  border-radius: 4px 14px 4px 11px;
+  background: linear-gradient(145deg, #071520e8, #0b1c2570);
+  box-shadow: none;
+}
+
+/* Static paint marks add the reference's sticker silhouette without image text. */
+.halfpipe-hud .hud-block::before,
+.halfpipe-hud .hud-trick-feedback::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -10px -13px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 7% 32%, var(--graffiti-cyan) 0 3px, transparent 4px),
+    radial-gradient(ellipse at 14% 9%, var(--graffiti-pink) 0 4px, transparent 5px),
+    radial-gradient(ellipse at 79% 6%, var(--graffiti-cyan) 0 2px, transparent 3px),
+    radial-gradient(ellipse at 94% 54%, var(--graffiti-pink) 0 4px, transparent 5px),
+    radial-gradient(ellipse at 83% 94%, var(--graffiti-cyan) 0 3px, transparent 4px),
+    radial-gradient(ellipse at 21% 88%, var(--graffiti-pink) 0 2px, transparent 3px),
+    linear-gradient(-8deg, transparent 14%, #e629aa 15% 19%, transparent 20% 78%, #25cce1 79% 82%, transparent 83%);
+  opacity: 0.85;
+}
+
+.halfpipe-hud .hud-block > span,
+.halfpipe-hud .hud-block > strong,
+.halfpipe-hud .hud-combo,
+.halfpipe-hud .hud-trick-feedback,
+.halfpipe-hud .hud-trick-feedback .trick-award-name,
+.halfpipe-hud .hud-landing-feedback,
+.halfpipe-hud .hud-action-feedback,
+.halfpipe-hud .hud-status {
+  font-family: 'Halfpipe Graffiti', Impact, 'Arial Black', sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0.015em;
+  paint-order: stroke fill;
+}
+
+.halfpipe-hud .hud-block > span {
+  font-size: calc(clamp(19px, 1.9vw, 30px) * var(--ui-scale));
+  line-height: 1.06;
+  color: #ffdc65;
+  -webkit-text-stroke: 3px var(--graffiti-ink);
+  text-shadow: var(--graffiti-depth);
+}
+
+.halfpipe-hud .hud-time > span {
+  color: var(--graffiti-cyan);
+}
+
+.halfpipe-hud .hud-block > strong {
+  display: block;
+  padding-top: 0.06em;
+  font-size: calc(clamp(34px, 4.3vw, 72px) * var(--ui-scale));
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+  color: #ffce51;
+  -webkit-text-stroke: 4px var(--graffiti-ink);
+  text-shadow: var(--graffiti-depth);
+}
+
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .halfpipe-hud .hud-block > strong {
+    background: linear-gradient(180deg, #fff7d3 8%, #ffe781 31%, #ffd147 55%, #ff7b31 83%, #ff5930 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    text-shadow: none;
+    filter: drop-shadow(2px 3px 0 var(--graffiti-ink))
+      drop-shadow(-2px 2px 0 #15b9d4) drop-shadow(2px 2px 0 #bb2692);
+  }
+}
+
+.halfpipe-hud .hud-score { transform: rotate(-3deg); }
+.halfpipe-hud .hud-time { transform: rotate(3deg); }
+.halfpipe-hud.is-time-low .hud-time > span { color: #ff6a57; }
+.halfpipe-hud.is-time-low .hud-time > strong {
+  background-image: linear-gradient(180deg, #fff1c9, #ffbc4c 48%, #ff483f);
+}
+
+.halfpipe-hud .hud-context {
+  width: min(100%, 700px);
+  gap: calc(6px * var(--ui-scale));
+}
+
+.halfpipe-hud .hud-combo {
+  padding: 0.18em 0.5em;
+  border: 0;
+  border-radius: 3px 8px;
+  color: #86f178;
+  background: #061720d9;
+  font-size: calc(clamp(13px, 1.1vw, 19px) * var(--ui-scale));
+  line-height: 1.2;
+  -webkit-text-stroke: 1.5px var(--graffiti-ink);
+  text-shadow: 2px 2px 0 var(--graffiti-ink);
+}
+
+.halfpipe-hud .hud-trick-feedback {
+  position: relative;
+  isolation: isolate;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 0.12em;
+  font-size: calc(clamp(23px, 2.7vw, 46px) * var(--ui-scale));
+  line-height: 1.14;
+  -webkit-text-stroke: 3px var(--graffiti-ink);
+  text-shadow: var(--graffiti-depth);
+}
+
+.halfpipe-hud .hud-trick-feedback .trick-award-name {
+  position: relative;
+  max-width: 100%;
+  line-height: 1.14;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  transform: rotate(-3deg);
+  -webkit-text-stroke: 3px var(--graffiti-ink);
+  text-shadow: var(--graffiti-depth);
+}
+
+.halfpipe-hud .hud-trick-feedback .trick-award-name::before {
+  display: none;
+}
+
+.halfpipe-hud .hud-trick-feedback[data-tone] > span {
+  margin-top: 0.04em;
+  color: var(--graffiti-cyan);
+  font-size: 1.12em;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  -webkit-text-stroke: 3px var(--graffiti-ink);
+  text-shadow: 2px 3px 0 var(--graffiti-ink), 4px 5px 0 #154a64,
+    5px 6px 0 var(--graffiti-ink), -2px 3px 0 #ed3bc0;
+}
+
+.halfpipe-hud .hud-trick-feedback small {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.4em auto 0;
+  padding: 0.3em 0.65em;
+  border-radius: 3px;
+  color: #fff6db;
+  background: #07131de8;
+  font-size: calc(clamp(10px, 0.8vw, 13px) * var(--ui-scale));
+  line-height: 1.25;
+  letter-spacing: 0.035em;
+  text-shadow: none;
+}
+
+.halfpipe-hud .hud-landing-feedback,
+.halfpipe-hud .hud-action-feedback,
+.halfpipe-hud .hud-status {
+  max-width: 100%;
+  margin-top: 0.14em;
+  padding: 0.16em 0.3em;
+  border: 0;
+  border-radius: 3px 8px;
+  background: #07131dba;
+  font-size: calc(clamp(17px, 1.5vw, 25px) * var(--ui-scale));
+  line-height: 1.18;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  -webkit-text-stroke: 2.5px var(--graffiti-ink);
+  text-shadow: 2px 3px 0 var(--graffiti-ink), 3px 4px 0 #147385;
+}
+
+.halfpipe-hud [data-tone='good'] { --feedback-color: #8df66b; }
+.halfpipe-hud [data-tone='bad'] { --feedback-color: #ff6659; }
+.halfpipe-hud [data-tone='ok'] { --feedback-color: #ffe06d; }
+.halfpipe-hud .hud-context [data-tone],
+.halfpipe-hud .hud-trick-feedback[data-tone] .trick-award-name,
+.halfpipe-hud .hud-landing-feedback[data-tone] > span {
+  color: var(--feedback-color);
+}
+.halfpipe-hud .hud-landing-feedback[data-tone],
+.halfpipe-hud .hud-action-feedback[data-tone] {
+  text-shadow: 2px 3px 0 var(--graffiti-ink), 3px 4px 0 #147385;
+}
+
+@media (max-width: 900px) {
+  .halfpipe-hud {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    row-gap: calc(13px * var(--ui-scale));
+  }
+  .halfpipe-hud .hud-score { grid-column: 1; grid-row: 1; }
+  .halfpipe-hud .hud-time { grid-column: 2; grid-row: 1; }
+  .halfpipe-hud .hud-context {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-height: 0;
+    width: min(100%, 580px);
+  }
+  .halfpipe-hud .hud-block > strong {
+    font-size: min(calc(clamp(30px, 5.5vw, 54px) * var(--ui-scale)), 8vw);
+  }
+  .halfpipe-hud .hud-trick-feedback {
+    font-size: calc(clamp(22px, 3.6vw, 34px) * var(--ui-scale));
+  }
+}
+
+@media (max-width: 580px) {
+  .halfpipe-hud {
+    padding: 12px 14px;
+    column-gap: 16px;
+    row-gap: 13px;
+  }
+  .halfpipe-hud .hud-block {
+    padding: 6px 8px;
+  }
+  .halfpipe-hud .hud-block > span {
+    font-size: min(calc(21px * var(--ui-scale)), 7vw);
+    -webkit-text-stroke: 2.5px var(--graffiti-ink);
+  }
+  .halfpipe-hud .hud-block > strong {
+    font-size: min(calc(31px * var(--ui-scale)), 8vw);
+    -webkit-text-stroke: 3px var(--graffiti-ink);
+  }
+  .halfpipe-hud .hud-trick-feedback {
+    font-size: min(calc(24px * var(--ui-scale)), 8vw);
+  }
+  .halfpipe-hud .hud-trick-feedback .trick-award-name {
+    -webkit-text-stroke: 2.5px var(--graffiti-ink);
+  }
+  .halfpipe-hud .hud-landing-feedback,
+  .halfpipe-hud .hud-action-feedback,
+  .halfpipe-hud .hud-status {
+    font-size: min(calc(18px * var(--ui-scale)), 6vw);
+    -webkit-text-stroke: 2px var(--graffiti-ink);
+  }
+}
+
+@media (max-height: 460px) and (min-width: 581px) {
+  .halfpipe-hud { padding-top: 10px; row-gap: 5px; }
+  .halfpipe-hud .hud-context { gap: 4px; }
+  .halfpipe-hud .hud-block > span { font-size: calc(20px * var(--ui-scale)); }
+  .halfpipe-hud .hud-block > strong { font-size: min(calc(34px * var(--ui-scale)), 7vw); }
+  .halfpipe-hud .hud-trick-feedback { font-size: calc(23px * var(--ui-scale)); }
+  .halfpipe-hud .hud-landing-feedback,
+  .halfpipe-hud .hud-action-feedback,
+  .halfpipe-hud .hud-status { font-size: calc(17px * var(--ui-scale)); }
+}
+
+.halfpipe-hud.is-high-contrast { filter: none; }
+.halfpipe-hud.is-high-contrast .hud-block,
+.halfpipe-hud.is-high-contrast .hud-combo,
+.halfpipe-hud.is-high-contrast .hud-landing-feedback,
+.halfpipe-hud.is-high-contrast .hud-action-feedback,
+.halfpipe-hud.is-high-contrast .hud-status { background: #000f; }
+.halfpipe-hud.is-high-contrast .hud-block::before,
+.halfpipe-hud.is-high-contrast .hud-trick-feedback::before { display: none; }
+.halfpipe-hud.is-high-contrast .hud-block > strong {
+  color: #fff1a8;
+  background: none;
+  text-shadow: 2px 3px 0 #000;
+  filter: none;
+}
+.halfpipe-hud.is-high-contrast .trick-award-name,
+.halfpipe-hud.is-high-contrast .hud-block > span,
+.halfpipe-hud.is-high-contrast .hud-trick-feedback[data-tone] > span,
+.halfpipe-hud.is-high-contrast .hud-landing-feedback[data-tone],
+.halfpipe-hud.is-high-contrast .hud-action-feedback[data-tone] {
+  text-shadow: 2px 3px 0 #000;
+}
+
+@media (forced-colors: active) {
+  .halfpipe-hud .hud-block > strong {
+    background: none;
+    color: CanvasText;
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+    filter: none;
+  }
+  .halfpipe-hud .hud-block::before,
+  .halfpipe-hud .hud-trick-feedback::before { display: none; }
+}

@@ -36,7 +36,7 @@ export class TrickFeedback {
     const detailLabel = details.length ? '<small>' + escapeText(details.join(' · ')) + '</small>' : '';
     this._show(this.trick, '<strong class="trick-award-name">' + label + '</strong>'
       + pointsLabel + detailLabel, duration, 'is-trick',
-      Number(points) > 0 && (!Number.isFinite(breakdown?.quality) || breakdown.quality >= 0.65) ? 'good' : 'ok');
+      Number(points) > 0 ? 'good' : 'ok');
   }
 
   showLanding(result, {
@@ -61,11 +61,13 @@ export class TrickFeedback {
   showActionFeedback(type, {
     text = null,
     duration = 900,
+    tone: requestedTone = null,
   } = {}) {
     const key = normalizeKey(type);
     const label = text || ACTION_LABELS[key] || String(type || '').toUpperCase();
-    const tone = ['perfect', 'good', 'great', 'clean'].includes(key) ? 'good'
+    const inferredTone = ['perfect', 'good', 'great', 'clean'].includes(key) ? 'good'
       : ['trick', 'ok', 'weak', 'early', 'late'].includes(key) ? 'ok' : 'bad';
+    const tone = ['good', 'ok', 'bad'].includes(requestedTone) ? requestedTone : inferredTone;
     this._show(this.status, escapeText(label), duration, 'is-action', tone);
   }
 

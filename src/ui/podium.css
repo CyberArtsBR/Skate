@@ -1,4 +1,3 @@
-.results-screen .results-card { max-height: 94%; overflow-y: auto; }
 .results-standings { margin: 14px 0; border-top: 1px solid #ffde8060; padding-top: 8px; }
 .results-standings > p { margin: 0 0 6px; font-size: 12px; letter-spacing: .14em; color: #ffde80; }
 .standing-row { display: flex; justify-content: space-between; gap: 15px; padding: 5px 0; font-size: 13px; }
