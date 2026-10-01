@@ -1,7 +1,8 @@
 import { OutdoorEnvironment } from '../graphics/OutdoorEnvironment.js';
+import { publicAssetUrl } from '../config/publicAssetUrl.js';
 
 const V18_CYBER_ALIAS = '/hdri/cyber-night-shanghai-bund-1k.hdr';
-const LOCAL_CYBER_HDR = '/hdri/shanghai_bund_1k.hdr';
+const LOCAL_CYBER_HDR = publicAssetUrl('hdri/shanghai_bund_1k.hdr');
 
 export function installCyberEnvironmentRedirect() {
   const proto = OutdoorEnvironment.prototype;

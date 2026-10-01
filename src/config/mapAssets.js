@@ -1,9 +1,11 @@
+import { publicAssetUrl } from './publicAssetUrl.js';
+
 const versions = typeof __HALFPIPE_MAP_VERSIONS__ === 'undefined'
   ? {} : __HALFPIPE_MAP_VERSIONS__;
 
 function mapImage(file) {
   const version = versions[file];
-  return '/images/maps/' + file + (version ? '?v=' + version : '');
+  return publicAssetUrl('images/maps/' + file) + (version ? '?v=' + version : '');
 }
 
 export const MAP_IMAGES = Object.freeze({

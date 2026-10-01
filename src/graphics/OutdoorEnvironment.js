@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { publicAssetUrl } from '../config/publicAssetUrl.js';
 
 const QUALITY_SEGMENTS = Object.freeze({
   low: [24, 12],
@@ -10,8 +11,8 @@ const QUALITY_SEGMENTS = Object.freeze({
 });
 
 const DAYLIGHT_URL = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr';
-const localEnvironmentUrl = url => url === DAYLIGHT_URL
-  ? '/hdri/piazza_martin_lutero_1k.hdr' : url;
+const LOCAL_DAYLIGHT_URL = publicAssetUrl('hdri/piazza_martin_lutero_1k.hdr');
+const localEnvironmentUrl = url => url === DAYLIGHT_URL ? LOCAL_DAYLIGHT_URL : url;
 
 export class OutdoorEnvironment {
   constructor(renderer, { url = null, onReady = null } = {}) {
