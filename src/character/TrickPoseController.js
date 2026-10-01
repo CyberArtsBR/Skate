@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { HANDPLANT_CLEARANCE as PLANT_PHASES } from '../gameplay/CrashPresentationTuning.js';
 
 const clamp01 = (value) => THREE.MathUtils.clamp(Number(value) || 0, 0, 1);
 const smoothstep = (value) => {
@@ -57,18 +58,20 @@ export class TrickPoseController {
       output.bodyY = -0.035 * envelope;
     } else if (state.trickVisualActive && state.trickType === 'hand-plant') {
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
-      const plant = phaseEnvelope(progress, 0.26, 0.82);
-      const settle = phaseEnvelope(progress, 0.38, 0.76);
+      const plant = phaseEnvelope(progress, PLANT_PHASES.enterEnd, PLANT_PHASES.releaseStart);
+      const facing = Number(state.plantFacingSign) < 0 ? -1 : 1;
+      const hand = state.selectedPlantHand === 'left' ? -1 : 1;
+      const scale = this.stanceHalfLength / 0.24;
 
-      // V14 hand plant: travel into the coping first, settle the shoulder/hip
-      // stack while the hand is planted, then release the body before the deck.
-      // This avoids the old symmetric "rock over and rock back" look.
-      output.boardYaw = -direction * (0.035 + 0.035 * settle) * plant;
-      output.boardRoll += side * (0.16 + 0.08 * settle) * plant;
-      output.bodyYaw = direction * (0.07 + 0.09 * settle) * plant;
-      output.bodyRoll = -side * 0.075 * settle;
-      output.bodyY = 0.025 * plant + 0.045 * settle;
-      output.bodyX = -side * (0.025 * plant + 0.055 * settle);
+      // The common carrier supplies the actual coping pivot and inversion.
+      // Small secondary offsets stack the torso over the supporting shoulder
+      // without introducing a second flip or pulling the feet off the deck.
+      output.boardYaw = -direction * 0.022 * plant;
+      output.boardRoll += side * facing * 0.055 * plant;
+      output.bodyYaw = (hand * 0.055 + direction * 0.025) * plant;
+      output.bodyRoll = -side * facing * 0.035 * plant;
+      output.bodyY = 0.025 * scale * plant;
+      output.bodyX = -side * facing * 0.018 * scale * plant;
     } else if (state.airborne && state.trickType === 'backflip') {
       const side = Math.sign(Number(state.wallSide) || 0) || 1;
       const flipDirection = Math.sign(Number(state.trickRoll) || 0) || side;

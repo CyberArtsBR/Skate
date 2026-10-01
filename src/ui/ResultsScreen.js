@@ -27,9 +27,10 @@ export class ResultsScreen {
     onRetry = null,
     onChangeRider = null,
     onMainMenu = null,
+    onNext = null,
     inputTarget = globalThis.window,
   } = {}) {
-    this.callbacks = { onRetry, onChangeRider, onMainMenu };
+    this.callbacks = { onRetry, onChangeRider, onMainMenu, onNext };
     this.inputTarget = inputTarget;
     this.selectedIndex = 0;
 
@@ -49,13 +50,14 @@ export class ResultsScreen {
     this.grid = this.root.querySelector('[data-results-grid]');
     this.actionsRoot = this.root.querySelector('[data-actions]');
     this.actions = [
+      ...(onNext ? [{ id: 'next', label: 'NEXT · WINNERS PODIUM', callback: () => this.callbacks.onNext?.() }] : []),
       { id: 'retry', label: 'RETRY', callback: () => this.callbacks.onRetry?.() },
       { id: 'changeRider', label: 'CHANGE RIDER', callback: () => this.callbacks.onChangeRider?.() },
       { id: 'mainMenu', label: 'MAIN MENU', callback: () => this.callbacks.onMainMenu?.() },
     ];
 
     this._onKeyDown = (event) => {
-      if (this.root.hidden) return;
+      if (this.root.hidden || event.defaultPrevented || event.repeat) return;
       if (event.code === 'ArrowUp' || event.code === 'KeyW') {
         this.moveSelection(-1);
         event.preventDefault();
@@ -78,7 +80,7 @@ export class ResultsScreen {
     this._renderActions();
   }
 
-  show(stats = {}) {
+  show(stats = {}, standings = []) {
     const normalized = normalizeResultsStats(stats);
     this.root.classList.toggle('is-game-over', Boolean(stats.severeCrash));
     this.root.querySelector('.menu-eyebrow').textContent = stats.severeCrash ? 'HEAD FIRST · RUN OVER' : 'RUN COMPLETE';
@@ -87,6 +89,26 @@ export class ResultsScreen {
       '<div class="result-stat" data-stat="' + key + '"><span>' + label + '</span><strong>'
       + escapeText(key === 'finalScore' ? normalized[key].toLocaleString('en-US') : normalized[key]) + '</strong></div>'
     )).join('');
+    this.root.querySelector('[data-standings]')?.remove();
+    if (standings.length) {
+      const ranking = document.createElement('div');
+      ranking.dataset.standings = '';
+      ranking.className = 'results-standings';
+      const heading = document.createElement('p');
+      heading.textContent = 'FINAL STANDINGS';
+      ranking.append(heading);
+      standings.forEach((entry, index) => {
+        const row = document.createElement('div');
+        row.className = 'standing-row' + (entry.isPlayer ? ' is-player' : '');
+        const label = document.createElement('span');
+        label.textContent = `${index + 1}. ${entry.isPlayer ? 'YOU · ' : ''}${entry.name}`;
+        const score = document.createElement('strong');
+        score.textContent = entry.score.toLocaleString('en-US');
+        row.append(label, score);
+        ranking.append(row);
+      });
+      this.grid.after(ranking);
+    }
     this.root.hidden = false;
     this.selectedIndex = 0;
     this._renderActions();

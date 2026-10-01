@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { LANDING_QUALITY } from './SkateAnimationState.js';
+import { HANDPLANT_CLEARANCE as PLANT_PHASES } from '../gameplay/CrashPresentationTuning.js';
 
 const clamp01 = (value) => THREE.MathUtils.clamp(Number(value) || 0, 0, 1);
 const smoothstep = (value) => {
@@ -29,6 +30,13 @@ export class SkatePoseController {
     const kickTurn = state.trickVisualActive && state.trickType === 'kick-turn';
     const backflip = Boolean(air && state.trickType === 'backflip');
     const trickProgress = clamp01(state.trickProgress);
+    const plantHold = handPlant
+      ? smoothstep(trickProgress / PLANT_PHASES.enterEnd)
+        * (1 - smoothstep((trickProgress - PLANT_PHASES.releaseStart)
+          / (1 - PLANT_PHASES.releaseStart)))
+      : 0;
+    const plantFacingSign = Number(state.plantFacingSign) < 0 ? -1 : 1;
+    const plantHand = state.selectedPlantHand;
     const flipTuck = backflip
       ? smoothstep(trickProgress / 0.22)
         * (1 - smoothstep((trickProgress - 0.70) / 0.30))
@@ -79,7 +87,7 @@ export class SkatePoseController {
       + bail * 0.16
       + recovery * 0.06,
     );
-    if (handPlant) compression = Math.max(0.38, compression * 0.74);
+    if (handPlant) compression = 0.46 + plantHold * 0.16;
 
     const asymmetry = sketchy * 0.18 * wallSide * facingSign;
     const bailLean = bail * wallSide * facingSign;
@@ -88,7 +96,7 @@ export class SkatePoseController {
       ? (Number(state.turnDirection) || 1) * (0.07 + airTuck * 0.09)
       : 0;
     const torsoCounter = handPlant
-      ? 0.22 + wallSide * 0.055
+      ? 0.12 + plantHold * 0.12
       : backflip
         ? 0.14 + flipTuck * 0.18 - flipOpen * 0.06
         : kickTurn
@@ -98,7 +106,7 @@ export class SkatePoseController {
     const neutralArm = 0.58;
     const airArm = neutralArm + 0.24 * (1 - anticipation) + 0.08 * airTuck;
     const landArm = landing * (0.08 + heavy * 0.18);
-    const handPlantFreeArm = 1.08;
+    const handPlantFreeArm = 0.92 + plantHold * 0.16;
     let leftArmBalance = air ? airArm : neutralArm + landArm;
     let rightArmBalance = leftArmBalance;
     if (sketchy > 0) {
@@ -112,10 +120,11 @@ export class SkatePoseController {
       rightArmBalance += bailArmReaction - bailLean * 0.12;
     }
     if (handPlant) {
-      // The IK-selected plant arm will be solved to the coping afterward. Keep
-      // the unsolved arm open as a visible counterbalance.
-      leftArmBalance = handPlantFreeArm;
-      rightArmBalance = handPlantFreeArm;
+      // The near arm anticipates support; the other opens as a counterbalance.
+      // This identity is latched before inversion, including fakie approaches.
+      const supportArm = 0.76 - plantHold * 0.22;
+      leftArmBalance = plantHand === 'left' ? supportArm : handPlantFreeArm;
+      rightArmBalance = plantHand === 'right' ? supportArm : handPlantFreeArm;
     } else if (backflip) {
       const flipArm = 0.72 + flipTuck * 0.38 - flipOpen * 0.20;
       leftArmBalance = Math.max(leftArmBalance, flipArm);
@@ -166,20 +175,23 @@ export class SkatePoseController {
           : -0.08 - compression * 0.075 + anticipation * 0.035,
       torsoCounter,
       torsoBalanceZ:
-        -surfaceAngle * (air ? 0.12 : 0.42) * facingSign
-        + asymmetry
-        + bailLean * 0.16
-        - wallSide * (handPlant ? 0.19 : 0)
-        - wallSide * flipTuck * 0.035,
+        handPlant
+          ? -wallSide * plantFacingSign * (0.04 + plantHold * 0.08)
+          : -surfaceAngle * (air ? 0.12 : 0.42) * facingSign
+            + asymmetry
+            + bailLean * 0.16
+            - wallSide * flipTuck * 0.035,
       headBalanceZ:
-        -surfaceAngle * (air ? 0.01 : 0.04) * facingSign
-        + asymmetry * 0.28
-        - bailLean * 0.07
-        + wallSide * flipOpen * 0.035,
+        handPlant
+          ? -wallSide * plantFacingSign * plantHold * 0.035
+          : -surfaceAngle * (air ? 0.01 : 0.04) * facingSign
+            + asymmetry * 0.28
+            - bailLean * 0.07
+            + wallSide * flipOpen * 0.035,
       // Airborne gaze opens toward the expected landing wall; on touchdown it
       // returns toward travel instead of snapping with the torso.
       headLook: handPlant
-        ? 0.30
+        ? 0.22 + plantHold * 0.16
         : backflip
           ? 0.22 + flipOpen * 0.34
           : air
@@ -189,8 +201,12 @@ export class SkatePoseController {
       leftArmBalance,
       rightArmBalance,
       forearmDrop,
-      leftForearmDrop: forearmDrop + Math.max(0, asymmetry) * 0.3,
-      rightForearmDrop: forearmDrop + Math.max(0, -asymmetry) * 0.3,
+      leftForearmDrop: handPlant
+        ? (plantHand === 'left' ? 0.07 : 0.20 + plantHold * 0.12)
+        : forearmDrop + Math.max(0, asymmetry) * 0.3,
+      rightForearmDrop: handPlant
+        ? (plantHand === 'right' ? 0.07 : 0.20 + plantHold * 0.12)
+        : forearmDrop + Math.max(0, -asymmetry) * 0.3,
       armLag: secondaryLag,
       torsoSettle: recovery * 0.08 - heavy * 0.11 - bail * 0.08,
       airborne: Boolean(state.airborne),
