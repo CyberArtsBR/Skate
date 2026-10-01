@@ -19,7 +19,8 @@ function visibleMenu(selector) {
 }
 
 function buttonsFor(root) {
-  return Array.from(root?.querySelectorAll?.('.menu-button:not([disabled])') || []);
+  return Array.from(root?.querySelectorAll?.('.menu-button:not([disabled])') || [])
+    .filter((button) => !button.hidden && button.getClientRects().length > 0);
 }
 
 function selectionIndex(root, buttons) {

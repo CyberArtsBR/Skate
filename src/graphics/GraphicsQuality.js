@@ -89,7 +89,7 @@ const PRESETS = Object.freeze({
 });
 
 export const GRAPHICS_PRESETS = PRESETS;
-export const DEFAULT_GRAPHICS_PRESET = 'high';
+export const DEFAULT_GRAPHICS_PRESET = 'cinematic';
 
 export function normalizeGraphicsPreset(name = DEFAULT_GRAPHICS_PRESET) {
   const normalized = String(name).trim().toLowerCase();

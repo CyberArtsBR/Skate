@@ -65,8 +65,8 @@ const RIDER_STORAGE_KEY = 'chimpions-halfpipe.rider';
 const BOARD_COLOR_STORAGE_KEY = 'chimpions-halfpipe.board-color';
 const GRAPHICS_NAMES = Object.freeze(Object.keys(GRAPHICS_PRESETS));
 const vfx = new HalfpipeVFX(scene);
-let currentAudioVolume = readStoredNumber(AUDIO_STORAGE_KEY, 0.8);
-let currentGraphicsPreset = restoreGraphicsPreset();
+let currentAudioVolume = 0.1;
+let currentGraphicsPreset = DEFAULT_GRAPHICS_PRESET;
 let selectedHeroId = readStoredString(RIDER_STORAGE_KEY, 'heretic');
 let selectedBoardColorId = readStoredString(BOARD_COLOR_STORAGE_KEY, 'original');
 const audio = new HalfpipeAudio({
@@ -77,7 +77,7 @@ quality.setPreset(currentGraphicsPreset);
 
 const titleScreen = createMenuScreen('title-screen', 'CALIFORNIA HALF-PIPE', 'CHIMPIONS HALF-PIPE', [
   ['start', 'START GAME'],
-  ['controls', 'CONTROLS'],
+  ['launcher', 'Back to the game selection'],
 ]);
 const graphicsScreen = createMenuScreen('graphics-screen', 'SETTINGS', 'GRAPHICS', [
   ...GRAPHICS_NAMES.map((name) => [name, name.toUpperCase()]),
@@ -904,7 +904,13 @@ function onKeyDown(event) {
   }
 
   if (gameFlow.state === HALFPIPE_FLOW_STATE.TITLE) {
-    if (event.code === 'Enter' || event.code === 'Space') beginCharacterSelect();
+    if (event.code === 'Enter' || event.code === 'Space') {
+      event.preventDefault();
+      const focused = document.activeElement;
+      const button = titleScreen.root.contains(focused) && focused?.matches('.menu-button')
+        ? focused : titleScreen.root.querySelector('.menu-button.is-selected');
+      (button || titleScreen.buttons.get('start')).click();
+    }
     else if (event.code === 'KeyC') {
       controlsReturnState = HALFPIPE_FLOW_STATE.TITLE;
       controlsScreen.backButton.textContent = 'BACK';
@@ -919,11 +925,8 @@ function onKeyDown(event) {
 
 function wireMenuButtons() {
   titleScreen.buttons.get('start').addEventListener('click', beginCharacterSelect);
-  titleScreen.buttons.get('controls').addEventListener('click', () => {
-    void unlockAudioFromGesture();
-    controlsReturnState = HALFPIPE_FLOW_STATE.TITLE;
-    controlsScreen.backButton.textContent = 'BACK';
-    gameFlow.transitionTo(HALFPIPE_FLOW_STATE.CONTROLS);
+  titleScreen.buttons.get('launcher').addEventListener('click', () => {
+    window.location.assign('https://chimp-jump.onrender.com/');
   });
   for (const name of GRAPHICS_NAMES) {
     graphicsScreen.buttons.get(name).addEventListener('click', () => setGraphicsPreset(name));
@@ -1016,10 +1019,12 @@ async function bootstrap() {
   });
   resetSimulation({ keepFlow: true });
 
-  loadingState.classList.add('is-hidden');
+  const openingArt = titleScreen.root.querySelector('.v16-title-art');
+  if (openingArt) await openingArt.decode().catch(() => {});
   stage.classList.add('is-ready');
   gameFlow.state = HALFPIPE_FLOW_STATE.TITLE;
   syncFlowUI({ state: HALFPIPE_FLOW_STATE.TITLE });
+  loadingState.classList.add('is-hidden');
   updateGraphicsMenuSelection();
   updateAudioMenuLabels();
 

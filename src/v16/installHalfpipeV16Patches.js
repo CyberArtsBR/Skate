@@ -9,7 +9,7 @@ import { BackflipGrabIK } from '../character/BackflipGrabIK.js';
 import './v16.css';
 
 let installed = false;
-const TITLE_SCREEN_URL = '/images/backgrounds/halfpipe-title.jpg';
+const TITLE_SCREEN_URL = '/images/backgrounds/halfpipe-opening.jpg';
 
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
 const smoothstep = (value) => {

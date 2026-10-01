@@ -3,7 +3,7 @@ import { createAudioManifest } from './AudioManifest.js';
 import { SkateAudio } from './SkateAudio.js';
 
 const DEFAULT_VOLUMES = Object.freeze({
-  master: 0.8,
+  master: 0.1,
   music: 0.55,
   sfx: 0.9,
   ambience: 0.42,
@@ -199,6 +199,7 @@ export class HalfpipeAudio {
     const context = this.context;
 
     this.masterGain = context.createGain();
+    this.masterGain.gain.value = 0.5;
     this.limiter = context.createDynamicsCompressor();
     this.limiter.threshold.value = -4;
     this.limiter.knee.value = 8;
