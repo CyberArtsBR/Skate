@@ -30,7 +30,6 @@ export class SpeedTrailVFX {
     this.reducedMotion = Boolean(reducedMotion);
     this.scale = THREE.MathUtils.clamp(Number(scale) || 1, 0.35, 1.25);
     this.comboBoost = 0;
-    this.emitAccumulator = 0;
     this._position = new THREE.Vector3();
     this._velocity = new THREE.Vector3();
     this._emitVelocity = new THREE.Vector3();
@@ -139,39 +138,12 @@ export class SpeedTrailVFX {
     this._previousFlipDegrees = flipDegrees;
     this._previousAerialDegrees = aerialDegrees;
     if (this.reducedMotion || !airborne || severeCrash || step <= 0) {
-      this.emitAccumulator = 0;
       this.rotationAccumulator = 0;
       return;
     }
 
-    const speed = this._velocity.length();
-    const intensity = THREE.MathUtils.clamp(Math.max(
-      THREE.MathUtils.smoothstep(Math.abs(Number(verticalVelocity) || 0), 5, 13),
-      THREE.MathUtils.smoothstep(Number(height) || 0, 0.7, 2.8),
-      THREE.MathUtils.smoothstep(Number(speedRatio) || 0, 0.55, 0.95),
-    ) + this.comboBoost, 0, 1);
-    const interval = THREE.MathUtils.lerp(0.06, 0.032, intensity)
-      / THREE.MathUtils.clamp(this.scale, 0.55, 1.15);
-    this.emitAccumulator += step;
-    if (intensity > 0.15 && speed > 0.8 && this.emitAccumulator >= interval) {
-      this.emitAccumulator %= interval;
-      // Leave a short world-space ribbon along the real velocity vector.
-      // It fades behind the rider rather than being a screen-space sticker.
-      this._emitVelocity.copy(this._velocity).multiplyScalar(-0.018);
-      for (const side of [-1, 1]) {
-        this._rotationPosition.copy(pos);
-        this._rotationPosition.x += side * 0.32;
-        this._rotationPosition.y += 0.42;
-        this._rotationPosition.z += 0.18;
-        this.pool.emit({
-          position: this._rotationPosition, velocity: this._emitVelocity,
-          rotation: Math.atan2(this._velocity.y, this._velocity.x),
-          lifetime: 0.42, startSize: 0.85 + intensity * 0.5,
-          endSize: 0.06, drag: 4, color: side < 0 ? 0xe5faff : 0x9de4ee,
-        });
-      }
-    }
-
+    // Straight airtime has no wind streaks. Only actual trick rotation emits
+    // the existing rotation traces and crescents below.
     const flipping = String(trickType).toLowerCase().includes('backflip') || aerialBackflip;
     const rotationDelta = flipping ? flipDelta : aerialDelta;
     // A reset/completed revolution must not emit a spurious full-circle arc.
@@ -210,7 +182,6 @@ export class SpeedTrailVFX {
   reset() {
     this.pool.clear();
     this.arcPool.clear();
-    this.emitAccumulator = 0;
     this.rotationAccumulator = 0;
     this.comboBoost = 0;
     this._hasPreviousPosition = false;

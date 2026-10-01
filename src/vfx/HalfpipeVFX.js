@@ -120,11 +120,6 @@ export class HalfpipeVFX {
       case 'TAKEOFF': {
         if (position) {
           this.impact.takeoff({ position, velocity });
-          this.speedTrail.pulse({
-            position,
-            velocity,
-            intensity: 0.48,
-          });
         }
         break;
       }
