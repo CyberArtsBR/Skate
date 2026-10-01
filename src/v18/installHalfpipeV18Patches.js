@@ -11,8 +11,8 @@ const CYBER_ENVIRONMENT = '/hdri/cyber-night-shanghai-bund-1k.hdr';
 export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
     id: 'city',
-    name: 'Tournament',
-    imageUrl: MAP_IMAGES.tournament,
+    name: 'City',
+    imageUrl: MAP_IMAGES.city,
     environmentUrl: BASE_ENVIRONMENT,
     position: 'center center',
     coherence: Object.freeze({ brightness: 0.96, saturation: 0.98, contrast: 0.98, gradeOpacity: 0.5 }),
