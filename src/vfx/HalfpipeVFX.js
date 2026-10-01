@@ -3,13 +3,14 @@ import { ImpactVFX } from './ImpactVFX.js';
 import { SpeedTrailVFX } from './SpeedTrailVFX.js';
 import { quality } from '../graphics/RenderQualityManager.js';
 import { ARCADE_FEEDBACK } from './ArcadeFeedbackTuning.js';
+import { ContactFeedbackGate } from '../presentation/ContactFeedback.js';
 
 const LANDING_IMPACTS = Object.freeze({
   PERFECT: Object.freeze({ strength: 0.005, duration: 0.08 }),
   CLEAN: Object.freeze({ strength: 0.018, duration: 0.11 }),
   SKETCHY: Object.freeze({ strength: 0.055, duration: 0.16 }),
   HEAVY: Object.freeze({ strength: 0.105, duration: 0.22 }),
-  BAIL: Object.freeze({ strength: 0.19, duration: 0.32 }),
+  BAIL: Object.freeze({ strength: 0.055, duration: 0.14 }),
 });
 const TRAIL_OBJECT_KEYS = Object.freeze(['velocity', 'boardQuaternion', 'trickType']);
 const TRAIL_NUMBER_KEYS = Object.freeze(['speedRatio', 'backflipRotationDegrees', 'aerialRotationDegrees']);
@@ -64,6 +65,7 @@ export class HalfpipeVFX {
       severeCrash: false,
     };
     this.severeCrashActive = false;
+    this.contactGate = new ContactFeedbackGate();
     this._carveAccumulator = 0;
     this._unsubscribeQuality = quality.subscribe(({ vfxScale }) => this.setScale(vfxScale));
   }
@@ -95,54 +97,59 @@ export class HalfpipeVFX {
           this.impact.pump({
             position,
             velocity,
-            rating: ratingOf(event, 'GOOD'),
-          });
-          this.speedTrail.pulse({
-            position,
-            velocity,
-            intensity: ratingOf(event, 'GOOD') === 'PERFECT' ? 0.75 : 0.42,
+            normal,
           });
         }
         break;
       }
 
       case 'COPING_HIT': {
+        const maneuver = String(event.maneuver || event.trick || '').toLowerCase().replaceAll('_', '-');
+        if (maneuver === 'hand-plant' || maneuver === 'takeoff') break;
+        if (!this.contactGate.claim(event, 'coping')) break;
         if (position) {
           this.impact.copingContact({
             position,
             normal,
             velocity,
+            contactKind: event.contactKind || 'metal',
           });
         }
         break;
       }
 
       case 'TAKEOFF': {
+        if (!this.contactGate.claim(event, 'takeoff')) break;
         if (position) {
-          this.impact.takeoff({ position, velocity });
+          this.impact.takeoff({ position, velocity, normal });
         }
         break;
       }
 
-      case 'TRICK_COMPLETED': {
-        const trick = String(event.trick || event.trickType || '').toLowerCase();
-        if (trick === 'hand-plant' && event.handContactPosition) {
+      case 'HAND_PLANT_CONTACT': {
+        if (!this.contactGate.claim(event, 'hand')) break;
+        if (position) {
           this.impact.copingContact({
-            position: event.handContactPosition,
+            position,
             normal,
             velocity,
+            contactKind: 'hand',
           });
         }
         break;
       }
 
       case 'LANDING': {
+        if (!this.contactGate.claim(event, 'landing')) break;
         const rating = ratingOf(event);
         if (position) {
           this.impact.landing({
             position,
             velocity,
             rating,
+            normal,
+            impact: event.impact,
+            impactIntensity: event.impactIntensity,
           });
         }
         cameraImpact = LANDING_IMPACTS[rating] || LANDING_IMPACTS.CLEAN;
@@ -150,21 +157,25 @@ export class HalfpipeVFX {
       }
 
       case 'BAIL': {
-        if (this.severeCrashActive) break;
+        if (!this.contactGate.claim(event, 'landing')) break;
         if (position) {
-          this.impact.crash({ position, velocity });
+          this.impact.crash({ position, velocity, normal, impact: event.impact });
         }
         cameraImpact = LANDING_IMPACTS.BAIL;
         break;
       }
 
-      case 'HEAD_FIRST_CRASH': {
-        if (this.severeCrashActive) break;
-        this.severeCrashActive = true;
-        if (position) this.impact.severeCrash({
-          position, velocity, normal, impactSpeed: event.impactSpeed,
-        });
-        cameraImpact = { strength: 0.24, duration: 0.3 };
+      case 'TRICK_STARTED': {
+        if (String(event.trick || '').toLowerCase() !== 'kick-turn') break;
+        if (!this.contactGate.claim(event, 'coping')) break;
+        if (position) this.impact.copingContact({ position, velocity, normal,
+          contactKind: event.contactKind || 'metal' });
+        break;
+      }
+
+      case 'TRICK_COMPLETED': {
+        // Completion belongs to HUD/score feedback; physical contact already
+        // emitted at the measured wheel or hand position.
         break;
       }
 
@@ -248,6 +259,7 @@ export class HalfpipeVFX {
   }
 
   reset() {
+    this.contactGate.clear();
     this.impact.reset();
     this.speedTrail.reset();
     this.severeCrashActive = false;

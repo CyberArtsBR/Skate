@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ParticlePool } from './ParticlePool.js';
 import { ARCADE_FEEDBACK } from './ArcadeFeedbackTuning.js';
+import { createSoftParticleMaterial, createTaperedArcGeometry } from './ParticleMaterials.js';
 
 const ZERO = Object.freeze([0, 0, 0]);
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
@@ -46,15 +47,7 @@ export class SpeedTrailVFX {
       capacity: ARCADE_FEEDBACK.trajectoryCapacity,
       name: 'halfpipe-vfx-speed-trails',
       geometry: new THREE.PlaneGeometry(1, 0.14),
-      material: new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.78,
-        depthWrite: false,
-        blending: THREE.NormalBlending,
-        toneMapped: false,
-        side: THREE.DoubleSide,
-      }),
+      material: createSoftParticleMaterial({ kind: 'stroke', opacity: 0.42 }),
       orientToVelocity: true,
     });
     this.pool.ownsGeometry = true;
@@ -62,9 +55,8 @@ export class SpeedTrailVFX {
     this.pool.mesh.renderOrder = 4;
     this.arcPool = new ParticlePool(scene, {
       capacity: 16, name: 'halfpipe-vfx-air-wind-arcs',
-      geometry: new THREE.RingGeometry(0.88, 1, 24, 1, 0, Math.PI * 0.75),
-      material: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true,
-        opacity: 0.66, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
+      geometry: createTaperedArcGeometry(),
+      material: createSoftParticleMaterial({ kind: 'stroke', opacity: 0.36 }),
     });
     this.arcPool.ownsGeometry = true;
     this.arcPool.ownsMaterial = true;

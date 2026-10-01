@@ -172,11 +172,14 @@ async function applyMapToRuntime(screen, map) {
       quality.apply({ rebuildEnvironment: true });
     }
 
+    foundation.lighting?.setMapProfile?.(map.id);
+
     foundation.activeMap = map;
     foundation.customization ??= {};
     foundation.customization.maps = HALFPIPE_MAPS;
     foundation.customization.map = map;
     foundation.customization.selectedMapMode = ensureState(screen).mapMode;
+    foundation.setMapPresentation?.(map.id);
     return true;
   } catch (error) {
     console.error('[Halfpipe V18] Map load failed', map.id, error);

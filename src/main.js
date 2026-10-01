@@ -37,6 +37,8 @@ import { PauseMenu } from './ui/PauseMenu.js';
 import { ResultsScreen } from './ui/ResultsScreen.js';
 import { PodiumScreen } from './ui/PodiumScreen.js';
 import { WinnersPodium } from './scene/WinnersPodium.js';
+import { ParkForeground } from './scene/ParkForeground.js';
+import { ContactPresentation, measureBoardContacts } from './presentation/ContactPresentation.js';
 import { HalfpipeVFX } from './vfx/HalfpipeVFX.js';
 import { HalfpipeAudio } from './audio/HalfpipeAudio.js';
 import { GRAPHICS_PRESETS, DEFAULT_GRAPHICS_PRESET } from './graphics/GraphicsQuality.js';
@@ -98,6 +100,9 @@ let rider = null;
 let skateboardVisual = null;
 let currentHeroId = null;
 let presentationBinder = null;
+let contactPresentation = null;
+let parkForeground = null;
+let activePresentationMap = 'city';
 let presentationDebug = null;
 let simulation = null;
 let simulationRunning = false;
@@ -228,6 +233,7 @@ const gameFlow = new HalfpipeGameFlow({
     onReducedCameraMotionChange(enabled) {
       cameraController.setReducedMotion(enabled);
       vfx.setReducedMotion(enabled);
+      winnersPodium.setReducedMotion(enabled);
       hud.setPlayerMode({ ...hud.playerMode, reducedMotion: enabled });
     },
     onControllerVibrationChange(enabled) {
@@ -277,7 +283,7 @@ const countdown = new CountdownOverlay(stage, {
     gameFlow.transitionTo(HALFPIPE_FLOW_STATE.RUN);
     hud.setStatus('', 'running');
     void audio.playMusic('gameplay');
-    void audio.playAmbience('outdoor');
+    void audio.setEnvironment(activePresentationMap);
   },
 });
 const pauseMenu = new PauseMenu(stage, {
@@ -620,6 +626,12 @@ function playControllerHaptics(recommendation) {
   }).catch(() => {});
 }
 
+function setMapPresentation(mapId) {
+  activePresentationMap = mapId || 'city';
+  parkForeground?.setMap(activePresentationMap);
+  void audio.setEnvironment(activePresentationMap);
+}
+
 async function unlockAudioFromGesture() {
   if (audio.isReady) return true;
   if (audioUnlockStarted) return false;
@@ -629,7 +641,7 @@ async function unlockAudioFromGesture() {
     if (unlocked) {
       audio.setMasterVolume(currentAudioVolume);
       void audio.playMusic(gameFlow.state === HALFPIPE_FLOW_STATE.RUN ? 'gameplay' : 'menu');
-      void audio.playAmbience('outdoor');
+      void audio.setEnvironment(activePresentationMap);
     }
     return unlocked;
   } catch (error) {
@@ -668,6 +680,7 @@ function vfxMotionState(state, presentationState) {
     ? state.airEntrySurfaceSpeed || state.airLaunchVelocity : state.tangentVelocity);
   const boardQuaternion = rider.skateboard.root.getWorldQuaternion(new THREE.Quaternion());
   return {
+    ...measureBoardContacts(rider, profile, halfpipe, state),
     position: rider.root.position,
     velocity: { x: state.mode === 'airborne' ? 0 : state.tangentVelocity * Math.abs(sample.tangent.x),
       y: presentationState?.verticalVelocity || 0, z: 0 },
@@ -678,8 +691,6 @@ function vfxMotionState(state, presentationState) {
     turnAmount: state.surfaceTrickActive ? 0.5 : Math.abs(sample.tangent.y)
       * speed / PHASE4_GAMEPLAY_CONFIG.launch.speedForMaximumVelocity,
     contactForce: Math.abs(state.tangentialAcceleration) / 60,
-    contactPosition: { x: sample.x, y: sample.y + 0.03, z: 0 },
-    surfaceNormal: { x: sample.normal.x, y: sample.normal.y, z: 0 },
     boardQuaternion,
     backflipRotationDegrees: state.backflipRotationDegrees || 0,
     aerialRotationDegrees: state.airRotationSignedDegrees ?? state.airRotationDegrees ?? 0,
@@ -713,12 +724,7 @@ function updatePlayerHUD(state) {
 
 function routeGameplayEvents(events, state, presentationState) {
   for (const rawEvent of events) {
-    const event = { ...rawEvent, worldPosition: rawEvent.position || rider?.root?.position?.clone?.() };
-    if (
-      String(event.type || '').toUpperCase() === 'TRICK_COMPLETED'
-      && String(event.trick || '').toLowerCase() === 'hand-plant'
-      && presentationState?.copingWorldPoint
-    ) event.handContactPosition = presentationState.copingWorldPoint;
+    const event = contactPresentation?.enrich(rawEvent, state) || rawEvent;
 
     const type = String(event.type || '').toUpperCase();
     const vfxResult = vfx.handleEvent(event) || {};
@@ -740,7 +746,7 @@ function routeGameplayEvents(events, state, presentationState) {
         tone: 'bad',
       });
     } else if (type === 'LANDING') {
-      hud.showLanding(event.quality || 'CLEAN', { multiplier: event.scoreMultiplier });
+      if (event.quality !== 'BAIL') hud.showLanding(event.quality || 'CLEAN', { multiplier: event.scoreMultiplier });
     } else if (type === 'BAIL') {
       hud.showActionFeedback('bail', { text: 'NO POINTS · −20% SPEED', duration: 1100, tone: 'bad' });
     } else if (type === 'COMBO_CHANGED') {
@@ -751,11 +757,17 @@ function routeGameplayEvents(events, state, presentationState) {
       hud.setCombo(event.multiplier || 1);
     }
   }
+  const handContact = contactPresentation?.pollHandContact(state);
+  if (handContact) {
+    vfx.handleEvent(handContact);
+    audio.handleEvent(handContact);
+  }
 }
 
 function resetSimulation({ keepFlow = false } = {}) {
   if (!simulation) return null;
   competitionStandings = null;
+  contactPresentation?.reset();
   vfx.reset();
   rider.skateboard.resetSpeedGlow?.();
   const state = simulation.reset();
@@ -1067,6 +1079,8 @@ async function bootstrap() {
   ]);
 
   skateboardVisual = skateboardAsset;
+  parkForeground = new ParkForeground(scene, halfpipe);
+  setMapPresentation(activePresentationMap);
   skateboardVisual.setDeckColor(initialBoardColor.color);
   currentHeroId = initialHero.id;
   heroSelectScreen.selectHero(
@@ -1086,6 +1100,7 @@ async function bootstrap() {
     visualSurface: halfpipe,
     visualSeparation: 0.02,
   });
+  contactPresentation = new ContactPresentation({ rider, profile, ramp: halfpipe });
   presentationDebug = new HalfpipePresentationDebug(profile, presentationBinder, {
     onChange(station, index, count) {
       if (hud.debugMode) {
@@ -1164,6 +1179,7 @@ async function bootstrap() {
     background,
     ground,
     lighting,
+    setMapPresentation,
     recoverWebGL,
   };
 }
@@ -1183,6 +1199,7 @@ function dispose() {
   profileDebug.dispose();
   presentationDebug?.dispose();
   ground.dispose();
+  parkForeground?.dispose();
   lighting.dispose();
   disposeEnvironment();
   background.dispose();

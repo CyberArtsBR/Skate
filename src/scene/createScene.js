@@ -31,7 +31,7 @@ export function createScene(canvas) {
     onReady(texture) {
       if (disposed) return;
       scene.environment = texture;
-      scene.environmentIntensity = quality.preset.environmentIntensity;
+      scene.environmentIntensity = quality.environmentIntensity;
     },
   });
   quality.attachEnvironment(outdoorEnvironment);

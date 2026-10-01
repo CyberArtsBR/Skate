@@ -8,6 +8,17 @@ import { ARCADE_FEEDBACK } from '../vfx/ArcadeFeedbackTuning.js';
 
 const COPING_MATERIAL_NAME = 'Rail_Metal';
 
+// The shipped GLB replaced the legacy rail material name. Resolve its authored
+// mesh AND parent so an unrelated generic Material.002 is never a contact rail.
+function isCopingMaterial(material, mesh) {
+  if (mesh.parent?.name !== 'halfpipe-coping.002_2') return false;
+  if (material?.name === COPING_MATERIAL_NAME) return true;
+  return mesh?.name === 'Object_8'
+    && mesh.userData.halfpipeSourceMeshName === 'Object_2'
+    && (material?.name === 'Material.002'
+      || material?.userData?.halfpipeRole === 'coping');
+}
+
 const RIDING_SURFACE_NAMES = Object.freeze([
   'Object_4',
   'halfpipe-riding-surface',
@@ -113,7 +124,7 @@ function createCopingGlowShell(mesh, sourceMaterials, expansion, opacity) {
   if (mesh.isSkinnedMesh || !mesh.geometry?.getAttribute('normal')) return null;
 
   const glowMaterials = sourceMaterials.map((material) => (
-    material?.name === COPING_MATERIAL_NAME
+    isCopingMaterial(material, mesh)
       ? createGlowMaterial(expansion, opacity)
       : createSilentMaterial()
   ));
@@ -198,6 +209,7 @@ export class HalfpipeVisual {
     this.ridingSurfaceBounds = new THREE.Box3();
     this.alignment = null;
     this._surfaceRaycaster = new THREE.Raycaster();
+    this._surfaceNormalMatrix = new THREE.Matrix3();
     this._unregisterQuality = null;
     this.copingBounds = { left: new THREE.Box3(), right: new THREE.Box3() };
   }
@@ -206,6 +218,9 @@ export class HalfpipeVisual {
     const gltf = await new GLTFLoader().loadAsync(this.url);
     this.model = gltf.scene;
     this.model.name = 'halfpipe-source-visual';
+    const paintMask = await new THREE.TextureLoader()
+      .loadAsync('/images/materials/halfpipe-paint-mask.png')
+      .catch(() => null);
 
     this.model.traverse((object) => {
       if (/ground/i.test(object.name)) {
@@ -213,13 +228,16 @@ export class HalfpipeVisual {
         this.hiddenGroundNodes.push(object.name);
       }
       if (object.isMesh && !object.userData?.visualGlowOnly) {
+        const association = gltf.parser?.associations?.get(object);
+        const sourceMesh = gltf.parser?.json?.meshes?.[association?.meshes];
+        if (sourceMesh?.name) object.userData.halfpipeSourceMeshName = sourceMesh.name;
         object.castShadow = true;
         object.receiveShadow = true;
 
         const sourceMaterials = Array.isArray(object.material)
           ? object.material
           : [object.material];
-        for (const material of sourceMaterials) prepareRampSurfaceFinish(material);
+        for (const material of sourceMaterials) prepareRampSurfaceFinish(material, paintMask);
         const frontMetal = GAME_CONFIG.renderer.frontMetal;
         // The current shipped GLB splits Object_4 into named material meshes.
         // Retain the legacy audit match, and recognize its actual FRENTE face.
@@ -256,17 +274,18 @@ export class HalfpipeVisual {
         }
 
         const hasCopingMaterial = sourceMaterials.some(
-          (material) => material?.name === COPING_MATERIAL_NAME,
+          (material) => isCopingMaterial(material, object),
         );
 
         if (hasCopingMaterial) {
           object.userData.emissiveBloom = true;
           object.userData.copingContactZone = true;
           preparedMaterials = preparedMaterials.map((material) => {
-            if (material?.name !== COPING_MATERIAL_NAME) return material;
+            if (!isCopingMaterial(material, object)) return material;
 
             const coping = material.clone();
             coping.name = `${material.name}-soft-emissive`;
+            coping.userData.halfpipeRole = 'coping';
             if (coping.emissive?.set) {
               coping.emissive.setHex(ARCADE_FEEDBACK.copingEmissiveColor);
               coping.emissiveIntensity = GAME_CONFIG.renderer.copingGlow.emissiveIntensity;
@@ -295,6 +314,10 @@ export class HalfpipeVisual {
         }
       }
     });
+
+    // The reviewed mask is sampled once into the packed finish texture. It does
+    // not need its own GPU allocation or a reference after material preparation.
+    paintMask?.dispose();
 
     this.root.add(this.model);
     this.root.updateWorldMatrix(true, true);
@@ -360,9 +383,17 @@ export class HalfpipeVisual {
     const hit = this._surfaceRaycaster.intersectObject(this.ridingSurface, true)[0];
     if (!hit) return null;
 
+    const hitNormal = hit.face?.normal
+      ? hit.face.normal.clone().applyNormalMatrix(
+        this._surfaceNormalMatrix.getNormalMatrix(hit.object.matrixWorld),
+      )
+      : normal.clone();
+    if (hitNormal.dot(normal) < 0) hitNormal.negate();
+
     return {
       separation: hit.distance - padding,
       point: hit.point.clone(),
+      normal: hitNormal,
       distance: hit.distance,
     };
   }
@@ -379,7 +410,9 @@ export class HalfpipeVisual {
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       const groups = geometry.groups.length ? geometry.groups : [{ start: 0, count: geometry.index?.count || positions.count, materialIndex: 0 }];
       for (const group of groups) {
-        if (!String(materials[group.materialIndex]?.name || '').startsWith(COPING_MATERIAL_NAME)) continue;
+        const material = materials[group.materialIndex];
+        if (material?.userData?.halfpipeRole !== 'coping'
+          && !String(material?.name || '').startsWith(COPING_MATERIAL_NAME)) continue;
         const end = Math.min(group.start + group.count, geometry.index?.count || positions.count);
         for (let vertex = group.start; vertex < end; vertex += 1) {
           const index = geometry.index ? geometry.index.getX(vertex) : vertex;

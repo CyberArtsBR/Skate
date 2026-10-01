@@ -217,7 +217,7 @@ export class RiderController {
     const pose = { ...targetPose };
     if (!resetPose) {
       for (const [key, value] of Object.entries(pose)) {
-        if (typeof value === 'number' && key !== 'facingSign') {
+        if (typeof value === 'number') {
           pose[key] = THREE.MathUtils.lerp(this.smoothedPose[key] ?? value, value, alpha);
         }
       }

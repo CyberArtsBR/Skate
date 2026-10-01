@@ -8,7 +8,7 @@ const placeholder = (kind, options = {}) => Object.freeze({
 const PIXEL_RAMPAGE = '/audio/music/Pixel%20Rampage.mp3';
 
 export const AUDIO_MANIFEST = Object.freeze({
-  version: 5,
+  version: 6,
   music: Object.freeze({
     // User-supplied Halfpipe theme. Browsers may require the first user gesture
     // before audible playback; once audio is unlocked this is the menu/theme
@@ -19,14 +19,15 @@ export const AUDIO_MANIFEST = Object.freeze({
   }),
   continuous: Object.freeze({
     wheelRoll: Object.freeze({ url: '/audio/skate/raw-street-roll.wav', loop: true, gain: 1 }),
-    rampTexture: Object.freeze({ url: '/audio/skate/raw-street-roll.wav', loop: true, gain: 1 }),
+    rampTexture: placeholder('procedural-dry-trucks', { loop: true, gain: 1 }),
     wind: placeholder('procedural-wind', { loop: true, gain: 1 }),
   }),
   ambience: Object.freeze({
-    outdoor: placeholder('procedural-california-outdoor', { loop: true, gain: 0.18 }),
-    california: placeholder('filtered-noise', { loop: true, gain: 0.18 }),
-    city: placeholder('filtered-noise', { loop: true, gain: 0.08 }),
-    crowd: placeholder('filtered-noise', { loop: true, gain: 0.06 }),
+    outdoor: placeholder('outdoor', { loop: true, gain: 0.055 }),
+    california: placeholder('outdoor', { loop: true, gain: 0.055 }),
+    city: placeholder('city', { loop: true, gain: 0.035 }),
+    'tree-house': placeholder('outdoor', { loop: true, gain: 0.055 }),
+    'cyber-night': placeholder('night', { loop: true, gain: 0.035 }),
   }),
   sfx: Object.freeze({
     pumpPerfect: placeholder('pump-perfect', { gain: 0.72 }),
@@ -60,10 +61,9 @@ export const AUDIO_ASSET_REQUIREMENTS = Object.freeze([
   'Optional distant-city ambience loop',
   'Optional restrained crowd ambience loop',
   'Preferred wheel-roll loop: 6-10 seconds, dry, seamless, no hard attack or baked fade, clean board-on-wood/concrete texture',
-  'Optional crowd OOOHH one-shot for bails',
   'Optional coping metal hit/scrape one-shots',
   'Optional landing impact family: perfect, clean, sketchy, heavy',
-  'Optional bail layers: board, body/dust, recovery accent',
+  'Bails use board/wheel stumble only; no body slam or emergency cue',
 ]);
 
 export function createAudioManifest(overrides = {}) {

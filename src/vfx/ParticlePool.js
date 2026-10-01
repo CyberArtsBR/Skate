@@ -60,6 +60,21 @@ export class ParticlePool {
     this.disposed = false;
 
     this.mesh = new THREE.InstancedMesh(this.geometry, this.material, this.capacity);
+    this._opacity = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity), 1);
+    this._opacity.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('particleOpacity', this._opacity);
+    const previousCompile = this.material.onBeforeCompile;
+    const previousCacheKey = this.material.customProgramCacheKey.bind(this.material);
+    this.material.onBeforeCompile = (shader, renderer) => {
+      previousCompile?.call(this.material, shader, renderer);
+      shader.vertexShader = 'attribute float particleOpacity;\nvarying float vParticleOpacity;\n'
+        + shader.vertexShader.replace('#include <begin_vertex>',
+          '#include <begin_vertex>\nvParticleOpacity = particleOpacity;');
+      shader.fragmentShader = 'varying float vParticleOpacity;\n' + shader.fragmentShader.replace(
+        '#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= vParticleOpacity;',
+      );
+    };
+    this.material.customProgramCacheKey = () => `${previousCacheKey()}:halfpipe-particle-alpha-v1`;
     this.mesh.name = name;
     this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -130,6 +145,7 @@ export class ParticlePool {
     this._writeInstance(index, state, 0);
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this._opacity.needsUpdate = true;
     return true;
   }
 
@@ -160,6 +176,7 @@ export class ParticlePool {
 
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this._opacity.needsUpdate = true;
   }
 
   clear() {
@@ -170,14 +187,19 @@ export class ParticlePool {
     }
     this.activeCount = 0;
     this.mesh.instanceMatrix.needsUpdate = true;
+    this._opacity.needsUpdate = true;
   }
 
   dispose() {
     if (this.disposed) return;
     this.clear();
     this.parent?.remove?.(this.mesh);
+    this.mesh.dispose();
     if (this.ownsGeometry) this.geometry.dispose();
-    if (this.ownsMaterial) this.material.dispose();
+    if (this.ownsMaterial) {
+      if (this.material.userData.ownsParticleMap) this.material.map?.dispose();
+      this.material.dispose();
+    }
     this.disposed = true;
   }
 
@@ -198,7 +220,8 @@ export class ParticlePool {
 
   _writeInstance(index, state, progress) {
     const fade = Math.pow(Math.max(0, 1 - progress), 0.7);
-    const size = THREE.MathUtils.lerp(state.startSize, state.endSize, progress) * fade;
+    const size = THREE.MathUtils.lerp(state.startSize, state.endSize, progress);
+    this._opacity.setX(index, fade);
 
     this._scratch.position.copy(state.position);
     if (this.orientToVelocity && state.velocity.lengthSq() > 1e-6) {
@@ -225,6 +248,7 @@ export class ParticlePool {
   }
 
   _hideInstance(index) {
+    this._opacity.setX(index, 0);
     this._scratch.position.set(0, -9999, 0);
     this._scratch.rotation.set(0, 0, 0);
     this._scratch.scale.set(HIDDEN_SCALE, HIDDEN_SCALE, HIDDEN_SCALE);

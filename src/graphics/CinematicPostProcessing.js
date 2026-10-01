@@ -197,10 +197,11 @@ export class CinematicPostProcessing {
     );
   }
 
-  _isBloomTarget(object) {
-    return Boolean(
-      object.userData?.emissiveBloom,
-    );
+  _isBloomTarget(object, material) {
+    if (!object.userData?.emissiveBloom) return false;
+    // Coping emission is a material-slot role, not permission to bloom any
+    // unrelated emissive slot sharing the same source mesh.
+    return !object.userData.copingContactZone || material?.userData?.halfpipeRole === 'coping';
   }
 
   _prepareBloomMaterials() {
@@ -210,7 +211,7 @@ export class CinematicPostProcessing {
       this._materialCache.set(object, object.material);
       const source = object.material;
       const bloomMaterial = (material) => {
-        if (!this._isBloomTarget(object) || !material?.emissive) return this.darkMaterial;
+        if (!this._isBloomTarget(object, material) || !material?.emissive) return this.darkMaterial;
         let glow = this._emissiveMaterials.get(material);
         if (!glow) {
           glow = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false,

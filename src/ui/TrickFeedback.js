@@ -22,6 +22,7 @@ export class TrickFeedback {
     this.status = root.querySelector('[data-action-feedback]');
     this.combo = root.querySelector('[data-combo]');
     this.timers = new Map();
+    this.recentLanding = null;
   }
 
   showTrick(name, points = 0, { duration = 1500, breakdown = null } = {}) {
@@ -37,6 +38,14 @@ export class TrickFeedback {
     this._show(this.trick, '<strong class="trick-award-name">' + label + '</strong>'
       + pointsLabel + detailLabel, duration, 'is-trick',
       Number(points) > 0 ? 'good' : 'ok');
+    this.trick.classList.toggle('is-long-name', formatTrickName(name).length > 28);
+    this._hide(this.status);
+    this._hide(this.landing);
+    // Event order can differ by maneuver: join the touchdown and its banked
+    // award in either order instead of stacking separate central banners.
+    if (this.recentLanding && Date.now() - this.recentLanding.time < 250) {
+      this._appendLanding(this.recentLanding);
+    }
   }
 
   showLanding(result, {
@@ -48,14 +57,14 @@ export class TrickFeedback {
     const multiplierLabel = Number(multiplier) > 1
       ? ' <span>×' + trimMultiplier(multiplier) + '</span>'
       : '';
-    this._show(
-      this.landing,
-      escapeText(label) + multiplierLabel,
-      duration,
-      'is-' + key,
-      ['perfect', 'clean', 'good'].includes(key) ? 'good'
-        : ['bail', 'bad', 'heavy', 'failed'].includes(key) ? 'bad' : 'ok',
-    );
+    const tone = ['perfect', 'clean', 'good'].includes(key) ? 'good'
+      : ['bail', 'bad', 'heavy', 'failed'].includes(key) ? 'bad' : 'ok';
+    this.recentLanding = { html: escapeText(label) + multiplierLabel, tone, time: Date.now() };
+    if (!this.trick.hidden && !this.trick.classList.contains('is-leaving')) {
+      this._appendLanding(this.recentLanding);
+    } else {
+      this._show(this.landing, this.recentLanding.html, duration, 'is-' + key, tone);
+    }
   }
 
   showActionFeedback(type, {
@@ -64,10 +73,19 @@ export class TrickFeedback {
     tone: requestedTone = null,
   } = {}) {
     const key = normalizeKey(type);
+    if (key.toLowerCase().includes('pump')) return;
     const label = text || ACTION_LABELS[key] || String(type || '').toUpperCase();
     const inferredTone = ['perfect', 'good', 'great', 'clean'].includes(key) ? 'good'
       : ['trick', 'ok', 'weak', 'early', 'late'].includes(key) ? 'ok' : 'bad';
     const tone = ['good', 'ok', 'bad'].includes(requestedTone) ? requestedTone : inferredTone;
+    if (tone === 'bad') {
+      // A bail must replace old positive feedback, not compete with it.
+      this._hide(this.trick);
+      this._hide(this.landing);
+      this.recentLanding = null;
+    } else if (!this.trick.hidden && key === 'trick') {
+      return;
+    }
     this._show(this.status, escapeText(label), duration, 'is-action', tone);
   }
 
@@ -87,6 +105,7 @@ export class TrickFeedback {
   clear() {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
+    this.recentLanding = null;
     for (const element of [this.trick, this.landing, this.status]) {
       if (!element) continue;
       element.hidden = true;
@@ -108,6 +127,26 @@ export class TrickFeedback {
 
   dispose() {
     this.clear();
+  }
+
+  _hide(element) {
+    if (!element) return;
+    clearTimeout(this.timers.get(element));
+    this.timers.delete(element);
+    element.hidden = true;
+    element.classList.remove('is-visible', 'is-leaving');
+  }
+
+  _appendLanding(summary) {
+    this._hide(this.landing);
+    let line = this.trick.querySelector('.trick-landing-summary');
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'trick-landing-summary';
+      this.trick.append(line);
+    }
+    line.dataset.tone = summary.tone;
+    line.innerHTML = summary.html;
   }
 
   _show(element, html, duration, className, tone = 'ok') {
@@ -149,6 +188,7 @@ export function formatTrickName(name) {
 function normalizeKey(value) {
   return String(value || '')
     .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .toLowerCase()
     .replace(/[-_\s]+(.)?/g, (_, char = '') => char.toUpperCase());
 }

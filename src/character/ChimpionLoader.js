@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
 import { RiderRigAdapter } from './RiderRigAdapter.js';
+import { applyCharacterMaterialProfile } from '../graphics/CharacterMaterialProfile.js';
 
 function fitModel(model, targetHeight) {
   model.updateWorldMatrix(true, true);
@@ -36,15 +37,15 @@ export class ChimpionLoader {
     const gltf = await new GLTFLoader().loadAsync(this.url);
     this.model = gltf.scene;
     this.model.name = 'chimpion-model';
+    applyCharacterMaterialProfile(this.model, this.url);
 
     this.model.traverse((object) => {
       if (!object.isMesh) return;
       object.castShadow = true;
       object.receiveShadow = true;
       object.frustumCulled = false;
-      // Preserve every authored material value and texture map from the GLB.
-      // Visibility belongs to lighting/environment, never destructive loader
-      // overrides (roughness/metalness/emissive/recolor).
+      // All textures/colors and unknown/custom materials retain their authoring.
+      // Only known roster slots receive the explicit PBR export corrections above.
     });
 
     fitModel(this.model, GAME_CONFIG.rider.targetHeight);
