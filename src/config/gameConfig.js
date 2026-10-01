@@ -1,5 +1,9 @@
 import { MAP_IMAGES } from './mapAssets.js';
 
+// Scale both authored visuals before their deck/sole/contact measurements are
+// built, preserving rider-to-board proportions without scaling gameplay space.
+const RIDER_VISUAL_SCALE = 1.2;
+
 export const GAME_CONFIG = Object.freeze({
   assets: Object.freeze({
     halfpipe: '/models/halfpipe/halfpipe.glb',
@@ -34,19 +38,19 @@ export const GAME_CONFIG = Object.freeze({
     }),
   }),
   skateboard: Object.freeze({
-    scale: 0.155,
+    scale: 0.155 * RIDER_VISUAL_SCALE,
     deckLengthScale: 1.18,
-    wheelRadius: 0.05,
-    surfaceClearance: 0.18,
+    wheelRadius: 0.05 * RIDER_VISUAL_SCALE,
+    surfaceClearance: 0.18 * RIDER_VISUAL_SCALE,
   }),
   rider: Object.freeze({
-    targetHeight: 2.32,
-    deckClearance: 0.025,
+    targetHeight: 2.32 * RIDER_VISUAL_SCALE,
+    deckClearance: 0.025 * RIDER_VISUAL_SCALE,
     stance: 'regular',
-    stanceHalfLength: 0.24,
-    footLateralOffset: 0.015,
-    fakieBodyDrop: 0.065,
-    fakieFootTargetDrop: 0.07,
+    stanceHalfLength: 0.24 * RIDER_VISUAL_SCALE,
+    footLateralOffset: 0.015 * RIDER_VISUAL_SCALE,
+    fakieBodyDrop: 0.065 * RIDER_VISUAL_SCALE,
+    fakieFootTargetDrop: 0.07 * RIDER_VISUAL_SCALE,
   }),
   halfpipeProfile: Object.freeze({
     flatHalfWidth: 2.35,
@@ -69,7 +73,9 @@ export const GAME_CONFIG = Object.freeze({
     presentationVerticalEpsilon: 0.02,
   }),
   session: Object.freeze({ durationSeconds: 75 }),
-  gameplay: Object.freeze({ motionTimeScale: 0.75 }),
+  // Motion runs 20% slower than the previous 0.75 pace. The round countdown
+  // remains in real time and existing controls/physics tuning stay intact.
+  gameplay: Object.freeze({ motionTimeScale: 0.60 }),
   arcadeMotion: Object.freeze({ downhillGravityScale: 1.12, uphillGravityScale: 1.6 }),
   // Pumping remains timing/direction based, but it is now eligible essentially
   // from rest so a low-energy run can always be rebuilt by player input.

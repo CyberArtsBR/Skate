@@ -87,7 +87,8 @@ export function correctHandPlantClearance(rider, state) {
   const t = THREE.MathUtils.clamp(state.trickProgress, 0, 1);
   const old = rider._handPlantClearanceState;
   const isNewPlant = !old || t < old.progress || state.time < old.time;
-  if (isNewPlant && rider.handPlantIK) rider.handPlantIK.selectedPlantHand = null;
+  // RiderController chooses the nearest arm in the incoming riding pose.
+  // Never reselect here after the carrier has already become inverted.
   rider.root.updateMatrixWorld(true);
   const reach = rider.handPlantIK?.getReachConstraint({ copingWorldPoint: state.copingWorldPoint,
     side: state.wallSide, progress: t });

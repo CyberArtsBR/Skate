@@ -7,6 +7,7 @@ import { SkateAnimationController } from './SkateAnimationController.js';
 import { TrickPoseController } from './TrickPoseController.js';
 import { HandPlantIK } from './HandPlantIK.js';
 import { correctHandPlantClearance } from './HandPlantClearance.js';
+import { HANDPLANT_CLEARANCE as PLANT_PHASES } from '../gameplay/CrashPresentationTuning.js';
 
 export class RiderController {
   constructor({ skateboard, chimpion }) {
@@ -63,6 +64,9 @@ export class RiderController {
 
   _rebuildCharacterIK() {
     this._handPlantClearanceState = null;
+    this._plantActive = false;
+    this.plantContact = null;
+    this.plantProgress = 0;
     this.smoothedPose = null;
     this.poseTime = null;
     const boardRotation = this.boardPivot.quaternion.clone();
@@ -82,6 +86,33 @@ export class RiderController {
       rigAdapter: this.chimpion.rigAdapter,
       riderRoot: this.root,
     });
+  }
+
+  _beginHandPlant(state) {
+    // Sample a riding pose before inversion and before the trick's 180 yaw.
+    // Choosing after those rotations made the far arm win in fakie stance.
+    const entryYaw = state.facingYaw - state.turnDirection * Math.PI * state.trickProgress;
+    this.plantEntryYaw = entryYaw;
+    this.trickCarrier.position.set(0, 0, 0);
+    this.trickCarrier.rotation.set(0, entryYaw, 0, 'ZXY');
+    this.boardPivot.position.set(this.trickPoseController.rearPivotX, 0, 0);
+    this.boardPivot.rotation.set(0, 0, 0);
+    this.bodyCarrier.position.set(0, 0, 0);
+    this.bodyCarrier.rotation.set(0, 0, 0);
+    const backAmount = (1 - Math.cos(entryYaw)) * 0.5;
+    this.chimpion.root.position.set(0, this.baseChimpionY
+      - GAME_CONFIG.rider.fakieBodyDrop * backAmount, 0.015);
+    const entryPose = this.poseController.evaluate({ ...state, facingYaw: entryYaw,
+      trickVisualActive: false, trickType: null, trickProgress: 0 });
+    this.chimpion.updatePose(entryPose);
+    this.root.updateWorldMatrix(true, true);
+    this.footIK.update({ ...state, kneeFlex: entryPose.kneeFlex });
+    const contact = this.handPlantIK.beginPlant({ copingWorldPoint: state.copingWorldPoint,
+      side: state.wallSide, facingYaw: entryYaw });
+    this.plantContact = contact?.target
+      ? { x: contact.target.x, y: contact.target.y, z: contact.target.z }
+      : state.copingWorldPoint ? { ...state.copingWorldPoint } : null;
+    this._handPlantClearanceState = null;
   }
 
   replaceChimpion(chimpion) {
@@ -114,15 +145,38 @@ export class RiderController {
       this.animationController.update(rawState),
     );
 
+    const planting = this.presentationState.trickVisualActive
+      && this.presentationState.trickType === 'hand-plant';
+    const newPlant = planting && (!this._plantActive
+      || this.presentationState.trickProgress < this.plantProgress
+      || this.presentationState.time < (this.poseTime ?? this.presentationState.time));
+    if (newPlant) this._beginHandPlant(this.presentationState);
+    if (planting) {
+      this.presentationState.copingWorldPoint = this.plantContact;
+      this.presentationState.selectedPlantHand = this.handPlantIK.selectedPlantHand;
+      this.presentationState.plantFacingSign = this.handPlantIK.plantFacingSign;
+      this.plantProgress = this.presentationState.trickProgress;
+    }
+
+    const plantEnter = THREE.MathUtils.smoothstep(
+      this.presentationState.trickProgress / PLANT_PHASES.enterEnd, 0, 1,
+    );
+    const plantRelease = 1 - THREE.MathUtils.smoothstep(
+      (this.presentationState.trickProgress - PLANT_PHASES.releaseStart)
+        / (1 - PLANT_PHASES.releaseStart), 0, 1,
+    );
+    const plantRoll = (this.presentationState.wallSide || 1)
+      * GAME_CONFIG.trickPresentation.handPlantRoll * plantEnter * plantRelease;
+
     this.trickCarrier.position.set(
-      this.presentationState.trickOffsetX,
-      this.presentationState.trickOffsetY,
+      planting ? 0 : this.presentationState.trickOffsetX,
+      planting ? 0 : this.presentationState.trickOffsetY,
       0,
     );
     this.trickCarrier.rotation.set(
       this.presentationState.trickPitch,
       this.presentationState.facingYaw,
-      this.presentationState.trickRoll,
+      planting ? plantRoll : this.presentationState.trickRoll,
       this.presentationState.trickType === 'hand-plant' ? 'ZXY' : 'XYZ',
     );
     if (this.presentationState.trickVisualActive
@@ -131,13 +185,16 @@ export class RiderController {
       const point = this.presentationState.copingWorldPoint;
       const anchor = this.root.worldToLocal(new THREE.Vector3(point.x, point.y, point.z));
       const unrolled = new THREE.Quaternion().setFromEuler(new THREE.Euler(
-        this.presentationState.trickPitch, this.presentationState.facingYaw, 0, 'ZXY',
+        this.presentationState.trickPitch, this.plantEntryYaw, 0, 'ZXY',
       ));
       const rotatedAnchor = anchor.clone().applyQuaternion(unrolled.invert())
         .applyQuaternion(this.trickCarrier.quaternion);
-      // The existing roll/timing stays intact. Its visual pivot is now the
-      // actual coping region, with continuous entry and exit at zero roll.
-      this.trickCarrier.position.add(anchor.sub(rotatedAnchor));
+      // Pivot the shared board/body assembly about the latched coping point.
+      // Independent lift/shift offsets would move that pivot away from the bar.
+      // The incoming yaw is fixed so the 180 also turns around the hand.
+      // Release the pivot with the contact envelope to meet normal riding
+      // continuously at exit. Physics, duration, inputs and score are untouched.
+      this.trickCarrier.position.addScaledVector(anchor.sub(rotatedAnchor), plantEnter * plantRelease);
     }
 
     const trickPose = this.trickPoseController.evaluate(this.presentationState);
@@ -172,20 +229,14 @@ export class RiderController {
 
     const footResult = this.footIK.update({ ...this.presentationState, kneeFlex: pose.kneeFlex });
     this.root.updateWorldMatrix(true, true);
-    const planting = this.presentationState.trickVisualActive
-      && this.presentationState.trickType === 'hand-plant';
     if (planting) {
-      const incoming = this.presentationState.copingWorldPoint;
-      if (!this.plantContact || this.presentationState.trickProgress < (this.plantProgress ?? 0)) {
-        this.plantContact = incoming ? { ...incoming } : null;
-      }
-      this.plantProgress = this.presentationState.trickProgress;
-      this.presentationState.copingWorldPoint = this.plantContact;
       this.root.userData.handPlantClearance = correctHandPlantClearance(this, this.presentationState);
     } else {
       this._handPlantClearanceState = null;
       this.plantContact = null;
       this.plantProgress = 0;
+      this.presentationState.selectedPlantHand = null;
+      this.presentationState.plantFacingSign = null;
       this.root.userData.handPlantClearance = null;
     }
     const handResult = this.handPlantIK.update({
@@ -208,6 +259,7 @@ export class RiderController {
     this.root.userData.animationState = this.presentationState.animationState;
     this.root.userData.footIK = { ...footResult };
     this.root.userData.handPlantIK = { ...handResult };
+    this._plantActive = planting;
     return this.presentationState;
   }
 

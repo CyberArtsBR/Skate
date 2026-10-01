@@ -6,6 +6,7 @@ export const HALFPIPE_FLOW_STATE = Object.freeze({
   RUN: 'run',
   PAUSE: 'pause',
   RESULTS: 'results',
+  PODIUM: 'podium',
 });
 
 const ALLOWED = Object.freeze({
@@ -15,7 +16,8 @@ const ALLOWED = Object.freeze({
   countdown: new Set(['run', 'title']),
   run: new Set(['pause', 'results', 'title']),
   pause: new Set(['run', 'controls', 'countdown', 'title']),
-  results: new Set(['countdown', 'character-select', 'title']),
+  results: new Set(['podium', 'countdown', 'character-select', 'title']),
+  podium: new Set(['countdown', 'character-select', 'title']),
 });
 
 const DEFAULT_SETTINGS = Object.freeze({

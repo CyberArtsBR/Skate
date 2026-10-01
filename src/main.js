@@ -35,6 +35,8 @@ import { HeroSelectScreen } from './ui/HeroSelectScreen.js';
 import { CountdownOverlay } from './ui/CountdownOverlay.js';
 import { PauseMenu } from './ui/PauseMenu.js';
 import { ResultsScreen } from './ui/ResultsScreen.js';
+import { PodiumScreen } from './ui/PodiumScreen.js';
+import { WinnersPodium } from './scene/WinnersPodium.js';
 import { HalfpipeVFX } from './vfx/HalfpipeVFX.js';
 import { HalfpipeAudio } from './audio/HalfpipeAudio.js';
 import { GRAPHICS_PRESETS, DEFAULT_GRAPHICS_PRESET } from './graphics/GraphicsQuality.js';
@@ -53,6 +55,7 @@ const lighting = createLighting(scene);
 const ground = createGround(scene);
 const hud = new HalfpipeHUD(stage);
 const profile = new HalfpipeProfile();
+const winnersPodium = new WinnersPodium(scene, { floorY: profile.sample(0).y });
 const session = new HalfpipeSession({
   durationSeconds: GAME_CONFIG.session.durationSeconds,
 });
@@ -109,6 +112,9 @@ let disposed = false;
 let audioUnlockStarted = false;
 let impactDebug = null;
 let unregisterRiderQuality = null;
+let competitionStandings = null;
+let podiumReady = false;
+let podiumGeneration = 0;
 let controlsReturnState = HALFPIPE_FLOW_STATE.CHARACTER_SELECT;
 let startPromptArmedAt = 0;
 const integrationStats = { longestCombo: 0 };
@@ -283,6 +289,12 @@ const pauseMenu = new PauseMenu(stage, {
   onMainMenu: returnToMainMenu,
 });
 const resultsScreen = new ResultsScreen(stage, {
+  onNext: showWinnersPodium,
+  onRetry: startCountdown,
+  onChangeRider: returnToCharacterSelect,
+  onMainMenu: returnToMainMenu,
+});
+const podiumScreen = new PodiumScreen(stage, {
   onRetry: startCountdown,
   onChangeRider: returnToCharacterSelect,
   onMainMenu: returnToMainMenu,
@@ -295,17 +307,81 @@ function hideAllFlowScreens() {
   countdown.hide();
   pauseMenu.hide();
   resultsScreen.hide();
+  podiumScreen.hide();
   graphicsScreen.hide();
   audioScreen.hide();
 }
 
 function syncFlowUI({ state } = gameFlow.snapshot()) {
   hideAllFlowScreens();
+  if (state !== HALFPIPE_FLOW_STATE.PODIUM) {
+    podiumGeneration++;
+    podiumReady = false;
+    winnersPodium.hide();
+    if (rider) rider.root.visible = true;
+    hud.root.hidden = false;
+    if (gameFlow.previousState === HALFPIPE_FLOW_STATE.PODIUM) cameraController.resetDynamic();
+  }
   if (state === HALFPIPE_FLOW_STATE.TITLE) titleScreen.show();
   else if (state === HALFPIPE_FLOW_STATE.CHARACTER_SELECT) heroSelectScreen.show();
   else if (state === HALFPIPE_FLOW_STATE.CONTROLS) controlsScreen.show();
   else if (state === HALFPIPE_FLOW_STATE.PAUSE) pauseMenu.show();
-  else if (state === HALFPIPE_FLOW_STATE.RESULTS) resultsScreen.show(buildResultsStats());
+  else if (state === HALFPIPE_FLOW_STATE.RESULTS) resultsScreen.show(buildResultsStats(), competitionStandings || []);
+  else if (state === HALFPIPE_FLOW_STATE.PODIUM) {
+    podiumScreen.show(competitionStandings || []);
+    if (rider) rider.root.visible = false;
+    hud.root.hidden = true;
+    vfx.reset();
+    cameraController.resetDynamic();
+  }
+}
+
+function createCompetitionStandings(score) {
+  const playerHero = heroSelectScreen.selectedHero?.id === currentHeroId
+    ? heroSelectScreen.selectedHero : riderById(currentHeroId);
+  const opponents = RIDER_ROSTER.filter(hero => hero.id !== currentHeroId);
+  const entries = [{
+    id: 'player', name: playerHero.name,
+    modelUrl: rider.chimpion.url,
+    score: Math.max(0, Math.round(Number(score) || 0)), isPlayer: true,
+  }];
+  for (let index = 0; index < 2; index++) {
+    const pick = Math.floor(Math.random() * opponents.length);
+    const hero = opponents.splice(pick, 1)[0];
+    entries.push({ id: 'opponent-' + index, name: hero.name, modelUrl: hero.modelUrl,
+      score: 10000 + Math.floor(Math.random() * 90001), isPlayer: false });
+  }
+  // Preserve this one draw from round end through the score and podium screens.
+  // Stable sorting gives the player the tied rank instead of a random tiebreak.
+  return entries.sort((a, b) => b.score - a.score);
+}
+
+async function showWinnersPodium() {
+  if (!competitionStandings || !gameFlow.transitionTo(HALFPIPE_FLOW_STATE.PODIUM)) return false;
+  const generation = ++podiumGeneration;
+  pumpInput?.clearHeldState();
+  try {
+    const ready = await winnersPodium.show(competitionStandings);
+    if (generation !== podiumGeneration || gameFlow.state !== HALFPIPE_FLOW_STATE.PODIUM) return false;
+    podiumReady = Boolean(ready);
+    podiumScreen.setReady(podiumReady);
+    if (podiumReady) frameWinnersPodium();
+  } catch (error) {
+    if (generation !== podiumGeneration || gameFlow.state !== HALFPIPE_FLOW_STATE.PODIUM) return false;
+    console.warn('[Halfpipe] Podium presentation unavailable.', error);
+    winnersPodium.hide();
+    podiumScreen.setReady(false);
+  }
+  return true;
+}
+
+function frameWinnersPodium() {
+  const camera = cameraController.camera;
+  const framing = winnersPodium.getCameraFraming(camera.aspect, GAME_CONFIG.camera.fov);
+  camera.fov = GAME_CONFIG.camera.fov;
+  camera.position.copy(framing.position);
+  camera.lookAt(framing.target);
+  camera.updateProjectionMatrix();
 }
 
 function beginCharacterSelect() {
@@ -683,6 +759,7 @@ function routeGameplayEvents(events, state, presentationState) {
 
 function resetSimulation({ keepFlow = false } = {}) {
   if (!simulation) return null;
+  competitionStandings = null;
   vfx.reset();
   rider.skateboard.resetSpeedGlow?.();
   const state = simulation.reset();
@@ -711,6 +788,8 @@ function finishSession(state) {
   if (session.phase !== 'finished') session.finish();
   updatePlayerHUD(state);
   audio.handleEvent({ type: 'SESSION_FINISHED', score: state.score || 0 });
+  competitionStandings = createCompetitionStandings(state.score || 0);
+  void winnersPodium.preload?.().catch(error => console.warn('[Halfpipe] Podium preload failed.', error));
   gameFlow.transitionTo(HALFPIPE_FLOW_STATE.RESULTS);
 }
 
@@ -750,6 +829,9 @@ function routeControllerUI(actions) {
   }
   if (gameFlow.state === HALFPIPE_FLOW_STATE.RESULTS) {
     return resultsScreen.handleControllerActions(actions);
+  }
+  if (gameFlow.state === HALFPIPE_FLOW_STATE.PODIUM) {
+    return podiumScreen.handleControllerActions(actions);
   }
   if (gameFlow.state === HALFPIPE_FLOW_STATE.CONTROLS) {
     return controlsScreen.handleControllerActions(actions);
@@ -837,7 +919,9 @@ function render(timestamp = 0) {
       const gameplayEvents = simulation.drainEvents();
       routeGameplayEvents(gameplayEvents, idleState, lastPresentationState);
 
-      vfx.update(frameDelta, vfxMotionState(idleState, lastPresentationState));
+      if (gameFlow.state !== HALFPIPE_FLOW_STATE.PODIUM) {
+        vfx.update(frameDelta, vfxMotionState(idleState, lastPresentationState));
+      }
       audio.update({ ...idleState, wheelDiameter: rider.skateboard.measuredWheelDiameter,
         sessionRemaining: session.remaining }, frameDelta);
     }
@@ -849,6 +933,11 @@ function render(timestamp = 0) {
     impactDebug?.update(hud.debugMode ? collectSkaterImpactProbes(rider) : [], hud.debugMode);
   }
 
+  if (gameFlow.state === HALFPIPE_FLOW_STATE.PODIUM && podiumReady) {
+    frameWinnersPodium();
+    winnersPodium.update?.(frameDelta);
+    podiumScreen.updateLabels(winnersPodium.getLabelAnchors(), cameraController.camera);
+  }
   if (!webglLost) renderer.render(scene, cameraController.camera);
   animationFrame = requestAnimationFrame(render);
 }
@@ -1107,6 +1196,8 @@ function dispose() {
   countdown.dispose();
   pauseMenu.dispose();
   resultsScreen.dispose();
+  podiumScreen.dispose();
+  winnersPodium.dispose();
   titleScreen.dispose();
   heroSelectScreen.dispose();
   graphicsScreen.dispose();

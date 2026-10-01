@@ -7,12 +7,9 @@ const effectorPosition = new THREE.Vector3();
 const toEffector = new THREE.Vector3();
 const toTarget = new THREE.Vector3();
 const worldDelta = new THREE.Quaternion();
-const parentWorld = new THREE.Quaternion();
-const localDelta = new THREE.Quaternion();
+const inverseParent = new THREE.Matrix4();
 const axis = new THREE.Vector3();
 const fallbackTarget = new THREE.Vector3();
-const ELBOW_COPING_CLEARANCE = 0.16;
-const ELBOW_COPING_LIFT = 0.06;
 const SHOULDER_FOLLOW_LIMIT = 0.06;
 
 const clamp01 = (value) => THREE.MathUtils.clamp(Number(value) || 0, 0, 1);
@@ -37,11 +34,13 @@ function rotateJointToward(joint, effector, target, weight, maxAngle) {
   toTarget.copy(target).sub(jointPosition);
   if (toEffector.lengthSq() < 1e-8 || toTarget.lengthSq() < 1e-8) return;
 
+  // Full parent matrices preserve mirrored avatar scales as well as rotation.
+  inverseParent.copy(joint.parent.matrixWorld).invert();
+  toEffector.transformDirection(inverseParent);
+  toTarget.transformDirection(inverseParent);
   worldDelta.setFromUnitVectors(toEffector.normalize(), toTarget.normalize());
   limitQuaternion(worldDelta, maxAngle * clamp01(weight));
-  joint.parent.getWorldQuaternion(parentWorld);
-  localDelta.copy(parentWorld).invert().multiply(worldDelta).multiply(parentWorld);
-  joint.quaternion.premultiply(localDelta).normalize();
+  joint.quaternion.premultiply(worldDelta).normalize();
 }
 
 function targetFromInput(input, riderRoot, side) {
@@ -62,6 +61,9 @@ export class HandPlantIK {
     this.rigAdapter = rigAdapter;
     this.riderRoot = riderRoot;
     this.selectedPlantHand = null;
+    this.plantFacingSign = 1;
+    this.contactTarget = null;
+    this.elbowDepthSign = 1;
     this.result = {
       active: false,
       side: null,
@@ -92,16 +94,11 @@ export class HandPlantIK {
     for (const side of sides) {
       const hand = this.rigAdapter.rig[`${side}Hand`];
       if (!hand) continue;
-      const upper = this.rigAdapter.rig[`${side}UpperArm`];
-      const elbow = this.rigAdapter.rig[`${side}Forearm`];
       const wrist = hand.getWorldPosition(new THREE.Vector3());
-      const shoulder = upper?.getWorldPosition(new THREE.Vector3());
-      const joint = elbow?.getWorldPosition(new THREE.Vector3());
-      const reach = shoulder && joint ? shoulder.distanceTo(joint) + joint.distanceTo(wrist) : 0;
-      // Prefer a hand that can support the body with a small adjustment, not
-      // simply whichever wrist happens to sweep closest during the inversion.
-      const unreachable = shoulder ? Math.max(0, shoulder.distanceTo(target) - reach) : 0;
-      const distance = wrist.distanceToSquared(target) + unreachable * unreachable * 4;
+      // The coping runs along Z. Measure the closest wrist to the actual bar,
+      // rather than to its center or an already-inverted animation pose.
+      // Measuring in world space automatically respects regular/fakie facing.
+      const distance = (wrist.x - target.x) ** 2 + (wrist.y - target.y) ** 2;
       if (distance < bestDistance) {
         bestDistance = distance;
         best = side;
@@ -112,9 +109,34 @@ export class HandPlantIK {
     return best;
   }
 
+  resetPlant() {
+    this.selectedPlantHand = null;
+    this.contactTarget = null;
+  }
+
+  beginPlant({ copingWorldPoint = null, side = 0, facingYaw = 0 } = {}) {
+    this.resetPlant();
+    if (!this.rigAdapter || !this.riderRoot) return null;
+    this.riderRoot.updateWorldMatrix(true, true);
+    const target = targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
+    this.selectedPlantHand = this._selectSide(target, side);
+    this.plantFacingSign = Math.cos(facingYaw) < 0 ? -1 : 1;
+    if (!this.selectedPlantHand) return null;
+    const rig = this.rigAdapter.rig;
+    const wrist = rig[`${this.selectedPlantHand}Hand`].getWorldPosition(new THREE.Vector3());
+    const elbow = rig[`${this.selectedPlantHand}Forearm`].getWorldPosition(new THREE.Vector3());
+    // Plant beside the incoming shoulder, not across the rider's body at the
+    // midpoint of the rail. This point stays fixed throughout the 180 turn.
+    target.z = THREE.MathUtils.clamp(wrist.z, -3.7, 3.7);
+    this.contactTarget = target;
+    this.elbowDepthSign = Math.sign(elbow.z - target.z) || this.plantFacingSign;
+    return { side: this.selectedPlantHand, target: target.clone(), facingSign: this.plantFacingSign };
+  }
+
   getReachConstraint({ copingWorldPoint = null, side = 0, progress = 0 } = {}) {
     if (!this.rigAdapter || !this.riderRoot) return null;
-    const target = targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
+    const target = this.contactTarget?.clone()
+      || targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
     this.riderRoot.updateWorldMatrix(true, true);
     if (!this.selectedPlantHand) this.selectedPlantHand = this._selectSide(target, side);
     const plantSide = this.selectedPlantHand;
@@ -130,7 +152,7 @@ export class HandPlantIK {
     const weight = smoothstep(t / PLANT_TUNING.enterEnd)
       * (1 - smoothstep((t - PLANT_TUNING.releaseStart) / (1 - PLANT_TUNING.releaseStart)));
     return { side: plantSide, target, shoulder, wrist,
-      minimum: Math.abs(upperLength - lowerLength) + 0.01,
+      minimum: Math.abs(upperLength - lowerLength) + Math.min(upperLength, lowerLength) * 0.035,
       maximum: Math.max(0.02, (upperLength + lowerLength) * 0.985), weight };
   }
 
@@ -150,7 +172,7 @@ export class HandPlantIK {
     this.result.degraded = false;
 
     if (!active || !this.rigAdapter || !this.riderRoot) {
-      this.selectedPlantHand = null;
+      this.resetPlant();
       this.result.side = null;
       this.result.selectedPlantHand = null;
       return this.result;
@@ -164,13 +186,15 @@ export class HandPlantIK {
     const release = 1 - smoothstep((t - PLANT_TUNING.releaseStart) / (1 - PLANT_TUNING.releaseStart));
     const weight = clamp01(reach * release);
 
-    const target = targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
+    const target = this.contactTarget?.clone()
+      || targetFromInput({ copingWorldPoint }, this.riderRoot, side).clone();
     this.riderRoot.updateWorldMatrix(true, true);
 
     // Select exactly once at maneuver start. Never switch hands during the
     // inverted pose even if the other hand becomes momentarily closer.
     if (!this.selectedPlantHand) {
-      this.selectedPlantHand = this._selectSide(target, side);
+      this.beginPlant({ copingWorldPoint, side, facingYaw });
+      if (this.contactTarget) target.copy(this.contactTarget);
     }
     const plantSide = this.selectedPlantHand;
     if (!plantSide) {
@@ -187,11 +211,17 @@ export class HandPlantIK {
       return this.result;
     }
 
-    const pole = forearm.getWorldPosition(new THREE.Vector3());
-    // Bend into the open interior rather than letting an inverted rest elbow
-    // choose a plane through the wall. This changes rotations, never lengths.
-    pole.x -= (Math.sign(side) || 1) * ELBOW_COPING_CLEARANCE * weight;
-    pole.y += ELBOW_COPING_LIFT * weight;
+    const shoulderPoint = upperArm.getWorldPosition(new THREE.Vector3());
+    const elbowPoint = forearm.getWorldPosition(new THREE.Vector3());
+    const wristPoint = hand.getWorldPosition(new THREE.Vector3());
+    const armLength = shoulderPoint.distanceTo(elbowPoint) + elbowPoint.distanceTo(wristPoint);
+    const supportPole = shoulderPoint.clone().lerp(target, 0.5);
+    // A stable coping-space bend plane prevents elbow flips as the rider turns
+    // from normal to fakie. All offsets scale with this avatar's measured arm.
+    supportPole.x -= (Math.sign(side) || 1) * armLength * 0.30;
+    supportPole.y += armLength * 0.10;
+    supportPole.z += this.elbowDepthSign * armLength * 0.28;
+    const pole = elbowPoint.lerp(supportPole, smoothstep(weight));
     rotateJointToward(shoulder, hand, target, weight * 0.25, SHOULDER_FOLLOW_LIMIT);
     this.riderRoot.updateWorldMatrix(true, true);
     solveTwoBone(upperArm, forearm, hand, target, pole, weight);

@@ -1,0 +1,24 @@
+.results-screen .results-card { max-height: 94%; overflow-y: auto; }
+.results-standings { margin: 14px 0; border-top: 1px solid #ffde8060; padding-top: 8px; }
+.results-standings > p { margin: 0 0 6px; font-size: 12px; letter-spacing: .14em; color: #ffde80; }
+.standing-row { display: flex; justify-content: space-between; gap: 15px; padding: 5px 0; font-size: 13px; }
+.standing-row.is-player { color: #ffdf80; }
+.halfpipe-hud[hidden] { display: none !important; }
+.podium-screen { background: transparent; pointer-events: none; }
+.podium-layout { position: absolute; inset: 0; text-align: center; }
+.podium-screen .menu-eyebrow { margin: 18px 0 6px; color: #fff4d8; text-shadow: 0 2px 5px #000; }
+.podium-screen h1 { margin: 0; color: #ffde80; font-family: Impact, 'Arial Black', sans-serif; font-size: clamp(30px, 5vw, 76px); font-style: italic; line-height: 1.05; transform: rotate(-3deg); -webkit-text-stroke: 1px #17272b; text-shadow: 3px 4px 0 #17272b, 6px 7px 0 #e57325, 0 5px 20px #0008; }
+.podium-screen h1[data-place="1"] { color: #a9ed87; }
+.podium-screen h1[data-place="3"] { color: #ffbb78; }
+.podium-score-labels { position: absolute; inset: 0; }
+.podium-score-label { position: absolute; transform: translate(-50%, -100%); padding: 6px 12px; background: #102029e0; border: 1px solid #f9efcd80; border-radius: 8px; color: #fff6de; box-shadow: 0 3px 12px #0006; white-space: nowrap; }
+.podium-score-label[hidden] { display: none; }
+.podium-score-label span { display: block; font-size: clamp(9px, 1.1vw, 14px); }
+.podium-score-label strong { display: block; font-family: Impact, 'Arial Black', sans-serif; font-size: clamp(22px, 2.5vw, 38px); color: #ffde80; font-variant-numeric: tabular-nums; }
+.podium-score-label.is-player { border-color: #ffdc72; box-shadow: 0 0 0 2px #ffdc7240; }
+.podium-status { position: absolute; top: 40%; width: 100%; color: #fff4dd; text-shadow: 0 2px 3px #000; }
+.podium-score-labels.is-fallback { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.podium-score-labels.is-fallback .podium-score-label { position: relative; transform: none; }
+.podium-screen .menu-actions { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; width: max-content; max-width: 96%; pointer-events: auto; }
+.podium-screen .menu-button { min-height: 42px; font-size: clamp(11px, 1.3vw, 16px); padding: 10px 18px; }
+@media (max-width: 600px) { .podium-screen .menu-button { padding: 8px; } .podium-score-label { padding: 5px 6px; } }
