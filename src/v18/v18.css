@@ -150,3 +150,34 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+.title-screen.v16-art-title .v16-title-art { object-fit: contain; }
+.title-screen.v16-art-title .menu-card {
+  inset: auto;
+  left: 50%; top: 50%;
+  width: min(100%, 177.68vh);
+  aspect-ratio: 1672 / 941;
+  transform: translate(-50%, -50%);
+}
+.title-screen.v16-art-title .menu-actions {
+  inset: 0; width: 100%; height: 100%; transform: none;
+  pointer-events: none;
+}
+.title-screen.v16-art-title .menu-button {
+  position: absolute; min-height: 0; padding: 0;
+  border: 0; border-radius: 8px;
+  color: transparent; background: transparent;
+  box-shadow: none; text-shadow: none;
+  pointer-events: auto; transform: none; cursor: pointer;
+}
+.title-screen.v16-art-title [data-action="start"] {
+  left: 35.8%; top: 68.5%; width: 28.5%; height: 12%;
+}
+.title-screen.v16-art-title [data-action="launcher"] {
+  left: 38%; top: 81.3%; width: 24%; height: 9.3%;
+}
+.title-screen.v16-art-title .menu-button:is(:hover, :focus-visible, .is-selected) {
+  outline: 3px solid #fff0a8; outline-offset: 3px;
+  background: rgb(255 255 255 / 5%);
+  box-shadow: 0 0 22px rgb(255 197 62 / 30%);
+  transform: none;
+}
