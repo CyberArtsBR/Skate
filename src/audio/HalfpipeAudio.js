@@ -1,6 +1,8 @@
 import { AudioBus, clampAudioVolume } from './AudioBus.js';
 import { createAudioManifest } from './AudioManifest.js';
 import { SkateAudio } from './SkateAudio.js';
+import { createEnvironmentBed } from './SkateSoundDesign.js';
+import { ContactFeedbackGate } from '../presentation/ContactFeedback.js';
 
 const DEFAULT_VOLUMES = Object.freeze({
   master: 0.1,
@@ -150,9 +152,16 @@ export class HalfpipeAudio {
 
     this.buffers = new Map();
     this.loading = new Map();
+    this.decodedUrls = new Map();
+    this.loadingUrls = new Map();
+    this.sfxVoices = new Set();
+    this.contactGate = new ContactFeedbackGate();
+    this.environment = 'city';
+    this.environmentGeneration = 0;
     this.cooldowns = new Map();
     this.musicVoices = new Set();
     this.ambienceVoices = new Map();
+    this.retiringAmbienceVoices = new Set();
     this.currentMusic = null;
     this.proceduralRockBuffer = null;
     this.paused = false;
@@ -262,6 +271,7 @@ export class HalfpipeAudio {
       wind: this.buffers.get('continuous.wind'),
     });
     this.skate?.setDeckImpactBuffer(this.buffers.get('sfx.deckImpact'));
+    void this.playAmbience(this.environment);
 
     return results;
   }
@@ -271,7 +281,9 @@ export class HalfpipeAudio {
     if (this.buffers.has(key)) return this.buffers.get(key);
     if (this.loading.has(key)) return this.loading.get(key);
 
-    const task = fetch(url)
+    const existing = this.decodedUrls.get(url);
+    if (existing) { this.buffers.set(key, existing); return existing; }
+    const shared = this.loadingUrls.get(url) || fetch(url)
       .then((response) => {
         if (!response.ok) {
           throw new Error('HTTP ' + response.status + ' loading ' + url);
@@ -279,16 +291,13 @@ export class HalfpipeAudio {
         return response.arrayBuffer();
       })
       .then((data) => this.context.decodeAudioData(data.slice(0)))
-      .then((buffer) => {
-        this.buffers.set(key, buffer);
-        this.loading.delete(key);
-        return buffer;
-      })
-      .catch((error) => {
-        this.loading.delete(key);
-        throw error;
-      });
-
+      .then((buffer) => { if (!this.disposed) this.decodedUrls.set(url, buffer); return buffer; })
+      .finally(() => this.loadingUrls.delete(url));
+    this.loadingUrls.set(url, shared);
+    const task = shared.then((buffer) => {
+      if (!this.disposed) this.buffers.set(key, buffer);
+      return buffer;
+    }).finally(() => this.loading.delete(key));
     this.loading.set(key, task);
     return task;
   }
@@ -303,7 +312,7 @@ export class HalfpipeAudio {
   }
 
   _playBuffer(key, busName = 'SFX', options = {}) {
-    if (!this.isReady) return null;
+    if (!this.isReady || this.sfxVoices.size >= 12) return null;
     const buffer = this.buffers.get(key);
     const bus = this.buses?.[busName];
     if (!buffer || !bus) return null;
@@ -318,12 +327,18 @@ export class HalfpipeAudio {
 
     source.connect(gain).connect(bus.gain);
     source.start(this.context.currentTime + delay);
-    source.addEventListener('ended', () => {
-      try { source.disconnect(); } catch {}
-      try { gain.disconnect(); } catch {}
-    }, { once: true });
+    this._registerSfxVoice(source, [source, gain]);
 
     return { source, gain };
+  }
+
+  _registerSfxVoice(source, nodes) {
+    const voice = { source, nodes };
+    this.sfxVoices.add(voice);
+    source.addEventListener('ended', () => {
+      for (const node of nodes) { try { node.disconnect(); } catch {} }
+      this.sfxVoices.delete(voice);
+    }, { once: true });
   }
 
   _tone({
@@ -335,7 +350,7 @@ export class HalfpipeAudio {
     delay = 0,
     busName = 'SFX',
   } = {}) {
-    if (!this.isReady) return null;
+    if (!this.isReady || this.sfxVoices.size >= 12) return null;
     const bus = this.buses?.[busName];
     if (!bus) return null;
 
@@ -363,10 +378,7 @@ export class HalfpipeAudio {
     oscillator.connect(voiceGain).connect(bus.gain);
     oscillator.start(start);
     oscillator.stop(end + 0.01);
-    oscillator.addEventListener('ended', () => {
-      try { oscillator.disconnect(); } catch {}
-      try { voiceGain.disconnect(); } catch {}
-    }, { once: true });
+    this._registerSfxVoice(oscillator, [oscillator, voiceGain]);
 
     return oscillator;
   }
@@ -380,7 +392,7 @@ export class HalfpipeAudio {
     delay = 0,
     busName = 'SFX',
   } = {}) {
-    if (!this.isReady || !this.noiseBuffer) return null;
+    if (!this.isReady || !this.noiseBuffer || this.sfxVoices.size >= 12) return null;
     const bus = this.buses?.[busName];
     if (!bus) return null;
 
@@ -400,11 +412,7 @@ export class HalfpipeAudio {
     source.connect(filter).connect(voiceGain).connect(bus.gain);
     source.start(start, Math.random() * 0.3);
     source.stop(end + 0.01);
-    source.addEventListener('ended', () => {
-      try { source.disconnect(); } catch {}
-      try { filter.disconnect(); } catch {}
-      try { voiceGain.disconnect(); } catch {}
-    }, { once: true });
+    this._registerSfxVoice(source, [source, filter, voiceGain]);
 
     return source;
   }
@@ -437,188 +445,45 @@ export class HalfpipeAudio {
 
   _pumpCue(event) {
     if (!this._allowed('pump', COOLDOWNS.pump)) return;
-
-    const explicit = normalizeType(
-      eventValue(event, 'rating', 'qualityLabel', 'grade'),
-    );
-    const quality = clamp01(
-      eventValue(event, 'quality', 'value', 'timingQuality'),
-    );
-    const wrong = (
-      eventValue(event, 'wrong', 'missed') === true
-      || explicit === 'MISS'
-      || explicit === 'WRONG'
-    );
-
-    if (wrong) return;
-
-    const rating = explicit || (
-      quality >= 0.82
-        ? 'PERFECT'
-        : quality >= 0.55
-          ? 'GOOD'
-          : quality > 0
-            ? 'WEAK'
-            : ''
-    );
-
-    if (!rating) return;
-
-    if (rating === 'PERFECT') {
-      this._assetOr('sfx.pumpPerfect', () => {
-        this._noiseBurst({
-          duration: 0.11,
-          gain: 0.085,
-          frequency: 760,
-        });
-        this._tone({
-          frequency: 270,
-          endFrequency: 410,
-          duration: 0.1,
-          gain: 0.055,
-          type: 'triangle',
-        });
-      });
-      this._haptic({
-        weakMagnitude: 0.22,
-        strongMagnitude: 0.08,
-        durationMs: 45,
-        reason: 'pump-perfect',
-      });
-      return;
-    }
-
-    if (rating === 'GOOD') {
-      this._assetOr('sfx.pumpGood', () => {
-        this._noiseBurst({
-          duration: 0.09,
-          gain: 0.055,
-          frequency: 680,
-        });
-        this._tone({
-          frequency: 245,
-          endFrequency: 320,
-          duration: 0.08,
-          gain: 0.035,
-          type: 'triangle',
-        });
-      });
-      return;
-    }
-
-    if (rating === 'WEAK') {
-      this._assetOr('sfx.pumpWeak', () => {
-        this._noiseBurst({
-          duration: 0.07,
-          gain: 0.025,
-          frequency: 520,
-        });
-      });
-    }
+    const rating = normalizeType(eventValue(event, 'rating', 'qualityLabel', 'grade'));
+    if (rating !== 'PERFECT' && rating !== 'GOOD') return;
+    // Keep tactile control response; speed-driven wheel audio supplies the
+    // physical feedback instead of a musical pump-rating cue.
+    this._haptic({ weakMagnitude: rating === 'PERFECT' ? 0.22 : 0.14,
+      strongMagnitude: 0.06, durationMs: 35, reason: 'pump-contact' });
   }
 
   _copingCue(event) {
-    if (!this._allowed('coping', COOLDOWNS.coping)) return;
-
-    const action = normalizeType(
-      eventValue(event, 'action', 'subtype', 'trickType'),
-    );
-    const intensity = clamp01(
-      eventValue(event, 'intensity', 'impact') ?? 0.6,
-    );
-
-    if (action === 'HAND_PLANT' || action === 'HANDPLANT') {
-      this._assetOr('sfx.handPlant', () => {
-        this._noiseBurst({
-          duration: 0.09,
-          gain: 0.09 + intensity * 0.035,
-          frequency: 1250,
-          q: 1.8,
-        });
-        this._tone({
-          frequency: 180,
-          endFrequency: 120,
-          duration: 0.11,
-          gain: 0.05,
-          type: 'triangle',
-        });
-      });
-      this._haptic({
-        weakMagnitude: 0.25,
-        strongMagnitude: 0.34,
-        durationMs: 80,
-        reason: 'hand-plant',
-      });
-      return;
-    }
-
-    if (action === 'KICK_TURN' || action === 'KICKTURN') {
-      this._assetOr('sfx.kickTurn', () => {
-        this._noiseBurst({
-          duration: 0.13,
-          gain: 0.075 + intensity * 0.03,
-          frequency: 1650,
-          q: 2.2,
-        });
-        this._tone({
-          frequency: 330,
-          endFrequency: 220,
-          duration: 0.1,
-          gain: 0.035,
-          type: 'square',
-        });
-      });
-      this._haptic({
-        weakMagnitude: 0.28,
-        strongMagnitude: 0.22,
-        durationMs: 65,
-        reason: 'kick-turn',
-      });
-      return;
-    }
-
-    this._assetOr('sfx.copingHit', () => {
-      this._noiseBurst({
-        duration: 0.07,
-        gain: 0.06 + intensity * 0.05,
-        frequency: 1900,
-        q: 2.6,
-      });
-      this._tone({
-        frequency: 420,
-        endFrequency: 300,
-        duration: 0.055,
-        gain: 0.025,
-        type: 'square',
-      });
-    });
-    this._haptic({
-      weakMagnitude: 0.12,
-      strongMagnitude: 0.18 + intensity * 0.18,
-      durationMs: 42,
-      reason: 'coping-hit',
-    });
+    const action = normalizeType(eventValue(event, 'action', 'subtype', 'trickType', 'maneuver', 'trick'));
+    const hand = action === 'HAND_PLANT' || action === 'HANDPLANT';
+    if (action === 'TAKEOFF') return;
+    // Approach reaches the lip before the visual hand does. The presentation
+    // layer emits HAND_PLANT_CONTACT at the actual latched IK contact.
+    if (hand && normalizeType(event.type) !== 'HAND_PLANT_CONTACT') return;
+    if (!this.contactGate.claim(event, hand ? 'hand' : 'coping')) return;
+    if (!this._allowed(hand ? 'hand-contact' : 'coping', COOLDOWNS.coping)) return;
+    const explicit = eventValue(event, 'intensity', 'impactIntensity');
+    const speed = Number(eventValue(event, 'speed', 'entrySpeed', 'incomingSpeed')) || 0;
+    const intensity = clamp01(explicit ?? (0.25 + speed / 35));
+    const kind = hand ? 'hand' : event.contactKind === 'wheel' ? 'panel' : 'metal';
+    this.skate?.playContact(kind, intensity, { gainScale: hand ? 0.7 : kind === 'panel' ? 0.5 : 0.85 });
+    this._duckMusic();
+    this._haptic({ weakMagnitude: hand ? 0.25 : 0.12,
+      strongMagnitude: hand ? 0.28 : 0.12 + intensity * 0.18,
+      durationMs: hand ? 65 : 42, reason: hand ? 'hand-plant' : 'coping-hit' });
   }
 
   _takeoffCue(event) {
+    if (!this.contactGate.claim(event, 'takeoff')) return;
     if (!this._allowed('takeoff', 0.1)) return;
     const intensity = clamp01(
-      eventValue(event, 'intensity', 'speed') ?? 0.55,
+      eventValue(event, 'intensity', 'impactIntensity')
+        ?? Math.max(Number(event.incomingSpeed || event.speed || 0) / 24,
+          Math.abs(Number(event.verticalVelocity) || 0) / 18),
     );
 
     this._assetOr('sfx.takeoff', () => {
-      this._noiseBurst({
-        duration: 0.075,
-        gain: 0.045 + intensity * 0.04,
-        frequency: 820,
-      });
-      this._tone({
-        frequency: 150,
-        endFrequency: 230,
-        duration: 0.07,
-        gain: 0.035 + intensity * 0.015,
-        type: 'triangle',
-      });
+      this.skate?.playContact('panel', intensity, { gainScale: 0.35 });
     }, { gain: 0.65 + intensity * 0.35, rate: 1.04 - intensity * 0.08 });
 
     this._haptic({
@@ -630,7 +495,7 @@ export class HalfpipeAudio {
   }
 
   _landingCue(event) {
-    if (!this._allowed('landing', COOLDOWNS.landing)) return;
+    if (!this.contactGate.claim(event, 'landing') || !this._allowed('landing', COOLDOWNS.landing)) return;
 
     const rating = normalizeType(
       eventValue(event, 'rating', 'quality', 'grade'),
@@ -643,7 +508,7 @@ export class HalfpipeAudio {
       ?? (Number.isFinite(impactSpeed) ? impactSpeed / 20 : 0.55));
 
     if (rating === 'BAIL') {
-      this._bailCue(event);
+      this._bailCue(event, { claimed: true });
       return;
     }
 
@@ -656,8 +521,9 @@ export class HalfpipeAudio {
     const key = keyByRating[rating] || keyByRating.CLEAN;
 
     this._assetOr(key, () => {
-      this.skate?.playDeckImpact(intensity);
+      this.skate?.playDeckImpact(intensity, { rating });
     }, { gain: 0.55 + intensity * 0.6, rate: 1.04 - intensity * 0.1 });
+    if (intensity > 0.65) this._duckMusic();
 
     const strong = (
       rating === 'HEAVY'
@@ -673,13 +539,27 @@ export class HalfpipeAudio {
     });
   }
 
-  _bailCue(event) {
+  _bailCue(event, { claimed = false } = {}) {
+    if (!claimed && !this.contactGate.claim(event, 'landing')) return;
     if (!this._allowed('bail', COOLDOWNS.bail)) return;
     // The skater never falls: use a brief deck/wheel stumble, no body slam,
     // synthetic crowd vowel or emergency sound.
-    this.skate?.playDeckImpact(0.45, { gainScale: 0.75 });
-    this._noiseBurst({ duration: 0.075, gain: 0.025, frequency: 1850, q: 0.7 });
+    const explicit = eventValue(event, 'intensity', 'impactIntensity');
+    const impact = clamp01(explicit ?? (Number(event.impact ?? 8) / 20));
+    this.skate?.playDeckImpact(impact, { gainScale: 0.65, rating: 'BAIL' });
     this._haptic({ weakMagnitude: 0.2, strongMagnitude: 0.15, durationMs: 55, reason: 'missed-trick' });
+  }
+
+  _duckMusic() {
+    const gain = this.buses?.MUSIC?.gain?.gain;
+    const base = this.volumes.music;
+    if (!gain || base <= 0 || !this._allowed('music-duck', 0.28)) return;
+    const now = this.context.currentTime;
+    const current = gain.value;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(current, now);
+    gain.linearRampToValueAtTime(base * 0.8, now + 0.018);
+    gain.linearRampToValueAtTime(base, now + 0.24);
   }
 
   _scoreCue(event) {
@@ -815,6 +695,7 @@ export class HalfpipeAudio {
         this._pumpCue(event);
         break;
       case 'COPING_HIT':
+      case 'HAND_PLANT_CONTACT':
         this._copingCue(event);
         break;
       case 'TAKEOFF':
@@ -830,17 +711,10 @@ export class HalfpipeAudio {
           });
         }
         break;
-      case 'TRICK_STARTED': {
-        const trick = normalizeType(
-          eventValue(event, 'trickType', 'trick', 'name'),
-        );
-        if (trick === 'HAND_PLANT' || trick === 'HANDPLANT') {
-          this._copingCue({ ...event, action: 'HAND_PLANT' });
-        } else if (trick === 'KICK_TURN' || trick === 'KICKTURN') {
-          this._copingCue({ ...event, action: 'KICK_TURN' });
-        }
+      case 'TRICK_STARTED':
+        // Kick turns contact the coping at entry; hand plants wait for IK.
+        if (normalizeType(event.trick) === 'KICK_TURN') this._copingCue(event);
         break;
-      }
       case 'TRICK_COMPLETED':
         this._scoreCue(event);
         break;
@@ -1005,31 +879,39 @@ export class HalfpipeAudio {
 
   async playAmbience(name, { gain = 1 } = {}) {
     if (!this.isReady) return false;
+    if (name === 'outdoor' || name === 'california') name = this.environment;
     if (this.ambienceVoices.has(name)) return true;
 
     const descriptor = this.manifest.ambience?.[name];
-    if (!descriptor?.url) return false;
+    if (!descriptor) return false;
+    const generation = this.environmentGeneration;
 
     const key = 'ambience.' + name;
     let buffer = this.buffers.get(key);
     if (!buffer) {
       try {
-        buffer = await this._loadBuffer(key, descriptor.url);
+        buffer = descriptor.url
+          ? await this._loadBuffer(key, descriptor.url)
+          : createEnvironmentBed(this.context, descriptor.placeholder);
+        if (!this.disposed) this.buffers.set(key, buffer);
       } catch {
         return false;
       }
     }
 
-    if (!buffer || !this.isReady) return false;
+    if (!buffer || !this.isReady || generation !== this.environmentGeneration) return false;
+    if (this.ambienceVoices.has(name)) return true;
 
     const source = this.context.createBufferSource();
     const voiceGain = this.context.createGain();
     source.buffer = buffer;
     source.loop = descriptor.loop !== false;
-    voiceGain.gain.value = Math.max(
+    const targetGain = Math.max(
       0,
       (descriptor.gain ?? 1) * gain,
     );
+    voiceGain.gain.value = 0;
+    voiceGain.gain.setTargetAtTime(targetGain, this.context.currentTime, 0.24);
     source.connect(voiceGain).connect(this.buses.AMBIENCE.gain);
     source.start();
 
@@ -1040,11 +922,24 @@ export class HalfpipeAudio {
     return true;
   }
 
+  async setEnvironment(mapId = 'city') {
+    const id = String(mapId).toLowerCase();
+    const name = id.includes('cyber') || id.includes('night') ? 'cyber-night'
+      : id.includes('tree') || id.includes('outdoor') || id.includes('california') ? 'tree-house' : 'city';
+    if (name !== this.environment) {
+      this.environment = name;
+      this.environmentGeneration += 1;
+      for (const active of this.ambienceVoices.keys()) this.stopAmbience(active, { fadeSeconds: 0.65 });
+    }
+    return this.playAmbience(name);
+  }
+
   stopAmbience(name, { fadeSeconds = 0.3 } = {}) {
     const voice = this.ambienceVoices.get(name);
     if (!voice || !this.context) return false;
 
     this.ambienceVoices.delete(name);
+    this.retiringAmbienceVoices.add(voice);
     const now = this.context.currentTime;
     const fade = Math.max(0.01, Number(fadeSeconds) || 0.3);
 
@@ -1052,6 +947,19 @@ export class HalfpipeAudio {
       voice.gain.gain.setTargetAtTime(0.0001, now, fade / 3);
       voice.source.stop(now + fade + 0.05);
     } catch {}
+    voice.source.addEventListener('ended', () => {
+      this.retiringAmbienceVoices.delete(voice);
+      try { voice.source.disconnect(); } catch {}
+      try { voice.gain.disconnect(); } catch {}
+    }, { once: true });
+    // Rapid controller map selection cannot accumulate unbounded fade voices.
+    if (this.retiringAmbienceVoices.size > 3) {
+      const oldest = this.retiringAmbienceVoices.values().next().value;
+      try { oldest.source.stop(); } catch {}
+      try { oldest.source.disconnect(); } catch {}
+      try { oldest.gain.disconnect(); } catch {}
+      this.retiringAmbienceVoices.delete(oldest);
+    }
 
     return true;
   }
@@ -1101,6 +1009,7 @@ export class HalfpipeAudio {
     this.timerWarningsPlayed.clear();
     this.lastRemaining = null;
     this.cooldowns.clear();
+    this.contactGate.clear();
   }
 
   async dispose() {
@@ -1116,13 +1025,19 @@ export class HalfpipeAudio {
       try { voice.gain.disconnect(); } catch {}
     }
     this.musicVoices.clear();
+    for (const voice of this.sfxVoices) {
+      try { voice.source.stop(); } catch {}
+      for (const node of voice.nodes) { try { node.disconnect(); } catch {} }
+    }
+    this.sfxVoices.clear();
 
-    for (const voice of this.ambienceVoices.values()) {
+    for (const voice of [...this.ambienceVoices.values(), ...this.retiringAmbienceVoices]) {
       try { voice.source.stop(); } catch {}
       try { voice.source.disconnect(); } catch {}
       try { voice.gain.disconnect(); } catch {}
     }
     this.ambienceVoices.clear();
+    this.retiringAmbienceVoices.clear();
 
     for (const bus of Object.values(this.buses || {})) {
       bus.dispose();
@@ -1134,6 +1049,9 @@ export class HalfpipeAudio {
 
     this.buffers.clear();
     this.loading.clear();
+    this.loadingUrls.clear();
+    this.decodedUrls.clear();
+    this.contactGate.clear();
     this.cooldowns.clear();
     this.proceduralRockBuffer = null;
 

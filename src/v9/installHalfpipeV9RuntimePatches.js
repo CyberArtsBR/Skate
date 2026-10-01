@@ -244,7 +244,11 @@ function installVisualCopingPatch() {
         raycaster.set(ray.origin, ray.direction);
         raycaster.near = 0;
         raycaster.far = 3;
-        const hit = raycaster.intersectObjects(this._v9CopingMeshes, true)[0];
+        const hit = raycaster.intersectObjects(this._v9CopingMeshes, false).find(candidate => {
+          const materials = Array.isArray(candidate.object.material)
+            ? candidate.object.material : [candidate.object.material];
+          return materials[candidate.face?.materialIndex || 0]?.userData?.halfpipeRole === 'coping';
+        });
         if (!hit?.point) continue;
         const error = hit.point.distanceToSquared(target);
         if (error < bestError) {

@@ -1,0 +1,155 @@
+/* Locally bundled Luckiest Guy, Apache 2.0; public/fonts contains its license. */
+@font-face {
+  font-family: 'Halfpipe Graffiti';
+  src: url('/fonts/LuckiestGuy-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+#game-stage {
+  --ui-font-display: 'Halfpipe Graffiti', Impact, 'Arial Black', sans-serif;
+  --ui-font-body: Arial, Helvetica, sans-serif;
+  --ui-ink: #080f18;
+  --ui-cream: #fff5d9;
+  --ui-yellow: #ffe06d;
+  --ui-cyan: #68e8ff;
+  --ui-pink: #ed3bc0;
+  --ui-good: #8df66b;
+  --ui-bad: #ff6659;
+  --ui-panel: #0b1b23ee;
+  --ui-display-shadow: 2px 3px 0 var(--ui-ink), 4px 5px 0 var(--ui-ink),
+    -1px 3px 0 #159fb5, 3px 6px 0 #ab288c;
+  --menu-ui-scale: 1;
+}
+
+#game-stage .menu-screen:not(.title-screen):not(.controls-screen) h1,
+#game-stage .podium-screen h1,
+#game-stage .countdown-label {
+  font-family: var(--ui-font-display);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: .015em;
+  paint-order: stroke fill;
+}
+
+#game-stage .menu-screen:not(.title-screen):not(.controls-screen) h1 {
+  color: var(--ui-yellow);
+  -webkit-text-stroke: 2px var(--ui-ink);
+  text-shadow: var(--ui-display-shadow);
+}
+#game-stage .menu-screen:not(.title-screen):not(.controls-screen):not(.results-screen):not(.hero-select-screen) h1 {
+  font-size: calc(clamp(30px, 4.8vw, 62px) * var(--menu-ui-scale));
+}
+#game-stage .hero-select-screen .hero-select-header h1 {
+  font-size: calc(clamp(24px, 3vw, 36px) * var(--menu-ui-scale));
+}
+#game-stage .results-screen h1 { font-size: calc(clamp(26px, 3.5vw, 38px) * var(--menu-ui-scale)); }
+
+#game-stage .game-ui-layer:not(.controls-screen) .menu-button,
+#game-stage .hero-card-copy,
+#game-stage .result-stat span,
+#game-stage .result-stat strong,
+#game-stage .standing-row {
+  font-family: var(--ui-font-body);
+}
+
+#game-stage .game-ui-layer:not(.title-screen):not(.controls-screen) .menu-button {
+  font-size: calc(12px * var(--menu-ui-scale));
+  letter-spacing: .055em;
+  font-weight: 800;
+}
+
+#game-stage .hero-select-screen .hero-select-help,
+#game-stage .hero-select-screen .avatar-upload-hint,
+#game-stage .hero-select-screen .hero-card-copy small {
+  font-size: calc(11px * var(--menu-ui-scale));
+  line-height: 1.25;
+}
+#game-stage .hero-select-screen .hero-card-copy strong {
+  font-size: calc(12px * var(--menu-ui-scale));
+  line-height: 1.2;
+}
+#game-stage .hero-select-screen .hero-roster-heading > strong,
+#game-stage .hero-select-screen .map-card strong {
+  font-size: calc(11px * var(--menu-ui-scale));
+}
+
+#game-stage .results-screen .result-stat span {
+  color: #dddccf;
+  font-size: calc(10px * var(--menu-ui-scale));
+  letter-spacing: .05em;
+}
+#game-stage .results-screen .result-stat strong {
+  font-size: calc(14px * var(--menu-ui-scale));
+}
+#game-stage .results-screen .result-stat[data-stat='bestTrick'] strong {
+  font-size: min(calc(14px * var(--menu-ui-scale)), 16px);
+  text-wrap: balance;
+}
+#game-stage .results-screen .result-stat[data-stat='finalScore'] strong {
+  font-family: var(--ui-font-display);
+  font-style: normal;
+  font-weight: 400;
+  font-size: calc(clamp(28px, 3.4vw, 40px) * var(--menu-ui-scale));
+  color: var(--ui-yellow);
+  -webkit-text-stroke: 1.5px var(--ui-ink);
+  paint-order: stroke fill;
+  text-shadow: 2px 3px 0 var(--ui-ink);
+}
+#game-stage .results-screen .menu-button { font-size: calc(11px * var(--menu-ui-scale)); }
+#game-stage .results-screen .standing-row { font-size: calc(12px * var(--menu-ui-scale)); }
+
+/* Keep the compact results structure; scale text rather than the entire card. */
+@media (max-width: 480px), (max-height: 480px) {
+  #game-stage .results-screen h1 { font-size: calc(25px * var(--menu-ui-scale)); }
+  #game-stage .results-screen .standing-row { font-size: calc(11px * var(--menu-ui-scale)); }
+  #game-stage .results-screen .result-stat strong { font-size: calc(12px * var(--menu-ui-scale)); }
+  #game-stage .results-screen .result-stat[data-stat='finalScore'] strong {
+    font-size: calc(27px * var(--menu-ui-scale));
+  }
+  #game-stage .results-screen .menu-button { font-size: calc(10px * var(--menu-ui-scale)); }
+  #game-stage .results-screen .result-stat[data-stat='bestTrick'] strong {
+    font-size: min(calc(12px * var(--menu-ui-scale)), 14px);
+  }
+}
+
+@media (max-height: 480px) and (min-aspect-ratio: 4/3) {
+  #game-stage .results-screen .results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+#game-stage.is-ui-high-contrast .menu-screen:not(.title-screen):not(.controls-screen) .menu-card,
+#game-stage.is-ui-high-contrast .hero-select-shell,
+#game-stage.is-ui-high-contrast .podium-score-label {
+  background: #000f;
+  border-color: var(--ui-cream);
+  box-shadow: none;
+}
+#game-stage.is-ui-high-contrast .game-ui-layer:not(.controls-screen) .menu-button,
+#game-stage.is-ui-high-contrast .result-stat,
+#game-stage.is-ui-high-contrast .results-standings {
+  background: #000f;
+  color: var(--ui-cream);
+  border: 1px solid #fff9;
+}
+#game-stage.is-ui-high-contrast .hero-card,
+#game-stage.is-ui-high-contrast .map-card { background: #000f; border-color: #fff9; }
+#game-stage.is-ui-high-contrast .hero-card.is-selected,
+#game-stage.is-ui-high-contrast .map-card.is-selected,
+#game-stage.is-ui-high-contrast .menu-button.is-selected {
+  border-color: var(--ui-yellow);
+  outline: 2px solid var(--ui-yellow);
+  outline-offset: 1px;
+}
+#game-stage.is-ui-high-contrast .podium-screen h1,
+#game-stage.is-ui-high-contrast .menu-screen:not(.title-screen):not(.controls-screen) h1 {
+  text-shadow: 2px 3px 0 #000;
+}
+
+#game-stage.is-ui-reduced-motion .game-ui-layer:not(.controls-screen) *,
+#game-stage.is-ui-reduced-motion .game-ui-layer:not(.controls-screen) *::before,
+#game-stage.is-ui-reduced-motion .game-ui-layer:not(.controls-screen) *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+}

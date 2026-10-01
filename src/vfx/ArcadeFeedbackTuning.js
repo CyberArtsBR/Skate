@@ -12,8 +12,4 @@ export const ARCADE_FEEDBACK = Object.freeze({
   carveMinTurn: 0.22,
   carveEmissionRate: 16,
   trajectoryCapacity: 64,
-  sirenDelay: 0.3,
-  sirenDuration: 5.2,
-  sirenGain: 0.095,
-  sirenFade: 0.24,
 });

@@ -5,6 +5,7 @@ import { RiderFootIK } from '../character/RiderFootIK.js';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { HalfpipeProfile } from '../halfpipe/HalfpipeProfile.js';
 import { disposeObject3D } from '../core/disposeObject3D.js';
+import { quality } from '../graphics/RenderQualityManager.js';
 
 // These are the three actual horizontal standing surfaces in the supplied
 // winner_podium.glb, measured in its scene coordinates. The podium's front is
@@ -59,6 +60,10 @@ export class WinnersPodium {
     this._preloadPromise = null;
     this._revision = 0;
     this._disposed = false;
+    this.reducedMotion = false;
+    this._poseElapsed = 0;
+    this._poseAccumulator = 0;
+    this._assetRegistrations = [];
   }
 
   preload() {
@@ -100,6 +105,12 @@ export class WinnersPodium {
         if (!object.isMesh) return;
         object.castShadow = true;
         object.receiveShadow = true;
+        for (const material of (Array.isArray(object.material) ? object.material : [object.material])) {
+          // These are the supplied podium's paint, lettering and platform slots.
+          // Preserve their colors and leave the separately authored trophy alone.
+          const roughness = { 'Material.005': 0.68, 'Material.002': 0.46, 'Material.006': 0.8 }[material.name];
+          if (roughness !== undefined) material.roughness = roughness;
+        }
       });
       this.platforms = SOURCE_PLATFORMS.map((surface) => ({
         rank: surface.rank,
@@ -111,10 +122,12 @@ export class WinnersPodium {
       }));
       this.podium = podium;
       this.root.add(podium);
+      this._assetRegistrations.push(quality.registerObject(podium));
       this.root.updateMatrixWorld(true);
       this._localBounds.setFromObject(podium, true);
       // Store a root-local box, independent of ramp floor elevation.
       this._localBounds.applyMatrix4(this.root.matrixWorld.clone().invert());
+      this._addWinnerBadge();
       await this._preloadTrophy();
       if (this._disposed) throw new Error('Podium was disposed while loading.');
       return this;
@@ -162,11 +175,33 @@ export class WinnersPodium {
       });
       this.trophy = trophy;
       this.root.add(trophy);
+      this._assetRegistrations.push(quality.registerObject(trophy));
     } catch (error) {
       disposeObject3D(trophyModel);
       // Trophy failure is cosmetic: the ranked competitors can still appear.
       if (!this._disposed) console.warn('Unable to load the winners podium trophy.', error);
     }
+  }
+
+  _addWinnerBadge() {
+    const winner = this.platforms.find(platform => platform.rank === 1);
+    const crown = new THREE.Shape();
+    crown.moveTo(-0.21, -0.075);
+    crown.lineTo(-0.24, 0.095);
+    crown.lineTo(-0.10, 0.025);
+    crown.lineTo(0, 0.16);
+    crown.lineTo(0.10, 0.025);
+    crown.lineTo(0.24, 0.095);
+    crown.lineTo(0.21, -0.075);
+    crown.closePath();
+    this.winnerBadge = new THREE.Mesh(new THREE.ShapeGeometry(crown),
+      new THREE.MeshStandardMaterial({ color: 0xd5a741, metalness: 0.72, roughness: 0.34 }));
+    this.winnerBadge.name = 'first-place-painted-crown';
+    this.winnerBadge.position.set(winner.position.x, winner.position.y * 0.56,
+      this._localBounds.max.z + 0.012);
+    this.winnerBadge.receiveShadow = true;
+    this.root.add(this.winnerBadge);
+    this._assetRegistrations.push(quality.registerObject(this.winnerBadge));
   }
 
   async show(entries) {
@@ -229,6 +264,8 @@ export class WinnersPodium {
         });
         asset.updatePose(STANDING_POSE);
         footIK.update(STANDING_POSE);
+        actor.footIK = footIK;
+        actor.unregisterQuality = quality.registerObject(asset.root);
         standing.updateMatrixWorld(true);
         const actorBounds = new THREE.Box3().setFromObject(asset.root, true);
         const label = actorBounds.getCenter(new THREE.Vector3());
@@ -236,11 +273,14 @@ export class WinnersPodium {
         this.root.worldToLocal(label);
         this._labelAnchors.push({ entry, rank: platform.rank, position: label });
       }
+      this._poseActors(0);
       this.root.updateMatrixWorld(true);
       this._localBounds.setFromObject(this.root, true)
         .applyMatrix4(this.root.matrixWorld.clone().invert());
       for (const anchor of this._labelAnchors) this._localBounds.expandByPoint(anchor.position);
       this.root.visible = true;
+      this._poseElapsed = 0;
+      this._poseAccumulator = 0;
       return true;
     } catch (error) {
       // Also release any fulfilled avatar not yet attached when posing fails.
@@ -281,13 +321,37 @@ export class WinnersPodium {
     return { target, position };
   }
 
-  update() {
-    // Standing poses and their foot constraints are solved once on show().
-    // This scene deliberately adds no per-frame skeleton or physics work.
+  setReducedMotion(enabled) {
+    this.reducedMotion = Boolean(enabled);
+    if (this.reducedMotion) this._poseActors(0);
+  }
+
+  _poseActors(time) {
+    for (const actor of this.actors) {
+      const movement = this.reducedMotion ? 0 : Math.sin(time * 1.4 + actor.rank * 0.7);
+      const pose = { ...STANDING_POSE,
+        torsoCounter: actor.rank === 1 ? 0.018 : actor.rank === 2 ? -0.015 : -0.035,
+        headLook: (actor.rank === 1 ? 0.025 : actor.rank === 2 ? -0.018 : -0.045) + movement * 0.012,
+        armBalance: STANDING_POSE.armBalance + (actor.rank === 1 ? 0.04 : -0.02) + movement * 0.018,
+      };
+      actor.asset.updatePose(pose);
+      actor.footIK.update(pose);
+    }
+  }
+
+  update(dt = 0) {
+    if (!this.root.visible || this.reducedMotion) return;
+    this._poseElapsed += Math.min(0.1, Math.max(0, Number(dt) || 0));
+    this._poseAccumulator += Math.min(0.1, Math.max(0, Number(dt) || 0));
+    // A subtle idle is sufficient at 20 Hz; solve sole constraints after FK.
+    if (this._poseAccumulator < 0.05) return;
+    this._poseAccumulator = 0;
+    this._poseActors(this._poseElapsed);
   }
 
   _clearActors() {
     for (const actor of this.actors) {
+      actor.unregisterQuality?.();
       actor.asset.dispose();
       actor.standing.removeFromParent();
     }
@@ -305,8 +369,11 @@ export class WinnersPodium {
     if (this._disposed) return;
     this._disposed = true;
     this.hide();
+    for (const unregister of this._assetRegistrations) unregister();
+    this._assetRegistrations = [];
     disposeObject3D(this.podium);
     disposeObject3D(this.trophy);
+    disposeObject3D(this.winnerBadge);
     this.podium = null;
     this.trophy = null;
     this.root.removeFromParent();

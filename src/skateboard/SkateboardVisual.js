@@ -5,6 +5,7 @@ import { disposeObject3D } from '../core/disposeObject3D.js';
 import { SkateboardAssetAdapter } from './SkateboardAssetAdapter.js';
 import { SkateboardRig } from './SkateboardRig.js';
 import { ARCADE_FEEDBACK } from '../vfx/ArcadeFeedbackTuning.js';
+import { quality } from '../graphics/RenderQualityManager.js';
 
 export const SKATEBOARD_COORDINATE_SYSTEM = Object.freeze({
   forwardAxis: '+X',
@@ -226,6 +227,7 @@ export class SkateboardVisual {
     this.root.userData.visualDimensions = this.dimensions.toArray();
     this.root.userData.proportionAudit = this.proportionAudit;
     this.root.userData.presentationHooks = this.presentationHooks;
+    this._unregisterQuality = quality.registerObject(this.root);
     return this;
   }
 
@@ -372,6 +374,8 @@ export class SkateboardVisual {
   }
 
   dispose() {
+    this._unregisterQuality?.();
+    this._unregisterQuality = null;
     // Runtime wheel meshes are reparented under dedicated pivots on root, so
     // disposing only the original GLB scene would leak their geometry/materials.
     disposeObject3D(this.root);

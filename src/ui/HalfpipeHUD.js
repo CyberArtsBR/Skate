@@ -1,4 +1,5 @@
 import { TrickFeedback } from './TrickFeedback.js';
+import { applyGameUIPreferences } from './UIPreferences.js';
 import './graffiti-hud.css';
 
 export function resolveDebugMode(search = globalThis.location?.search || '') {
@@ -105,6 +106,7 @@ export class HalfpipeHUD {
       uiScale: scale,
       reducedMotion: Boolean(reducedMotion),
     };
+    applyGameUIPreferences(this.root.parentElement, this.playerMode);
     return { ...this.playerMode };
   }
 

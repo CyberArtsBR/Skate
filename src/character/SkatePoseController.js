@@ -24,8 +24,10 @@ export class SkatePoseController {
       -1.25,
       1.25,
     );
-    const facingBack = Math.cos(Number(state.facingYaw) || 0) < 0;
-    const facingSign = facingBack ? -1 : 1;
+    // Board yaw already turns the whole rider. Only the secondary upper-body
+    // response changes here, continuously, so quarter turns cannot flip the
+    // chest and gaze instantaneously between normal and fakie.
+    const facingSign = Math.cos(Number(state.facingYaw) || 0);
     const handPlant = state.trickVisualActive && state.trickType === 'hand-plant';
     const kickTurn = state.trickVisualActive && state.trickType === 'kick-turn';
     const backflip = Boolean(air && state.trickType === 'backflip');

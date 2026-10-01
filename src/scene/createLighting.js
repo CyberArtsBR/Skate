@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { quality } from '../graphics/RenderQualityManager.js';
+import { getMapLightingProfile } from '../graphics/MapLightingProfiles.js';
 
 export function createLighting(scene) {
+  let mapProfile = getMapLightingProfile('city');
   const hemisphere = new THREE.HemisphereLight(0xdaf5ff, 0x6b5140, 1.7);
   scene.add(hemisphere);
 
@@ -27,9 +29,15 @@ export function createLighting(scene) {
 
   function applyLightingPreset() {
     const lighting = quality.preset.lighting || {};
-    hemisphere.intensity = Number(lighting.hemisphere ?? 1.7);
-    key.intensity = Number(lighting.key ?? 3.7);
-    fill.intensity = Number(lighting.fill ?? 0.95);
+    hemisphere.color.setHex(mapProfile.skyColor);
+    hemisphere.groundColor.setHex(mapProfile.groundColor);
+    key.color.setHex(mapProfile.keyColor);
+    fill.color.setHex(mapProfile.fillColor);
+    key.position.fromArray(mapProfile.keyPosition);
+    fill.position.fromArray(mapProfile.fillPosition);
+    hemisphere.intensity = Number(lighting.hemisphere ?? 1.7) * mapProfile.hemisphereFactor;
+    key.intensity = Number(lighting.key ?? 3.7) * mapProfile.keyFactor;
+    fill.intensity = Number(lighting.fill ?? 0.95) * mapProfile.fillFactor;
     key.shadow.radius = Number(lighting.shadowRadius ?? 3.0);
     key.shadow.needsUpdate = true;
   }
@@ -41,6 +49,11 @@ export function createLighting(scene) {
     hemisphere,
     key,
     fill,
+    setMapProfile(mapId = 'city') {
+      mapProfile = getMapLightingProfile(mapId);
+      quality.setMapLighting(mapProfile);
+      return mapProfile;
+    },
     dispose() {
       unsubscribeQuality();
       unregisterShadow();

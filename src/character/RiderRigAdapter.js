@@ -296,7 +296,11 @@ export class RiderRigAdapter {
     };
 
     const stanceDirection = stance === 'goofy' ? -1 : 1;
-    const facingDirection = facingSign < 0 ? -1 : 1;
+    // This is a presentation weight, not a stance/physics flag. Retain the
+    // intermediate values supplied by pose blending during aerial yaw.
+    const facingDirection = THREE.MathUtils.clamp(
+      Number.isFinite(Number(facingSign)) ? Number(facingSign) : 1, -1, 1,
+    );
     const motionDirection = stanceDirection * facingDirection;
     apply('hips', -hipFlex, 0, torsoSettle * 0.18);
     apply(

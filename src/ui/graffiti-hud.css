@@ -1,16 +1,7 @@
-/* Local font: Luckiest Guy, Apache 2.0; see public/fonts/LuckiestGuy-LICENSE.txt. */
-@font-face {
-  font-family: 'Halfpipe Graffiti';
-  src: url('/fonts/LuckiestGuy-Regular.ttf') format('truetype');
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
 .halfpipe-hud {
-  --graffiti-ink: #080f18;
-  --graffiti-cyan: #68e8ff;
-  --graffiti-pink: #ed3bc0;
+  --graffiti-ink: var(--ui-ink, #080f18);
+  --graffiti-cyan: var(--ui-cyan, #68e8ff);
+  --graffiti-pink: var(--ui-pink, #ed3bc0);
   --graffiti-depth: 2px 3px 0 var(--graffiti-ink), 4px 5px 0 var(--graffiti-ink),
     -2px 4px 0 #15b9d4, 4px 7px 0 #bb2692, 5px 8px 0 var(--graffiti-ink);
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr);
@@ -63,7 +54,7 @@
 .halfpipe-hud .hud-landing-feedback,
 .halfpipe-hud .hud-action-feedback,
 .halfpipe-hud .hud-status {
-  font-family: 'Halfpipe Graffiti', Impact, 'Arial Black', sans-serif;
+  font-family: var(--ui-font-display, 'Halfpipe Graffiti'), Impact, 'Arial Black', sans-serif;
   font-weight: 400;
   font-style: normal;
   letter-spacing: 0.015em;
@@ -154,6 +145,26 @@
   text-shadow: var(--graffiti-depth);
 }
 
+.halfpipe-hud .hud-trick-feedback.is-long-name .trick-award-name {
+  font-size: .78em;
+  line-height: 1.1;
+}
+
+.halfpipe-hud .hud-trick-feedback .trick-landing-summary {
+  margin: .3em auto 0;
+  padding: .2em .5em;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 3px 8px;
+  background: #07131de8;
+  color: var(--feedback-color);
+  font-size: .48em;
+  line-height: 1.2;
+  -webkit-text-stroke: 1.25px var(--graffiti-ink);
+  text-shadow: 1px 2px 0 var(--graffiti-ink);
+}
+.halfpipe-hud .trick-landing-summary > span { color: inherit; }
+
 .halfpipe-hud .hud-trick-feedback .trick-award-name::before {
   display: none;
 }
@@ -196,13 +207,13 @@
   line-height: 1.18;
   text-wrap: balance;
   overflow-wrap: anywhere;
-  -webkit-text-stroke: 2.5px var(--graffiti-ink);
-  text-shadow: 2px 3px 0 var(--graffiti-ink), 3px 4px 0 #147385;
+  -webkit-text-stroke: 1.5px var(--graffiti-ink);
+  text-shadow: 1px 2px 0 var(--graffiti-ink);
 }
 
-.halfpipe-hud [data-tone='good'] { --feedback-color: #8df66b; }
-.halfpipe-hud [data-tone='bad'] { --feedback-color: #ff6659; }
-.halfpipe-hud [data-tone='ok'] { --feedback-color: #ffe06d; }
+.halfpipe-hud [data-tone='good'] { --feedback-color: var(--ui-good, #8df66b); }
+.halfpipe-hud [data-tone='bad'] { --feedback-color: var(--ui-bad, #ff6659); }
+.halfpipe-hud [data-tone='ok'] { --feedback-color: var(--ui-yellow, #ffe06d); }
 .halfpipe-hud .hud-context [data-tone],
 .halfpipe-hud .hud-trick-feedback[data-tone] .trick-award-name,
 .halfpipe-hud .hud-landing-feedback[data-tone] > span {
@@ -210,7 +221,7 @@
 }
 .halfpipe-hud .hud-landing-feedback[data-tone],
 .halfpipe-hud .hud-action-feedback[data-tone] {
-  text-shadow: 2px 3px 0 var(--graffiti-ink), 3px 4px 0 #147385;
+  text-shadow: 1px 2px 0 var(--graffiti-ink);
 }
 
 @media (max-width: 900px) {
@@ -261,7 +272,7 @@
   .halfpipe-hud .hud-action-feedback,
   .halfpipe-hud .hud-status {
     font-size: min(calc(18px * var(--ui-scale)), 6vw);
-    -webkit-text-stroke: 2px var(--graffiti-ink);
+    -webkit-text-stroke: 1.25px var(--graffiti-ink);
   }
 }
 
@@ -274,6 +285,8 @@
   .halfpipe-hud .hud-landing-feedback,
   .halfpipe-hud .hud-action-feedback,
   .halfpipe-hud .hud-status { font-size: calc(17px * var(--ui-scale)); }
+  .halfpipe-hud .hud-trick-feedback small { margin-top: .2em; padding: .15em .4em; }
+  .halfpipe-hud .hud-trick-feedback .trick-landing-summary { margin-top: .18em; }
 }
 
 .halfpipe-hud.is-high-contrast { filter: none; }
