@@ -20,11 +20,11 @@ This pass modifies the existing Chimpions Halfpipe project on `main`. The keyboa
 
 ## Pumping and low-speed recovery
 
-- Pump acceleration is 9.6, with a 150 ms input buffer. Buffer time expires during air and surface tricks too.
+- Pump acceleration is 16.0 (up from 9.6), with the same 150 ms input buffer. Buffer time expires during air and surface tricks too. GOOD/WEAK/EARLY/LATE force multipliers are 0.90/0.65/0.32/0.32, so correctly directed pumps outside the perfect window still build useful speed; PERFECT remains strongest and wrong-direction braking is unchanged.
 - Correct compression can start from zero speed. Direction follows existing movement, the downhill ramp tangent or the remembered travel direction.
 - Recovery requires nonzero input matching the current desired pump phase and a valid timing rating. There is no automatic speed grant.
-- Additional recovery work is capped at 24 units of kinetic energy per unit mass per side/phase/direction window. A window permits one impulse, with a 320 ms cooldown; button spam does not create a fresh budget.
-- Below speed 10, extra acceleration is capped at 6. Impulse rewards taper toward target speed 13. PERFECT/GOOD/WEAK/EARLY/LATE base impulse values are 1.4/0.95/0.35/0.45/0.45; wrong input earns none.
+- Additional recovery work is capped at 42 units of kinetic energy per unit mass per side/phase/direction window. A window permits one impulse, with a 320 ms cooldown; button spam does not create a fresh budget.
+- Below speed 10, extra acceleration is capped at 9. Impulse rewards taper toward target speed 13. PERFECT/GOOD/WEAK/EARLY/LATE base impulse values are 2.1/1.5/0.65/0.75/0.75; wrong input earns none. Recovery still requires the player's correct pumping direction, and the bail penalty is preserved.
 - Velocity gains use `sqrt(speed² + 2 × admittedWork)`, so the limit is an energy budget rather than a teleport to maximum speed.
 
 ## Hand Plant and combined aerials
