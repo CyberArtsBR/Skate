@@ -626,6 +626,30 @@ function playControllerHaptics(recommendation) {
   }).catch(() => {});
 }
 
+const arenaVisuals = new Map();
+async function setArenaMap(map) {
+  if (!arenaVisuals.has('standard')) arenaVisuals.set('standard', halfpipe);
+  const key = map.kind === 'full' ? map.id : 'standard';
+  let next = arenaVisuals.get(key);
+  if (!next) {
+    next = new HalfpipeVisual(map.modelUrl, { fullMap: true });
+    try { await next.load(); } catch (error) { next.dispose(); throw error; }
+    arenaVisuals.set(key, next);
+    scene.add(next.root);
+  }
+  for (const visual of arenaVisuals.values()) visual.root.visible = visual === next;
+  halfpipe = next;
+  presentationBinder.visualSurface = next;
+  rider.rampVisual = next;
+  contactPresentation.ramp = next;
+  window.__HALFPIPE_FOUNDATION__.halfpipe = next;
+  const fullMap = map.kind === 'full';
+  parkForeground.root.visible = !fullMap;
+  ground.ground.visible = !fullMap;
+  background.element.hidden = fullMap;
+  scene.background = fullMap ? new THREE.Color(0x202933) : null;
+}
+
 function setMapPresentation(mapId) {
   activePresentationMap = mapId || 'city';
   parkForeground?.setMap(activePresentationMap);
@@ -1180,6 +1204,7 @@ async function bootstrap() {
     ground,
     lighting,
     setMapPresentation,
+    setArenaMap,
     recoverWebGL,
   };
 }
@@ -1194,7 +1219,10 @@ function dispose() {
   canvas.removeEventListener('webglcontextrestored', onWebGLContextRestored, false);
   unregisterRiderQuality?.();
   impactDebug?.dispose();
-  halfpipe?.dispose();
+  if (arenaVisuals.size) {
+    for (const visual of arenaVisuals.values()) visual.dispose();
+    arenaVisuals.clear();
+  } else halfpipe?.dispose();
   rider?.dispose();
   profileDebug.dispose();
   presentationDebug?.dispose();

@@ -198,7 +198,8 @@ function isAuditedFrontMetalObject(object, frontMetal) {
 }
 
 export class HalfpipeVisual {
-  constructor(url) {
+  constructor(url, { fullMap = false } = {}) {
+    this.fullMap = fullMap;
     this.url = url;
     this.root = new THREE.Group();
     this.root.name = 'halfpipe-visual-root';
@@ -223,7 +224,7 @@ export class HalfpipeVisual {
       .catch(() => null);
 
     this.model.traverse((object) => {
-      if (/ground/i.test(object.name)) {
+      if (!this.fullMap && /ground/i.test(object.name)) {
         object.visible = false;
         this.hiddenGroundNodes.push(object.name);
       }
@@ -237,7 +238,9 @@ export class HalfpipeVisual {
         const sourceMaterials = Array.isArray(object.material)
           ? object.material
           : [object.material];
-        for (const material of sourceMaterials) prepareRampSurfaceFinish(material, paintMask);
+        if (!this.fullMap || object.parent?.name === 'Object_4') {
+          for (const material of sourceMaterials) prepareRampSurfaceFinish(material, paintMask);
+        }
         const frontMetal = GAME_CONFIG.renderer.frontMetal;
         // The current shipped GLB splits Object_4 into named material meshes.
         // Retain the legacy audit match, and recognize its actual FRENTE face.
@@ -322,7 +325,11 @@ export class HalfpipeVisual {
     this.root.add(this.model);
     this.root.updateWorldMatrix(true, true);
 
-    const fullBoxBeforeAlignment = visibleBounds(this.root);
+    const alignmentRoot = this.fullMap
+      ? this.model.getObjectByName('Sketchfab_model')
+      : this.root;
+    if (!alignmentRoot) throw new Error('Full map is missing its authored halfpipe.');
+    const fullBoxBeforeAlignment = visibleBounds(alignmentRoot);
     const fullCenter = fullBoxBeforeAlignment.getCenter(new THREE.Vector3());
     const authoredPositionX = this.model.position.x;
 

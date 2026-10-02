@@ -33,6 +33,11 @@ export const HALFPIPE_MAPS = Object.freeze([
     position: 'center center',
     coherence: Object.freeze({ brightness: 0.94, saturation: 1.03, contrast: 1.01, gradeOpacity: 0.24 }),
   }),
+  Object.freeze({
+    id: 'the-gym', name: 'The Gym', kind: 'full',
+    modelUrl: '/models/arenas/the-gym.glb',
+    environmentUrl: BASE_ENVIRONMENT,
+  }),
 ]);
 
 const STORAGE = Object.freeze({
@@ -163,7 +168,8 @@ async function applyMapToRuntime(screen, map) {
   screen.setBusy(true, 'LOADING ' + map.name.toUpperCase() + '...');
 
   try {
-    await foundation.background?.setImage?.(map.imageUrl, map.position);
+    await foundation.setArenaMap?.(map);
+    if (map.kind !== 'full') await foundation.background?.setImage?.(map.imageUrl, map.position);
     foundation.background?.setCoherence?.(map.coherence);
 
     const environment = quality.environment;
@@ -261,7 +267,13 @@ function ensureMapUI(screen) {
     button.dataset.mapId = map.id;
     button.innerHTML = '<span class="map-card-preview"><img alt="" loading="eager" decoding="async" draggable="false"></span><strong></strong>';
     const image = button.querySelector('img');
-    image.src = map.imageUrl;
+    if (map.kind === 'full') {
+      image.remove();
+      const preview = button.querySelector('.map-card-preview');
+      preview.textContent = '3D';
+      preview.classList.add('full-map-preview');
+      button.title = 'Full 3D arena · no image backdrop';
+    } else image.src = map.imageUrl;
     image.alt = map.name;
     button.querySelector('strong').textContent = map.name;
     button.addEventListener('click', () => selectMap(screen, index + 1));
@@ -442,7 +454,7 @@ function patchHeroSelect() {
     try {
       const state = resolveRandomSelections(this);
       const map = state.resolvedMap || HALFPIPE_MAPS[0];
-      await applyMapToRuntime(this, map);
+      if (!await applyMapToRuntime(this, map)) return false;
       return await originalConfirm.call(this);
     } finally {
       this._confirmationPending = false;

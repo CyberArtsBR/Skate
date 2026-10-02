@@ -1,6 +1,14 @@
 // Intensity factors compose with the player's graphics preset. Distant painted
 // backgrounds remain approved artwork; these profiles light the actual 3D park.
 export const MAP_LIGHTING_PROFILES = Object.freeze({
+  'the-gym': Object.freeze({
+    skyColor: 0xdce8f5, groundColor: 0x65616a,
+    keyColor: 0xfff0dc, fillColor: 0xc3d9ef,
+    keyPosition: [-8, 16, 10], fillPosition: [10, 10, -8],
+    hemisphereFactor: 0.85, keyFactor: 0.85, fillFactor: 1.15,
+    environmentFactor: 0.8, exposureFactor: 0.98,
+    environmentRotationY: 0, fogColor: 0x202933, fogFactor: 0.18,
+  }),
   city: Object.freeze({
     skyColor: 0xdaf0ff, groundColor: 0x6b5140,
     keyColor: 0xffe5bd, fillColor: 0xb7d3e0,

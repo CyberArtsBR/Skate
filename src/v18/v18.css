@@ -181,3 +181,5 @@
   box-shadow: 0 0 22px rgb(255 197 62 / 30%);
   transform: none;
 }
+
+.full-map-preview { display: grid; place-items: center; background: linear-gradient(145deg, #223442, #455d6b); color: #ffe184; font: 32px var(--ui-font, sans-serif); text-shadow: 2px 3px #081018; }
