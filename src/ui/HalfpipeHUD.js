@@ -36,10 +36,10 @@ export class HalfpipeHUD {
     this.scoreElement = this.root.querySelector('[data-score]');
     this.timeElement = this.root.querySelector('[data-time]');
 
-    setGraffitiText(this.root.querySelector('.hud-score > span'), 'SCORE', { palette: 'gold' });
-    setGraffitiText(this.root.querySelector('.hud-time > span'), 'TIME', { palette: 'cyan' });
-    setGraffitiText(this.scoreElement, '0', { palette: 'gold' });
-    setGraffitiText(this.timeElement, '1:15', { palette: 'gold' });
+    setGraffitiText(this.root.querySelector('.hud-score > span'), 'SCORE', { palette: 'fire' });
+    setGraffitiText(this.root.querySelector('.hud-time > span'), 'TIME', { palette: 'fire' });
+    setGraffitiText(this.scoreElement, '0', { palette: 'fire' });
+    setGraffitiText(this.timeElement, '1:15', { palette: 'fire' });
 
     this.feedback = new TrickFeedback(this.root);
     this.setPlayerMode({ highContrast, uiScale, reducedMotion });
@@ -48,7 +48,7 @@ export class HalfpipeHUD {
 
   setScore(score) {
     const label = Math.max(0, Math.round(Number(score) || 0)).toLocaleString('en-US');
-    setGraffitiText(this.scoreElement, label, { palette: 'gold' });
+    setGraffitiText(this.scoreElement, label, { palette: 'fire' });
   }
 
   setTime(time) {
@@ -56,7 +56,7 @@ export class HalfpipeHUD {
     const parts = label.split(':').map(Number);
     const seconds = parts.length === 2 ? parts[0] * 60 + parts[1] : Number(label);
     this.root.classList.toggle('is-time-low', seconds <= 10);
-    setGraffitiText(this.timeElement, label, { palette: seconds <= 10 ? 'red' : 'gold', align: 'right' });
+    setGraffitiText(this.timeElement, label, { palette: 'fire', align: 'right' });
   }
 
   setCombo(multiplier = 1) {

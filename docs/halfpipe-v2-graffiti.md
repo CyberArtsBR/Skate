@@ -19,6 +19,21 @@ Editable local source and originals are preserved in
 `artifacts/halfpipe2-baked/`: `halfpipe2-graffiti-jpg.blend`,
 `frente-graffiti.jpg`, the prior PNG edition, and original procedural bake.
 
-Run `npm run check:graffiti-ramp`, `npm run check:camera`, and
+The game camera uses a fixed 43.750442-degree vertical FOV and a 2-degree
+downward frontal angle. At 16:9, the complete structure reaches the side edges
+and its frontage reaches the bottom edge, without showing scenery underneath.
+The wider fixed lens reproduces the reference's front/back coping perspective.
+During aerials, camera and target translate together only in Y: X, Z, angle and
+FOV never change. No automatic ramp-fitting retreat or zoom is allowed. Native
+viewport aspect is retained; narrower aspect ratios crop the sides instead of
+moving the camera back.
+
+All maps share The Gym's direct lights, hemisphere colors, reflection HDRI,
+environment orientation/intensity and exposure. Original map artwork, fog and
+Japan's separately loaded sunset sky remain unchanged. SCORE/TIME labels and
+numbers use the `fire` atlas; trick name and points use `cyan`.
+
+Run `npm run check:graffiti-ramp`, `npm run check:camera`,
+`npm run check:hud-palettes`, `npm run check:map-lighting`, and
 `npm run check:presentation:browser` to verify material semantics, full-ramp
 framing, final coping glow, and full-arena replacements.

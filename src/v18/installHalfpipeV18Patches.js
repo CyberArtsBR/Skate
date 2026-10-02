@@ -3,10 +3,11 @@ import { HalfpipeAudio } from '../audio/HalfpipeAudio.js';
 import { HalfpipePumpInput } from '../input/HalfpipePumpInput.js';
 import { quality } from '../graphics/RenderQualityManager.js';
 import { MAP_IMAGES } from '../config/mapAssets.js';
+import { EquirectangularReflectionMapping } from 'three';
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import './v18.css';
 
 const BASE_ENVIRONMENT = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr';
-const CYBER_ENVIRONMENT = '/hdri/shanghai_bund_1k.hdr';
 
 export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
@@ -29,7 +30,7 @@ export const HALFPIPE_MAPS = Object.freeze([
     id: 'cyber-night',
     name: 'Cyber Night',
     imageUrl: MAP_IMAGES.cyberNight,
-    environmentUrl: CYBER_ENVIRONMENT,
+    environmentUrl: BASE_ENVIRONMENT,
     position: 'center center',
     coherence: Object.freeze({ brightness: 0.94, saturation: 1.03, contrast: 1.01, gradeOpacity: 0.24 }),
   }),
@@ -43,7 +44,10 @@ export const HALFPIPE_MAPS = Object.freeze([
     id: 'japan', name: 'Japan', kind: 'full',
     thumbnailUrl: MAP_IMAGES.japanThumbnail,
     modelUrl: '/models/arenas/japan.glb',
-    environmentUrl: '/hdri/japan-sunset-1k.exr',
+    environmentUrl: BASE_ENVIRONMENT,
+    // Keep the authored Japan sky separate from the shared Gym reflection light.
+    backgroundEnvironmentUrl: '/hdri/japan-sunset-1k.exr',
+    backgroundRotationY: 0.5,
     environmentBackground: true,
     backgroundColor: 0xb9d6e9,
   }),
@@ -66,7 +70,7 @@ export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
     id: 'space', name: 'Space',
     imageUrl: MAP_IMAGES.space,
-    environmentUrl: CYBER_ENVIRONMENT,
+    environmentUrl: BASE_ENVIRONMENT,
     position: 'center center',
     coherence: Object.freeze({ brightness: 1, saturation: 1, contrast: 1, gradeOpacity: 0.08 }),
   }),
@@ -79,6 +83,34 @@ const STORAGE = Object.freeze({
 });
 
 let installed = false;
+let mapBackgroundTexture = null;
+let mapBackgroundGeneration = 0;
+
+function replaceMapBackground(foundation, map) {
+  const generation = ++mapBackgroundGeneration;
+  // setArenaMap has already removed the previous texture from scene.background.
+  mapBackgroundTexture?.dispose();
+  mapBackgroundTexture = null;
+  if (!map.environmentBackground || !map.backgroundEnvironmentUrl) return;
+
+  // This texture is a backdrop only: it never becomes the lighting PMREM.
+  void new EXRLoader().loadAsync(map.backgroundEnvironmentUrl).then(texture => {
+    if (generation !== mapBackgroundGeneration || foundation.activeMap?.id !== map.id) {
+      texture.dispose();
+      return;
+    }
+    texture.mapping = EquirectangularReflectionMapping;
+    mapBackgroundTexture = texture;
+    foundation.setEnvironmentBackground?.(texture);
+    if (quality.scene?.backgroundRotation) {
+      quality.scene.backgroundRotation.y = map.backgroundRotationY ?? 0;
+    }
+  }).catch(error => {
+    if (generation === mapBackgroundGeneration) {
+      console.warn('[Halfpipe] Map sky load failed; retaining background color.', error);
+    }
+  });
+}
 
 const readStored = (key, fallback = 'random') => {
   try {
@@ -199,6 +231,9 @@ async function applyMapToRuntime(screen, map) {
   const state = ensureState(screen);
   if (state.applyingMap) return false;
   state.applyingMap = true;
+  // Invalidate pending sky loads before any arena/photo await. Keep an already
+  // displayed sky alive until setArenaMap has safely removed it from the scene.
+  mapBackgroundGeneration += 1;
   screen.setBusy(true, 'LOADING ' + map.name.toUpperCase() + '...');
   let loadError = '';
 
@@ -214,7 +249,8 @@ async function applyMapToRuntime(screen, map) {
       // Reflection loading is optional and must not hold arena confirmation.
       void environment.setUrl(map.environmentUrl).then(() => {
         quality.apply({ rebuildEnvironment: true });
-        if (foundation.activeMap?.id === map.id && map.environmentBackground) {
+        if (foundation.activeMap?.id === map.id && map.environmentBackground
+          && !map.backgroundEnvironmentUrl) {
           foundation.setEnvironmentBackground?.(environment.backgroundTexture);
         }
       }).catch(error => console.warn('[Halfpipe] Reflection load failed', error));
@@ -223,6 +259,7 @@ async function applyMapToRuntime(screen, map) {
     foundation.lighting?.setMapProfile?.(map.id);
 
     foundation.activeMap = map;
+    replaceMapBackground(foundation, map);
     foundation.customization ??= {};
     foundation.customization.maps = HALFPIPE_MAPS;
     foundation.customization.map = map;
@@ -317,7 +354,7 @@ function ensureMapUI(screen) {
       const preview = button.querySelector('.map-card-preview');
       preview.textContent = '3D';
       preview.classList.add('full-map-preview');
-      button.title = 'Full 3D arena · no image backdrop';
+      button.title = 'Full 3D arena Â· no image backdrop';
     } else image.src = map.thumbnailUrl || map.imageUrl;
     image.alt = map.name;
     button.querySelector('strong').textContent = map.name;

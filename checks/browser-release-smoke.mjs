@@ -116,7 +116,7 @@ for (const thumb of heroThumbs) {
 }
 
 // First validate the new map pipeline itself. Cyber Night must use the uploaded
-// image and the uploaded Shanghai HDRI, never the daytime Piazza environment.
+// image, while its 3D lighting now shares the Gym's local Piazza HDRI.
 await page.locator('.hero-card[data-hero-id="heretic"]').click();
 await page.locator('.board-swatch[data-board-color-id="original"]').click();
 await page.locator('.map-card[data-map-id="cyber-night"]').click();
@@ -134,11 +134,11 @@ const cyber = await page.evaluate(() => ({
 }));
 assert.equal(cyber.mapId, 'cyber-night');
 assert.equal(cyber.backgroundAsset, '/images/maps/cyber-night.jpg');
-assert.equal(cyber.environmentUrl, '/hdri/shanghai_bund_1k.hdr');
+assert.equal(cyber.environmentUrl, '/hdri/piazza_martin_lutero_1k.hdr');
 assert.equal(cyber.hasEnvironment, true);
 
 // Return to selection and choose a deterministic loadout for the remainder of
-// the production smoke. This also validates switching back from Cyber HDRI.
+// the production smoke. This also validates changing maps with shared Gym IBL.
 await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.flow.transitionTo('character-select'));
 await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'character-select');
 await page.locator('.hero-card[data-hero-id="commodore"]').click();

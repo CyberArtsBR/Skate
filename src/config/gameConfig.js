@@ -123,11 +123,13 @@ export const GAME_CONFIG = Object.freeze({
     landingVelocityRetention: 0.94,
   }),
   camera: Object.freeze({
-    fov: 30,
+    fov: 43.750442,
     near: 0.1,
     far: 180,
-    position: Object.freeze([0, 6.0, 32]),
-    target: Object.freeze([0, 4.0, 0]),
+    // Tight, centered frontal view: fascia reaches the desktop frame edges.
+    // Aerial tracking translates this fixed 2-degree view in Y only.
+    position: Object.freeze([0, 6.205201, 22.266473]),
+    target: Object.freeze([0, 5.427639, 0]),
     dynamicAirTracking: Object.freeze({
       enterHeight: 7.4,
       exitHeight: 6.8,
