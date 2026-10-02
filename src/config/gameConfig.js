@@ -126,16 +126,22 @@ export const GAME_CONFIG = Object.freeze({
     fov: 43.750442,
     near: 0.1,
     far: 180,
-    // Tight, centered frontal view: fascia reaches the desktop frame edges.
+    // Reference perspective, with a small fixed optical cover on each layout.
     // Aerial tracking translates this fixed 2-degree view in Y only.
     position: Object.freeze([0, 6.205201, 22.266473]),
     target: Object.freeze([0, 5.427639, 0]),
+    viewportCover: Object.freeze({
+      referenceAspect: 16 / 9,
+      // Bottom side edges are narrower than the top: cover the full frontage,
+      // plus raster/impact slack, not just its largest projected X extent.
+      scale: 1.045,
+    }),
     dynamicAirTracking: Object.freeze({
       enterHeight: 7.4,
       exitHeight: 6.8,
       maxTrackedHeight: 22,
       followRatio: 0.94,
-      maxVerticalShift: 12,
+      maxVerticalShift: 14,
       riseResponse: 7.0,
       fallResponse: 6.0,
     }),

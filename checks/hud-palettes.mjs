@@ -65,7 +65,7 @@ feedback._show = () => { feedback.trick.hidden = false; };
 draws.length = 0;
 feedback.showTrick('fakie-aerial-540', 1421);
 assert.deepEqual(draws.map(({ text, palette }) => [text, palette]), [
-  ['FAKIE AERIAL 540°', 'cyan'], ['+1,421', 'cyan'],
+  ['FAKIE AERIAL 540°', 'green'], ['+1,421', 'green'],
 ]);
 assert.equal(draws[0].element, name);
 assert.equal(draws[1].element, points);
@@ -74,4 +74,4 @@ assert.equal(draws[0].maxLines, 2);
 assert.equal(feedback.landing.hidden, true);
 assert.equal(feedback.status.hidden, true);
 
-console.log('HUD palettes passed: SCORE/TIME fire, trick name/score cyan, including low time.');
+console.log('HUD palettes passed: SCORE/TIME fire, trick name/score green, including low time.');

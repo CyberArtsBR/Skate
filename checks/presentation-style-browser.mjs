@@ -96,7 +96,8 @@ try {
           right: Math.max(...projected.map(p => p[0])),
           bottom: Math.min(...projected.map(p => p[1])),
           top: Math.max(...projected.map(p => p[1])) },
-        insideFrame: projected.every(p => Math.abs(p[0]) <= 1.001 && Math.abs(p[1]) <= 1.001) });
+        coversSides: Math.min(...projected.map(p => p[0])) < -1.02
+          && Math.max(...projected.map(p => p[0])) > 1.02 });
     });
     return fronts;
   });
@@ -104,11 +105,9 @@ try {
   assert.equal(graffiti[0].metalness, 0, 'paint must remain nonmetallic in the game');
   assert.ok(graffiti[0].texture && graffiti[0].uv === 1);
   assert.equal(graffiti[0].reflectiveOverride, false);
-  assert.ok(graffiti[0].insideFrame, 'the complete graffiti front must fit the game camera');
-  assert.ok(graffiti[0].bounds.left < -.99 && graffiti[0].bounds.right > .99,
-    'tight desktop composition must not leave broad side margins');
-  assert.ok(Math.abs(graffiti[0].bounds.bottom + 1) < .002,
-    'ramp frontage must meet the bottom edge, with no scenery below');
+  assert.ok(graffiti[0].coversSides, 'painted front must overscan the screen, not nearly fit inside it');
+  assert.ok(graffiti[0].bounds.bottom < -1.02,
+    'ramp frontage must cover the bottom with slack for impacts');
   const hud = {};
   for (const selector of ['.hud-score > span', '[data-score]', '.hud-time > span', '[data-time]',
     '.trick-award-name', '[data-trick-feedback] > span']) {
@@ -116,7 +115,7 @@ try {
     assert.equal(hud[selector].background, 'rgba(0, 0, 0, 0)', selector);
     assert.ok(hud[selector].opaque > 30 && hud[selector].transparent > 30, selector);
     assert.equal(hud[selector].palette, selector.startsWith('.trick-')
-      || selector.startsWith('[data-trick-') ? 'cyan' : 'fire', selector);
+      || selector.startsWith('[data-trick-') ? 'green' : 'fire', selector);
   }
   assert.equal(hud['[data-score]'].text, '3,217');
   assert.equal(hud['[data-time]'].text, '0:37');
@@ -243,7 +242,7 @@ try {
   }
   assert.equal(await page.locator('[data-time]').textContent(), '0:09');
   assert.equal((await inspectText('[data-time]')).palette, 'fire', 'low time keeps the requested palette');
-  assert.equal((await inspectText('.trick-award-name')).palette, 'cyan');
+  assert.equal((await inspectText('.trick-award-name')).palette, 'green');
   await page.screenshot({ path: path.join(output, 'graffiti-hud-small-screen.png') });
 
   await page.setViewportSize({ width: 1600, height: 900 });

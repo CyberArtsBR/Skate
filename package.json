@@ -27,6 +27,7 @@
     "check:session": "node checks/session.mjs",
     "check:controller": "node checks/controller-input.mjs",
     "check:camera": "node checks/camera-framing.mjs",
+    "check:ramp-edges:browser": "node checks/ramp-edge-cover-browser.mjs",
     "check:hud-palettes": "node checks/hud-palettes.mjs",
     "check:map-lighting": "node checks/map-lighting.mjs",
     "check:tricks": "node checks/trick-presentation.mjs",

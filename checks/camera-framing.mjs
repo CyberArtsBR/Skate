@@ -8,9 +8,13 @@ import { GAME_CONFIG } from '../src/config/gameConfig.js';
 
 const camera = new HalfpipeCamera();
 const base = camera.snapshot();
+const expectedBaseFov = THREE.MathUtils.radToDeg(2 * Math.atan(
+  Math.tan(THREE.MathUtils.degToRad(GAME_CONFIG.camera.fov) / 2)
+    / GAME_CONFIG.camera.viewportCover.scale,
+));
 
 assert.equal(base.dynamicActive, false);
-assert.equal(base.fov, GAME_CONFIG.camera.fov);
+assert.equal(base.fov, expectedBaseFov);
 assert.equal(base.targetY, GAME_CONFIG.camera.target[1]);
 assert.equal(base.verticalShift, 0);
 
@@ -26,7 +30,7 @@ assert.ok(
 );
 assert.equal(
   high.fov,
-  GAME_CONFIG.camera.fov,
+  base.fov,
   'high-air tracking must never widen or narrow the FOV',
 );
 assert.ok(
@@ -53,7 +57,7 @@ const descending = camera.snapshot();
 assert.equal(descending.dynamicActive, false);
 assert.equal(
   descending.fov,
-  GAME_CONFIG.camera.fov,
+  base.fov,
   'descending must keep the original FOV',
 );
 assert.ok(
@@ -66,7 +70,7 @@ assert.ok(
 );
 
 const reset = camera.resetDynamic();
-assert.equal(reset.fov, GAME_CONFIG.camera.fov);
+assert.equal(reset.fov, base.fov);
 assert.equal(reset.targetY, GAME_CONFIG.camera.target[1]);
 assert.equal(reset.position[1], GAME_CONFIG.camera.position[1]);
 assert.equal(reset.dynamicAmount, 0);
@@ -135,23 +139,30 @@ assert.ok(Math.abs(copingPerspective.backToFrontRatio - .46) < .01,
   `fixed lens must match the reference's stronger front/back coping perspective: ${copingPerspective.backToFrontRatio}`);
 assert.ok(copingPerspective.frontY > copingPerspective.backY,
   'the low front angle must put the near coping above the far coping, like the reference');
-assert.ok(desktopFrame.frontLeft < -.99 && desktopFrame.frontLeft >= -1.001,
-  `desktop graffiti left edge must nearly touch screen edge, not leave a side margin: ${desktopFrame.frontLeft}`);
-assert.ok(desktopFrame.frontRight > .99 && desktopFrame.frontRight <= 1.001,
-  `desktop graffiti right edge must nearly touch screen edge, not leave a side margin: ${desktopFrame.frontRight}`);
-assert.ok(Math.abs(desktopFrame.bottom + 1) < .002,
-  `desktop ramp bottom must touch the screen bottom, without under-ramp scenery: ${desktopFrame.bottom}`);
-for (const point of projectedStructure) {
-  assert.ok(Math.abs(point.x) <= 1.001 && Math.abs(point.y) <= 1.001,
-    'tight desktop base frame must still contain the complete structure');
+assert.ok(desktopFrame.frontLeft < -1.02 && desktopFrame.frontRight > 1.02,
+  'painted frontage must overscan both sides instead of leaving even a thin gap');
+assert.ok(desktopFrame.bottom < -1.02,
+  `ramp frontage needs bottom slack for landing impacts: ${desktopFrame.bottom}`);
+assert.ok(desktopFrame.top < 1, 'top of the structure must remain visible');
+
+// The limiting outer side is the bottom, not the much wider-looking top.
+// Check every authored side point, then repeat for every viewport below.
+const outerX = Math.max(...frontFace.map(point => Math.abs(point.x)));
+const sidePoints = frontFace.filter(point => Math.abs(Math.abs(point.x) - outerX) < .001);
+assert.ok(sidePoints.length >= 4, 'inspect both painted outer front edges');
+for (const point of sidePoints) {
+  const projected = point.clone().project(camera.camera);
+  assert.ok(Math.abs(projected.x) > 1.02,
+    `every height of the side edge must overscan, including the bottom: ${projected.x}`);
 }
 assert.ok(new THREE.Vector3(0, -.1, frontZ).project(camera.camera).y < -1,
   'the area immediately underneath the ramp must be below the desktop view');
 
-// Native aspect may crop the sides on narrower screens, but resize must not
-// retreat, widen the FOV, or change the physical camera. Aerial follow likewise
-// moves only Y; retaining the floor during a high air is deliberately not a goal.
-const viewports = [[1920, 1080], [2560, 1080], [640, 400], [800, 600], [720, 720], [360, 640]];
+// The layout resolves a uniform optical cover once per viewport. Native aspect
+// is not stretched; after layout the lens and physical X/Z are locked for every
+// aerial and impact. Keeping the floor during a high air is not a goal.
+const viewports = [[1920, 1080], [2879, 1613], [2879, 1216], [2560, 1080],
+  [640, 400], [800, 600], [720, 720], [360, 640]];
 const frames = [];
 for (const [width, height] of viewports) {
   const controller = new HalfpipeCamera();
@@ -159,8 +170,14 @@ for (const [width, height] of viewports) {
   controller.resize(width, height);
   assert.deepEqual(controller.camera.position.toArray(), initialPosition,
     'viewport resize must not dolly or change camera position');
-  assert.equal(controller.camera.fov, GAME_CONFIG.camera.fov,
-    'viewport resize must not change the fixed field of view');
+  const layoutFov = controller.camera.fov;
+  assert.ok(layoutFov <= expectedBaseFov, 'wide viewports need cover instead of side gaps');
+  controller.camera.updateMatrixWorld(true);
+  for (const point of sidePoints) {
+    const projected = point.clone().project(controller.camera);
+    assert.ok(Math.abs(projected.x) > 1.02,
+      `${width}x${height}: the complete painted side edge must cover the screen`);
+  }
   for (const state of [
     { y: 0, airborne: false },
     { y: 6.62, airborne: false },
@@ -174,7 +191,7 @@ for (const [width, height] of viewports) {
       assert.equal(controller.camera.position.x, GAME_CONFIG.camera.position[0]);
       assert.equal(controller.camera.position.z, GAME_CONFIG.camera.position[2],
         'no frame of an aerial or landing may move the camera backward');
-      assert.equal(controller.camera.fov, GAME_CONFIG.camera.fov);
+      assert.equal(controller.camera.fov, layoutFov, 'flight must never change the viewport lens');
     }
     controller.addImpact({ strength: 0.45, duration: 0.18 });
     controller.updateForRider(state, 0.03);

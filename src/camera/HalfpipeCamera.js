@@ -10,11 +10,21 @@ function damp(current, target, response, dt) {
   return THREE.MathUtils.lerp(current, target, t);
 }
 
+function viewportFov(config, aspect) {
+  const cover = config.viewportCover;
+  if (!cover) return config.fov;
+  const scale = cover.scale * Math.max(1, aspect / cover.referenceAspect);
+  return THREE.MathUtils.radToDeg(2 * Math.atan(
+    Math.tan(THREE.MathUtils.degToRad(config.fov) / 2) / scale,
+  ));
+}
+
 export class HalfpipeCamera {
   constructor({ reducedMotion = false } = {}) {
     const config = GAME_CONFIG.camera;
     this.config = config;
     this.camera = new THREE.PerspectiveCamera(config.fov, 16 / 9, config.near, config.far);
+    this.viewportFov = viewportFov(config, this.camera.aspect);
     this.camera.name = 'halfpipe-camera';
     this.camera.position.fromArray(config.position);
     this.basePosition = new THREE.Vector3().fromArray(config.position);
@@ -35,8 +45,11 @@ export class HalfpipeCamera {
 
   resize(width, height) {
     this.camera.aspect = Math.max(1, width) / Math.max(1, height);
-    // A different viewport changes only the projection's native aspect, never
-    // the camera distance or its tightly framed desktop composition.
+    // Resolve an undistorted, uniform cover only when the viewport changes.
+    // This lens then stays locked during every aerial/impact at this size.
+    // Never move X/Z or derive the cover from rider height.
+    this.viewportFov = viewportFov(this.config, this.camera.aspect);
+    this.camera.fov = this.viewportFov;
     this.camera.updateProjectionMatrix();
   }
 
@@ -170,7 +183,7 @@ export class HalfpipeCamera {
   }
 
   _composeCamera() {
-    this.camera.fov = this.config.fov;
+    this.camera.fov = this.viewportFov;
     this._composedOffset.set(0, this.verticalShift, 0).add(this.impactOffset);
     this.camera.position.copy(this.basePosition).add(this._composedOffset);
     this.target.copy(this.baseTarget).add(this._composedOffset);

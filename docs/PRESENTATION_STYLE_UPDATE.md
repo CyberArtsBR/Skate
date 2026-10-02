@@ -8,7 +8,7 @@ The five alphabet sheets supplied by the owner are rendered as bitmap glyphs. Th
 
 - SCORE and score numbers: yellow/red (`fire`).
 - TIME label and time numbers: yellow/red (`fire`), including the final ten seconds.
-- Trick name and trick points: blue/purple (`cyan`).
+- Trick name and trick points: green (`green`), per the latest owner request.
 - Press to Start: yellow-to-red.
 - Congratulations: green; other podium messages retain their gold/red rank distinction.
 - Final score, best trick and podium score numbers also use the supplied artwork.
@@ -36,6 +36,7 @@ npm run check:camera
 npm run check:hud-palettes
 npm run check:map-lighting
 npm run check:presentation:browser
+npm run check:ramp-edges:browser
 ```
 
 The browser check requires a running local Vite server (default `http://localhost:5173`, overridable with `HALFPIPE_PREVIEW_URL`). It exercises the real title, selection, start prompt, HUD updates, low timer, responsive/high-contrast UI, rendered character poses, results, winners podium and full 3D arenas. Captures and numerical evidence are saved under `artifacts/presentation-style/`.
@@ -44,11 +45,43 @@ The ten-rider geometric test checks the actual shipped skeletons at different fa
 
 Two older gameplay checks already fail on unmodified `9bec11c`: `trick-presentation.mjs` at line 165 (Hand Plant eligibility below the coping), and `v9-gameplay-regressions.mjs` at line 192 (pumping amplitude recovery). The same failures were reproduced using a separate `git archive HEAD src checks` snapshot under `artifacts/head-baseline-9bec11c-air-pose/`. These presentation changes do not repair those earlier gameplay assertions.
 
-The corrected camera/HUD/light browser check passed on Space, The Gym and
-Japan. It verifies side/bottom framing against the actual graffiti mesh,
+The camera/HUD/light browser check for the earlier `5ed1bf4` correction passed
+on Space, The Gym and Japan. It verified global side/bottom mesh extents,
 fixed X/Z/FOV and constant apparent scale through 10/14/18/22 m aerial tracking,
 the requested six font palettes, and the composed Gym lights on all eight maps.
 Japan's sunset background remains a separate texture at its original rotation.
+Those historical passes did not prove full-height fascia coverage: the global
+horizontal extent came from the upper edge, while the lower outer edge remained
+inside the viewport and exposed thin background gutters.
+
+## Side-gutter camera correction
+
+The reference camera angle remains 2 degrees, with physical X/Z unchanged and
+vertical-only camera/target following. The reference lens is 43.750442 degrees;
+`viewportCover` uses reference aspect 16:9 and scale 1.045, producing an effective
+42.034138-degree vertical FOV at 16:9. The uniform cover crop also compensates for
+wider viewport ratios without stretching the scene or adding geometry masks.
+The effective lens is recomputed only on resize and stays locked during every
+flight; no airborne dolly, retreat or rider-dependent lens change is introduced.
+The Y-follow cap is 14 m, preserving high-air visibility with the tighter wide
+projection. Lighting, HUD palettes, ramp geometry and physics are unchanged by
+this side-gutter correction.
+
+The new `npm run check:ramp-edges:browser` checks horizontal slices through the
+actual projected graffiti-fascia triangles, including the narrower lower outer
+edge and a rasterization margin. Its five viewport sizes are 1600 x 900,
+2879 x 1613, 2879 x 1216, 2560 x 1080 and 640 x 400. It also checks fixed
+X/Z and viewport-locked lens/apparent scale through aerial following. Evidence
+and captures are written to `artifacts/ramp-edge-cover/`. The check passed on the
+production build at all five sizes with no browser errors. The minimum measured
+side overscan was 0.0237 NDC, exceeding the 0.015 rasterization margin. X/Z, FOV,
+orientation and apparent scale remain fixed at 10/18/22 m in each viewport.
+The 2879 x 1613 and 2879 x 1216 base captures were visually reviewed, confirming
+paint reaches both viewport edges without outside-fascia background gutters.
+
+The full presentation browser check also passed on the final production build,
+including the green trick name and green trick points, with no JavaScript,
+shader or asset errors.
 
 `check:static` still reports two pre-existing release-contract mismatches:
 its old approved-background path and single-material coping regex. Both were

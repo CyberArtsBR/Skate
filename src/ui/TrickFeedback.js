@@ -41,9 +41,9 @@ export class TrickFeedback {
       + pointsLabel + detailLabel, duration, 'is-trick',
       Number(points) > 0 ? 'good' : 'ok');
     this.trick.classList.toggle('is-long-name', formatTrickName(name).length > 28);
-    setGraffitiText(this.trick.querySelector('.trick-award-name'), formatTrickName(name), { palette: 'cyan', wrap: true, maxLines: 2 });
+    setGraffitiText(this.trick.querySelector('.trick-award-name'), formatTrickName(name), { palette: 'green', wrap: true, maxLines: 2 });
     const awardScore = this.trick.querySelector(':scope > span');
-    if (awardScore) setGraffitiText(awardScore, awardScore.textContent, { palette: 'cyan' });
+    if (awardScore) setGraffitiText(awardScore, awardScore.textContent, { palette: 'green' });
     this._hide(this.status);
     this._hide(this.landing);
     // Event order can differ by maneuver: join the touchdown and its banked
