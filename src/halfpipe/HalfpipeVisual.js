@@ -11,13 +11,12 @@ const COPING_MATERIAL_NAME = 'Rail_Metal';
 // The shipped GLB replaced the legacy rail material name. Resolve its authored
 // mesh AND parent so an unrelated generic Material.002 is never a contact rail.
 function isCopingMaterial(material, mesh) {
-  if ((mesh.parent?.userData?.halfpipeSourceNodeName || mesh.parent?.name) !== 'halfpipe-coping.002_2'
-    && mesh.parent?.name !== THREE.PropertyBinding.sanitizeNodeName('halfpipe-coping.002_2')) return false;
+  if (!/^halfpipe-coping\.002_2(?:\.\d+)?$/.test(mesh.parent?.userData?.halfpipeSourceNodeName || mesh.parent?.name || '')) return false;
   if (material?.name === COPING_MATERIAL_NAME) return true;
   return (mesh?.name === 'Object_8'
     || /^Object_8(?:\.\d+)?$/.test(mesh.userData.halfpipeSourceNodeName || ''))
-    && mesh.userData.halfpipeSourceMeshName === 'Object_2'
-    && (material?.name === 'Material.002'
+    && /^Object_2(?:\.\d+)?$/.test(mesh.userData.halfpipeSourceMeshName || '')
+    && (material?.name === 'Material.002' || material?.name === 'Material.003'
       || material?.userData?.halfpipeRole === 'coping');
 }
 
@@ -341,6 +340,27 @@ export class HalfpipeVisual {
       const sourceNode = gltf.parser?.json?.nodes?.[association?.nodes];
       if (sourceNode?.name) object.userData.halfpipeSourceNodeName = sourceNode.name;
     });
+    // Full arenas retain their scenery/animations, but never render the embedded
+    // v1 ramp. Import the same v2 asset used by the photographic maps.
+    if (this.fullMap) {
+      let embeddedRamp = null;
+      this.model.traverse(object => {
+        if (object.userData.halfpipeSourceNodeName === 'halfpipe.001_Baked_0') embeddedRamp = object;
+      });
+      const embeddedGroup = embeddedRamp?.parent?.parent?.parent;
+      if (!embeddedGroup) throw new Error('Full map is missing its embedded ramp group.');
+      embeddedGroup.visible = false;
+      const replacement = await new GLTFLoader().loadAsync(GAME_CONFIG.assets.halfpipe);
+      this.replacementRamp = replacement.scene;
+      this.replacementRamp.traverse(object => {
+        const association = replacement.parser.associations.get(object);
+        const node = replacement.parser.json.nodes?.[association?.nodes];
+        const mesh = replacement.parser.json.meshes?.[association?.meshes];
+        if (node?.name) object.userData.halfpipeSourceNodeName = node.name;
+        if (mesh?.name) object.userData.halfpipeSourceMeshName = mesh.name;
+      });
+      this.model.add(this.replacementRamp);
+    }
     this.model.name = 'halfpipe-source-visual';
     const paintMask = await new THREE.TextureLoader()
       .loadAsync('/images/materials/halfpipe-paint-mask.png')
@@ -352,6 +372,7 @@ export class HalfpipeVisual {
         this.hiddenGroundNodes.push(object.name);
       }
       if (object.isMesh && !object.userData?.visualGlowOnly) {
+        if (!isVisibleInHierarchy(object)) return;
         const association = gltf.parser?.associations?.get(object);
         const sourceMesh = gltf.parser?.json?.meshes?.[association?.meshes];
         if (sourceMesh?.name) object.userData.halfpipeSourceMeshName = sourceMesh.name;
@@ -369,7 +390,7 @@ export class HalfpipeVisual {
         // The current shipped GLB splits Object_4 into named material meshes.
         // Retain the legacy audit match, and recognize its actual FRENTE face.
         const isCurrentFront = object.name.startsWith('Object_4_')
-          && sourceMaterials.some(material => material?.name === 'FRENTE');
+          && sourceMaterials.some(material => /^FRENTE(?:\.\d+)?$/.test(material?.name || ''));
         let preparedMaterials = sourceMaterials;
 
         if (
@@ -378,7 +399,7 @@ export class HalfpipeVisual {
           || isCurrentFront
         ) {
           preparedMaterials = sourceMaterials.map((material) => {
-            if (material?.name !== frontMetal.materialName && material?.name !== 'FRENTE') return material;
+            if (material?.name !== frontMetal.materialName && !/^FRENTE(?:\.\d+)?$/.test(material?.name || '')) return material;
 
             // V9 audit maps Material -> source mesh Object_0 -> runtime node
             // Object_4 uniquely. Preserve authored roughness/maps exactly and
@@ -417,22 +438,15 @@ export class HalfpipeVisual {
     this.root.add(this.model);
     this.root.updateWorldMatrix(true, true);
 
-    let authoredRamp = null;
-    if (this.fullMap) this.model.traverse(object => {
-      if (object.userData.halfpipeSourceNodeName === 'halfpipe.001_Baked_0'
-        || object.name === THREE.PropertyBinding.sanitizeNodeName('halfpipe.001_Baked_0')) {
-        authoredRamp = object;
-      }
-    });
     const alignmentRoot = this.fullMap
-      ? authoredRamp?.parent?.parent?.parent
+      ? this.replacementRamp
       : this.root;
     if (!alignmentRoot) throw new Error('Full map is missing its authored halfpipe.');
     const fullBoxBeforeAlignment = visibleBounds(alignmentRoot);
     const fullCenter = fullBoxBeforeAlignment.getCenter(new THREE.Vector3());
     const authoredPositionX = this.model.position.x;
 
-    this.ridingSurface = findRidingSurface(this.fullMap ? authoredRamp : this.model);
+    this.ridingSurface = findRidingSurface(this.replacementRamp || this.model);
     if (!this.ridingSurface) {
       throw new Error('Halfpipe riding surface could not be identified for visual alignment.');
     }

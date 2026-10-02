@@ -6,7 +6,7 @@ const RIDER_VISUAL_SCALE = 1.2;
 
 export const GAME_CONFIG = Object.freeze({
   assets: Object.freeze({
-    halfpipe: '/models/halfpipe/halfpipe.glb',
+    halfpipe: '/models/halfpipe/halfpipe2.glb',
     skateboard: '/models/skateboard/skateboard.glb',
     chimpion: '/models/characters/The%20Heretic.glb',
     background: MAP_IMAGES.city,

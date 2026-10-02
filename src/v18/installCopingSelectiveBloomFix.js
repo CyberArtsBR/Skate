@@ -42,7 +42,7 @@ function createPhysicalCopingMaterial(source) {
     name: `${source?.name || 'Rail_Metal'}-physical-emissive`,
     color: ARCADE_FEEDBACK.copingSourceColor,
     emissive: ARCADE_FEEDBACK.copingGlowColor,
-    emissiveIntensity: 1.15,
+    emissiveIntensity: 3,
     metalness: 0.58,
     roughness: 0.28,
     side: source?.side ?? THREE.FrontSide,
