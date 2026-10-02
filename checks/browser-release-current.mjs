@@ -76,13 +76,13 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.hero-card').length >= 11);
 
   const selection = await page.evaluate(() => {
-    const foundation = window.__HALFPIPE_FOUNDATION__;
+    const mapIds = Array.from(document.querySelectorAll('.map-card'), (node) => node.dataset.mapId || '');
     return {
       heroCards: document.querySelectorAll('.hero-card').length,
       heroImages: document.querySelectorAll('.hero-card-image').length,
       boardSwatches: document.querySelectorAll('.board-swatch').length,
-      mapCards: document.querySelectorAll('.map-card').length,
-      runtimeMaps: foundation.customization?.maps?.length || 0,
+      mapCards: mapIds.length,
+      mapIds,
       randomHero: Boolean(document.querySelector('.hero-card[data-hero-id="random"].is-selected')),
       randomBoard: Boolean(document.querySelector('.board-swatch[data-board-color-id="random"].is-selected')),
       randomMap: Boolean(document.querySelector('.map-card[data-map-id="random"].is-selected')),
@@ -92,8 +92,10 @@ try {
   assert.equal(selection.heroCards, 11, 'Random + 10 production riders must be visible');
   assert.equal(selection.heroImages, 10, 'only production riders should use animated thumbnails');
   assert.equal(selection.boardSwatches, 10, 'Random + 9 skateboard colors must be visible');
-  assert.ok(selection.runtimeMaps >= 1, 'runtime map catalog must be exposed');
-  assert.equal(selection.mapCards, selection.runtimeMaps + 1, 'map UI must match runtime map catalog plus Random');
+  assert.ok(selection.mapCards >= 2, 'map UI must expose Random plus production maps');
+  assert.equal(new Set(selection.mapIds).size, selection.mapIds.length, 'map IDs must be unique');
+  assert.ok(selection.mapIds.includes('random'), 'Random map option must remain available');
+  assert.ok(selection.mapIds.includes('city'), 'City map must remain available');
   assert.equal(selection.randomHero, true);
   assert.equal(selection.randomBoard, true);
   assert.equal(selection.randomMap, true);
@@ -115,6 +117,7 @@ try {
       boardColorId: foundation.customization.boardColorId,
       mapId: foundation.activeMap?.id,
       mapImageUrl: foundation.activeMap?.imageUrl || '',
+      runtimeMapIds: Array.from(foundation.customization.maps || [], (map) => map.id),
       backgroundAsset: foundation.background.element.dataset.assetUrl,
       rigValid: Boolean(foundation.rider.chimpion.rigAdapter.valid),
       halfpipeLoaded: Boolean(foundation.halfpipe?.model),
@@ -123,6 +126,12 @@ try {
   assert.equal(customization.riderId, 'heretic');
   assert.equal(customization.boardColorId, 'original');
   assert.equal(customization.mapId, 'city');
+  assert.ok(customization.runtimeMapIds.includes('city'));
+  assert.deepEqual(
+    selection.mapIds.filter((id) => id !== 'random').sort(),
+    [...customization.runtimeMapIds].sort(),
+    'map UI and runtime map catalog must stay synchronized',
+  );
   assert.equal(assetPath(customization.backgroundAsset), assetPath(customization.mapImageUrl));
   assert.equal(customization.rigValid, true);
   assert.equal(customization.halfpipeLoaded, true);
