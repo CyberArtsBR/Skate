@@ -41,7 +41,8 @@ export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
     id: 'japan', name: 'Japan', kind: 'full',
     modelUrl: '/models/arenas/japan.glb',
-    environmentUrl: CYBER_ENVIRONMENT,
+    environmentUrl: BASE_ENVIRONMENT,
+    backgroundColor: 0xb9d6e9,
   }),
 ]);
 

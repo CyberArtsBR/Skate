@@ -10,12 +10,12 @@ export const MAP_LIGHTING_PROFILES = Object.freeze({
     environmentRotationY: 0, fogColor: 0x202933, fogFactor: 0.18,
   }),
   japan: Object.freeze({
-    skyColor: 0x9faed8, groundColor: 0x414157,
-    keyColor: 0xdde7ff, fillColor: 0xa9c9f0,
+    skyColor: 0xd8eaf5, groundColor: 0x8a7867,
+    keyColor: 0xffead1, fillColor: 0xc6dff2,
     keyPosition: [-12, 18, 12], fillPosition: [12, 10, -8],
-    hemisphereFactor: 0.65, keyFactor: 0.65, fillFactor: 1.1,
-    environmentFactor: 0.8, exposureFactor: 0.98,
-    environmentRotationY: 0.5, fogColor: 0x101626, fogFactor: 0.12,
+    hemisphereFactor: 1.05, keyFactor: 0.95, fillFactor: 1.2,
+    environmentFactor: 1, exposureFactor: 1,
+    environmentRotationY: 0.5, fogColor: 0xb9d6e9, fogFactor: 0.12,
   }),
   city: Object.freeze({
     skyColor: 0xdaf0ff, groundColor: 0x6b5140,

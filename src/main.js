@@ -647,7 +647,7 @@ async function setArenaMap(map) {
   parkForeground.root.visible = !fullMap;
   ground.ground.visible = !fullMap;
   background.element.hidden = fullMap;
-  scene.background = fullMap ? new THREE.Color(0x202933) : null;
+  scene.background = fullMap ? new THREE.Color(map.backgroundColor ?? 0x202933) : null;
 }
 
 function setMapPresentation(mapId) {
