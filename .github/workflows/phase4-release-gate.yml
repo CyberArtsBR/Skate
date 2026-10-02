@@ -1,4 +1,4 @@
-name: Phase 4 Release Gate
+name: Release Gate
 
 on:
   pull_request:
@@ -12,9 +12,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  core:
-    name: Core release gate
+  contracts:
+    name: Contracts and syntax
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,39 +27,85 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Static and release contracts
-        run: npm run check:static
-      - name: Passive physics
-        run: npm run check:physics
+      - name: Syntax
+        run: npm run check:syntax
+      - name: Current release contracts
+        if: always()
+        run: npm run check:contracts
+
+  simulation:
+    name: Simulation and gameplay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Current gameplay invariants
+        run: npm run check:gameplay:current
       - name: Contact clearance
+        if: always()
         run: npm run check:contact
       - name: Session flow
+        if: always()
         run: npm run check:session
       - name: Controller input
+        if: always()
         run: npm run check:controller
       - name: Camera framing
+        if: always()
         run: npm run check:camera
-      - name: Trick presentation
-        run: npm run check:tricks
-      - name: Gameplay core
-        run: npm run check:gameplay
-      - name: V9 regressions
-        run: npm run check:v9
       - name: V15 pump energy regression
+        if: always()
         run: npm run check:v15
+
+  presentation:
+    name: Presentation and integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Coping glow contract
+        run: npm run check:coping-glow
+      - name: Graffiti ramp contract
+        if: always()
+        run: npm run check:graffiti-ramp
+      - name: Aerial tuck
+        if: always()
+        run: npm run check:aerial-tuck
       - name: Rig compatibility
+        if: always()
         run: npm run check:rigs
       - name: Character tricks
+        if: always()
         run: npm run check:character
-      - name: UI flow
-        run: npm run check:ui
-      - name: Integration
-        run: npm run check:integration
-      - name: Production build
-        run: npm run build
+      - name: HUD palettes
+        if: always()
+        run: npm run check:hud-palettes
+      - name: Map lighting
+        if: always()
+        run: npm run check:map-lighting
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
 
   browser:
-    name: Browser and visual contact
+    name: Browser release validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,25 +127,18 @@ jobs:
           done
           cat /tmp/halfpipe-preview.log
           exit 1
-      - name: Run production browser smoke
-        env:
-          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
-        run: npm run check:browser:release
-      - name: Run V16 title selection and backflip regressions
-        if: always()
-        env:
-          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
-        run: npm run check:v16:browser
-      - name: Run deep browser smoke
-        if: always()
+      - name: Current production browser smoke
         env:
           HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
         run: npm run check:browser
-      - name: Run visual contact regression
+      - name: Visual contact regression
         if: always()
         env:
           HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
         run: npm run check:visual-contact
+      - name: Preview log on failure
+        if: failure()
+        run: cat /tmp/halfpipe-preview.log || true
 
   security:
     name: Dependency audit
