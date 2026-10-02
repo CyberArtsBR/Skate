@@ -647,6 +647,7 @@ async function setArenaMap(map) {
   parkForeground.root.visible = !fullMap;
   ground.ground.visible = !fullMap;
   background.element.hidden = fullMap;
+  renderer.setClearAlpha(fullMap ? 1 : 0);
   scene.background = fullMap ? new THREE.Color(map.backgroundColor ?? 0x202933) : null;
 }
 
@@ -1206,6 +1207,14 @@ async function bootstrap() {
     lighting,
     setMapPresentation,
     setArenaMap,
+    setEnvironmentBackground(texture) {
+      if (!texture) return;
+      scene.background = texture;
+      scene.backgroundIntensity = 1;
+      scene.backgroundBlurriness = 0;
+      scene.backgroundRotation.y = scene.environmentRotation.y;
+      renderer.setClearAlpha(1);
+    },
     recoverWebGL,
   };
 }

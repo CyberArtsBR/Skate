@@ -41,7 +41,8 @@ export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
     id: 'japan', name: 'Japan', kind: 'full',
     modelUrl: '/models/arenas/japan.glb',
-    environmentUrl: BASE_ENVIRONMENT,
+    environmentUrl: '/hdri/japan-sunset-1k.exr',
+    environmentBackground: true,
     backgroundColor: 0xb9d6e9,
   }),
 ]);
@@ -184,6 +185,9 @@ async function applyMapToRuntime(screen, map) {
       // Reflection loading is optional and must not hold arena confirmation.
       void environment.setUrl(map.environmentUrl).then(() => {
         quality.apply({ rebuildEnvironment: true });
+        if (foundation.activeMap?.id === map.id && map.environmentBackground) {
+          foundation.setEnvironmentBackground?.(environment.backgroundTexture);
+        }
       }).catch(error => console.warn('[Halfpipe] Reflection load failed', error));
     }
 
