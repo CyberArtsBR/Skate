@@ -45,6 +45,9 @@ jobs:
       - run: npm ci
       - name: Current gameplay invariants
         run: npm run check:gameplay:current
+      - name: Phase 3 decomposition boundary
+        if: always()
+        run: npm run check:phase3
       - name: Contact clearance
         if: always()
         run: npm run check:contact
