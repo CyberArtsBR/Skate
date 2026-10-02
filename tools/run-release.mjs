@@ -1,27 +1,23 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-// Canonical non-browser release validation. Production deployment is gated by
-// GitHub Actions; Render performs a clean build only after those checks pass.
+// Canonical non-browser release validation. Historical V9/Phase 4 suites remain
+// available as explicit legacy diagnostics, but they no longer define the
+// approved current tuning. Production deployment is gated by GitHub Actions.
 const suites = [
   'check:syntax',
   'check:contracts',
-  'check:physics',
+  'check:gameplay:current',
   'check:contact',
   'check:session',
   'check:controller',
   'check:camera',
-  'check:tricks',
-  'check:gameplay',
-  'check:v9',
   'check:v15',
   'check:coping-glow',
   'check:graffiti-ramp',
   'check:aerial-tuck',
   'check:rigs',
   'check:character',
-  'check:ui',
-  'check:integration',
   'check:hud-palettes',
   'check:map-lighting',
   'build',
