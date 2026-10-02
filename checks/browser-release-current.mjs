@@ -193,9 +193,12 @@ try {
 
   const runStart = await page.evaluate(() => window.__HALFPIPE_FOUNDATION__.session.snapshot());
   await page.waitForFunction(
-    (remaining) => window.__HALFPIPE_FOUNDATION__.session.snapshot().remaining < remaining,
-    runStart.remaining,
-    { timeout: 2500 },
+    ({ elapsed }) => {
+      const session = window.__HALFPIPE_FOUNDATION__.session.snapshot();
+      return session.phase === 'running' && session.elapsed > elapsed + 0.05;
+    },
+    { elapsed: runStart.elapsed },
+    { timeout: 10000, polling: 100 },
   );
 
   await page.keyboard.press('KeyP');
