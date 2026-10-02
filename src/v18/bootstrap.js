@@ -4,6 +4,7 @@ import { installHalfpipeV9RuntimePatches } from '../v9/installHalfpipeV9RuntimeP
 import { installHalfpipeV16Patches } from '../v16/installHalfpipeV16Patches.js';
 import { installCyberEnvironmentRedirect } from './installCyberEnvironmentRedirect.js';
 import { installHalfpipeV18Patches } from './installHalfpipeV18Patches.js';
+import { installCopingSelectiveBloomFix } from './installCopingSelectiveBloomFix.js';
 
 // V18 starts every fresh game load with all three customization axes on Random.
 // Choices still remain stable while the current page/session is running.
@@ -19,4 +20,5 @@ installHalfpipeV9RuntimePatches();
 installHalfpipeV16Patches();
 installCyberEnvironmentRedirect();
 installHalfpipeV18Patches();
+installCopingSelectiveBloomFix();
 await import('../main.js');
