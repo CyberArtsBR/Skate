@@ -5,6 +5,8 @@ import { disposeObject3D } from '../core/disposeObject3D.js';
 import { SkateboardAssetAdapter } from './SkateboardAssetAdapter.js';
 import { SkateboardRig } from './SkateboardRig.js';
 import { ARCADE_FEEDBACK } from '../vfx/ArcadeFeedbackTuning.js';
+import { quality } from '../graphics/RenderQualityManager.js';
+import { skateboardFinishByColor } from '../config/skateboardFinishes.js';
 
 export const SKATEBOARD_COORDINATE_SYSTEM = Object.freeze({
   forwardAxis: '+X',
@@ -78,6 +80,7 @@ export class SkateboardVisual {
     };
     this.deckColorMaterials = null;
     this.deckColorOriginals = null;
+    this.deckColorUniforms = [];
     this.deckColor = null;
     this.wheelGlowMaterials = [];
     this.wheelGlowAmount = 0;
@@ -226,6 +229,7 @@ export class SkateboardVisual {
     this.root.userData.visualDimensions = this.dimensions.toArray();
     this.root.userData.proportionAudit = this.proportionAudit;
     this.root.userData.presentationHooks = this.presentationHooks;
+    this._unregisterQuality = quality.registerObject(this.root);
     return this;
   }
 
@@ -233,6 +237,18 @@ export class SkateboardVisual {
     if (this.deckColorMaterials) return;
     this.deckColorMaterials = [];
     this.deckColorOriginals = [];
+    this.root.updateWorldMatrix(true, true);
+    const rootInverse = this.root.matrixWorld.clone().invert();
+    this.deck.geometry.computeBoundingBox();
+    const deckBounds = this.deck.geometry.boundingBox.clone().applyMatrix4(
+      new THREE.Matrix4().multiplyMatrices(rootInverse, this.deck.matrixWorld),
+    );
+    const gradientBounds = new THREE.Vector4(
+      deckBounds.min.x,
+      1 / Math.max(deckBounds.max.x - deckBounds.min.x, 0.001),
+      (deckBounds.min.z + deckBounds.max.z) * 0.5,
+      1 / Math.max(deckBounds.max.z - deckBounds.min.z, 0.001),
+    );
     const wheels = new Set(this.wheels);
     const sources = new Set();
     this.root.traverse(object => {
@@ -242,6 +258,8 @@ export class SkateboardVisual {
         if (!material?.color) return material;
         sources.add(material);
         const finish = material.clone();
+        const transform = new THREE.Matrix4().multiplyMatrices(rootInverse, object.matrixWorld);
+        this._installGradientFinish(finish, transform, gradientBounds);
         this.deckColorMaterials.push(finish);
         this.deckColorOriginals.push({ color: material.color.clone(), map: material.map,
           vertexColors: material.vertexColors });
@@ -252,6 +270,51 @@ export class SkateboardVisual {
     // Textures remain shared with the cloned finishes; only replaced material
     // instances are released. Wheels own separate glow materials already.
     for (const material of sources) material.dispose();
+  }
+
+  _installGradientFinish(material, transform, bounds) {
+    const uniforms = {
+      halfpipeFinishEnabled: { value: 0 },
+      halfpipeFinishTransform: { value: transform },
+      halfpipeFinishBounds: { value: bounds },
+      halfpipeFinishTail: { value: new THREE.Color() },
+      halfpipeFinishMiddle: { value: new THREE.Color() },
+      halfpipeFinishNose: { value: new THREE.Color() },
+    };
+    this.deckColorUniforms.push(uniforms);
+    const originalCompile = material.onBeforeCompile;
+    const originalCacheKey = material.customProgramCacheKey();
+    material.onBeforeCompile = (shader, renderer) => {
+      originalCompile.call(material, shader, renderer);
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>
+          uniform mat4 halfpipeFinishTransform;
+          varying vec3 vHalfpipeFinishPosition;`)
+        .replace('#include <project_vertex>', `
+          vHalfpipeFinishPosition = (halfpipeFinishTransform * vec4(transformed, 1.0)).xyz;
+          #include <project_vertex>`);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+          uniform float halfpipeFinishEnabled;
+          uniform vec4 halfpipeFinishBounds;
+          uniform vec3 halfpipeFinishTail;
+          uniform vec3 halfpipeFinishMiddle;
+          uniform vec3 halfpipeFinishNose;
+          varying vec3 vHalfpipeFinishPosition;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          if (halfpipeFinishEnabled > 0.5) {
+            float paintPosition = clamp(
+              (vHalfpipeFinishPosition.x - halfpipeFinishBounds.x) * halfpipeFinishBounds.y
+              + (vHalfpipeFinishPosition.z - halfpipeFinishBounds.z) * halfpipeFinishBounds.w * 0.12,
+              0.0, 1.0);
+            vec3 paint = mix(halfpipeFinishTail, halfpipeFinishMiddle,
+              smoothstep(0.0, 0.56, paintPosition));
+            paint = mix(paint, halfpipeFinishNose, smoothstep(0.5, 1.0, paintPosition));
+            diffuseColor.rgb *= paint;
+          }`);
+    };
+    material.customProgramCacheKey = () => `${originalCacheKey}-halfpipe-gradient-v1`;
   }
 
   _prepareWheelGlowMaterials() {
@@ -307,6 +370,7 @@ export class SkateboardVisual {
     if (!this.deck) return false;
     this._prepareDeckColorMaterials();
     this.deckColor = color === null || color === undefined ? null : Number(color);
+    const finish = skateboardFinishByColor(this.deckColor);
 
     this.deckColorMaterials.forEach((material, index) => {
       if (!material?.color) return;
@@ -318,16 +382,24 @@ export class SkateboardVisual {
           material.vertexColors = original.vertexColors;
         }
       } else {
-        material.color.setHex(this.deckColor);
-        // A solid finish covers grip, artwork, deck edges and trucks alike.
+        material.color.setHex(0xffffff);
+        // Board-local paint covers grip, artwork, deck edges and trucks alike.
         // Keep normal/roughness/metalness detail, without tinting the wheels.
         material.map = null;
         material.vertexColors = false;
+      }
+      const uniforms = this.deckColorUniforms[index];
+      uniforms.halfpipeFinishEnabled.value = finish ? 1 : 0;
+      if (finish) {
+        uniforms.halfpipeFinishTail.value.setHex(finish.stops[0]);
+        uniforms.halfpipeFinishMiddle.value.setHex(finish.stops[1]);
+        uniforms.halfpipeFinishNose.value.setHex(finish.stops[2]);
       }
       material.needsUpdate = true;
     });
 
     this.root.userData.deckColor = this.deckColor;
+    this.root.userData.deckGradient = finish ? [...finish.stops] : null;
     return true;
   }
 
@@ -372,6 +444,8 @@ export class SkateboardVisual {
   }
 
   dispose() {
+    this._unregisterQuality?.();
+    this._unregisterQuality = null;
     // Runtime wheel meshes are reparented under dedicated pivots on root, so
     // disposing only the original GLB scene would leak their geometry/materials.
     disposeObject3D(this.root);

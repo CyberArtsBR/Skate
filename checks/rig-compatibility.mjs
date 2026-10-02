@@ -2,23 +2,16 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import * as THREE from 'three';
 import { NodeIO } from '@gltf-transform/core';
+import { RIDER_ROSTER } from '../src/config/riderRoster.js';
 import {
   HERETIC_REFERENCE_MODEL_ROTATIONS,
   SLOT_ALIASES,
 } from '../src/character/RiderRigAdapter.js';
 
-const FILES = Object.freeze([
-  ['archon', 'The Archon.glb'],
-  ['heretic', 'The Heretic.glb'],
-  ['commodore', 'The Commodore.glb'],
-  ['pioneer', 'The Pioneer.glb'],
-  ['punk', 'The Punk.glb'],
-  ['street-fighter', 'The Street Fighter.glb'],
-  ['bosun', 'The Bosun.glb'],
-  ['adolescent', 'The Adolescent.glb'],
-  ['angsty', 'The Angsty.glb'],
-  ['apologetic', 'The Apologetic.glb'],
-]);
+const FILES = Object.freeze(RIDER_ROSTER.map(rider => [
+  rider.id,
+  path.basename(decodeURIComponent(new URL(rider.modelUrl, 'http://localhost').pathname)),
+]));
 
 const REQUIRED_POSE_SLOTS = Object.freeze([
   'hips',

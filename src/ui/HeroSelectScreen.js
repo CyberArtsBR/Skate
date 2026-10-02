@@ -1,3 +1,4 @@
+import { skateboardFinishByColor } from '../config/skateboardFinishes.js';
 import { loadCustomAvatar, releaseCustomAvatar } from '../character/CustomAvatar.js';
 
 export class HeroSelectScreen {
@@ -254,7 +255,7 @@ export class HeroSelectScreen {
       if (entry.color === null) {
         button.classList.add('is-original');
       } else {
-        button.style.setProperty('--swatch', '#' + entry.color.toString(16).padStart(6, '0'));
+        button.style.setProperty('--swatch', skateboardFinishByColor(entry.color).cssGradient);
       }
       button.addEventListener('click', () => this.selectBoardColor(index));
       this.swatchRoot.append(button);

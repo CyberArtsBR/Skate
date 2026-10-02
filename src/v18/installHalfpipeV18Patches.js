@@ -6,7 +6,7 @@ import { MAP_IMAGES } from '../config/mapAssets.js';
 import './v18.css';
 
 const BASE_ENVIRONMENT = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr';
-const CYBER_ENVIRONMENT = '/hdri/cyber-night-shanghai-bund-1k.hdr';
+const CYBER_ENVIRONMENT = '/hdri/shanghai_bund_1k.hdr';
 
 export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
@@ -32,6 +32,43 @@ export const HALFPIPE_MAPS = Object.freeze([
     environmentUrl: CYBER_ENVIRONMENT,
     position: 'center center',
     coherence: Object.freeze({ brightness: 0.94, saturation: 1.03, contrast: 1.01, gradeOpacity: 0.24 }),
+  }),
+  Object.freeze({
+    id: 'the-gym', name: 'The Gym', kind: 'full',
+    thumbnailUrl: MAP_IMAGES.theGymThumbnail,
+    modelUrl: '/models/arenas/the-gym.glb',
+    environmentUrl: BASE_ENVIRONMENT,
+  }),
+  Object.freeze({
+    id: 'japan', name: 'Japan', kind: 'full',
+    thumbnailUrl: MAP_IMAGES.japanThumbnail,
+    modelUrl: '/models/arenas/japan.glb',
+    environmentUrl: '/hdri/japan-sunset-1k.exr',
+    environmentBackground: true,
+    backgroundColor: 0xb9d6e9,
+  }),
+  Object.freeze({
+    id: 'canyon-session', name: 'Canyon Session',
+    imageUrl: MAP_IMAGES.canyonSession,
+    thumbnailUrl: MAP_IMAGES.canyonSession,
+    environmentUrl: BASE_ENVIRONMENT,
+    position: 'center center',
+    coherence: Object.freeze({ brightness: 1, saturation: 1, contrast: 1, gradeOpacity: 0.12 }),
+  }),
+
+  Object.freeze({
+    id: 'skate-park', name: 'Skate Park',
+    imageUrl: MAP_IMAGES.skatePark,
+    environmentUrl: BASE_ENVIRONMENT,
+    position: 'center center',
+    coherence: Object.freeze({ brightness: 1, saturation: 1, contrast: 1, gradeOpacity: 0.12 }),
+  }),
+  Object.freeze({
+    id: 'space', name: 'Space',
+    imageUrl: MAP_IMAGES.space,
+    environmentUrl: CYBER_ENVIRONMENT,
+    position: 'center center',
+    coherence: Object.freeze({ brightness: 1, saturation: 1, contrast: 1, gradeOpacity: 0.08 }),
   }),
 ]);
 
@@ -70,7 +107,9 @@ function ensureState(screen) {
 
   const storedHero = readStored(STORAGE.rider);
   const storedBoard = readStored(STORAGE.board);
-  const storedMap = readStored(STORAGE.map);
+  const previousMap = readStored(STORAGE.map);
+  const storedMap = previousMap === 'storm-coast' ? 'canyon-session' : previousMap;
+  if (storedMap !== previousMap) writeStored(STORAGE.map, storedMap);
   const heroIndex = screen.heroes.findIndex((hero) => hero.id === storedHero);
   const boardIndex = screen.boardColors.findIndex((entry) => entry.id === storedBoard);
   const mapIndex = HALFPIPE_MAPS.findIndex((entry) => entry.id === storedMap);
@@ -161,29 +200,42 @@ async function applyMapToRuntime(screen, map) {
   if (state.applyingMap) return false;
   state.applyingMap = true;
   screen.setBusy(true, 'LOADING ' + map.name.toUpperCase() + '...');
+  let loadError = '';
 
   try {
-    await foundation.background?.setImage?.(map.imageUrl, map.position);
+    await foundation.setArenaMap?.(map);
+    if (map.kind !== 'full') {
+      await foundation.background?.setImage?.(map.imageUrl, map.position);
+    }
     foundation.background?.setCoherence?.(map.coherence);
 
     const environment = quality.environment;
     if (environment?.setUrl) {
-      await environment.setUrl(map.environmentUrl);
-      quality.apply({ rebuildEnvironment: true });
+      // Reflection loading is optional and must not hold arena confirmation.
+      void environment.setUrl(map.environmentUrl).then(() => {
+        quality.apply({ rebuildEnvironment: true });
+        if (foundation.activeMap?.id === map.id && map.environmentBackground) {
+          foundation.setEnvironmentBackground?.(environment.backgroundTexture);
+        }
+      }).catch(error => console.warn('[Halfpipe] Reflection load failed', error));
     }
+
+    foundation.lighting?.setMapProfile?.(map.id);
 
     foundation.activeMap = map;
     foundation.customization ??= {};
     foundation.customization.maps = HALFPIPE_MAPS;
     foundation.customization.map = map;
     foundation.customization.selectedMapMode = ensureState(screen).mapMode;
+    foundation.setMapPresentation?.(map.id);
     return true;
   } catch (error) {
+    loadError = 'COULD NOT LOAD ' + map.name.toUpperCase() + '. PLEASE TRY AGAIN.';
     console.error('[Halfpipe V18] Map load failed', map.id, error);
     return false;
   } finally {
     state.applyingMap = false;
-    screen.setBusy(false, '');
+    screen.setBusy(false, loadError);
   }
 }
 
@@ -256,9 +308,17 @@ function ensureMapUI(screen) {
     button.type = 'button';
     button.className = 'map-card';
     button.dataset.mapId = map.id;
+    button.dataset.mapKind = map.kind || 'image';
+    if (map.kind === 'full') button.title = 'Full 3D arena - no image backdrop';
     button.innerHTML = '<span class="map-card-preview"><img alt="" loading="eager" decoding="async" draggable="false"></span><strong></strong>';
     const image = button.querySelector('img');
-    image.src = map.imageUrl;
+    if (map.kind === 'full' && !map.thumbnailUrl) {
+      image.remove();
+      const preview = button.querySelector('.map-card-preview');
+      preview.textContent = '3D';
+      preview.classList.add('full-map-preview');
+      button.title = 'Full 3D arena · no image backdrop';
+    } else image.src = map.thumbnailUrl || map.imageUrl;
     image.alt = map.name;
     button.querySelector('strong').textContent = map.name;
     button.addEventListener('click', () => selectMap(screen, index + 1));
@@ -439,7 +499,7 @@ function patchHeroSelect() {
     try {
       const state = resolveRandomSelections(this);
       const map = state.resolvedMap || HALFPIPE_MAPS[0];
-      await applyMapToRuntime(this, map);
+      if (!await applyMapToRuntime(this, map)) return false;
       return await originalConfirm.call(this);
     } finally {
       this._confirmationPending = false;

@@ -10,6 +10,11 @@ function mapImage(file) {
 
 export const MAP_IMAGES = Object.freeze({
   city: mapImage('city.jpg'),
+  canyonSession: mapImage('canyon-session.png'),
+  skatePark: mapImage('skate-park.png'),
+  space: mapImage('space.png'),
+  theGymThumbnail: mapImage('the-gym-thumb.png'),
+  japanThumbnail: mapImage('japan-thumb.png'),
   treeHouse: mapImage('treehouse.jpg'),
   cyberNight: mapImage('cyber-night.png'),
 });

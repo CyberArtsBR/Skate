@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 
-const mapFiles = ['city.jpg', 'treehouse.jpg', 'cyber-night.png'];
+const mapFiles = ['city.jpg', 'treehouse.jpg', 'cyber-night.png', 'canyon-session.png',
+  'skate-park.png', 'space.png', 'the-gym-thumb.png', 'japan-thumb.png'];
 const mapVersions = Object.fromEntries(mapFiles.map((file) => [
   file,
   createHash('sha256')
@@ -11,5 +12,7 @@ const mapVersions = Object.fromEntries(mapFiles.map((file) => [
 ]));
 
 export default defineConfig({
+  // Portals mounts the package below a host route rather than at the origin root.
+  base: './',
   define: { __HALFPIPE_MAP_VERSIONS__: JSON.stringify(mapVersions) },
 });

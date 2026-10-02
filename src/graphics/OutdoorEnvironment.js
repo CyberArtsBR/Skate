@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { publicAssetUrl } from '../config/publicAssetUrl.js';
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 
 const QUALITY_SEGMENTS = Object.freeze({
   low: [24, 12],
@@ -23,6 +24,7 @@ export class OutdoorEnvironment {
     this.fallbackTarget = null;
     this.hdriTarget = null;
     this.texture = null;
+    this.backgroundTexture = null;
     this.disposed = false;
     this.loadGeneration = 0;
     this.loadingUrl = null;
@@ -33,7 +35,7 @@ export class OutdoorEnvironment {
     let source = null;
     this.loadingUrl = url;
     try {
-      source = await new RGBELoader().loadAsync(url);
+      source = await (/\.exr(?:[?#]|$)/i.test(url) ? new EXRLoader() : new RGBELoader()).loadAsync(url);
       if (this.disposed || generation !== this.loadGeneration) {
         source.dispose();
         return null;
@@ -41,14 +43,17 @@ export class OutdoorEnvironment {
 
       source.mapping = THREE.EquirectangularReflectionMapping;
       const nextTarget = this.pmrem.fromEquirectangular(source);
-      source.dispose();
+      const nextBackground = source;
       source = null;
 
       if (this.disposed || generation !== this.loadGeneration) {
         nextTarget.dispose();
+        nextBackground.dispose();
         return null;
       }
 
+      this.backgroundTexture?.dispose();
+      this.backgroundTexture = nextBackground;
       this.hdriTarget?.dispose();
       this.hdriTarget = nextTarget;
       this.fallbackTarget?.dispose();
@@ -184,6 +189,8 @@ export class OutdoorEnvironment {
   dispose() {
     this.disposed = true;
     this.loadGeneration += 1;
+    this.backgroundTexture?.dispose();
+    this.backgroundTexture = null;
     this.loadingUrl = null;
     this.fallbackTarget?.dispose();
     this.fallbackTarget = null;

@@ -90,6 +90,7 @@ export class CinematicPostProcessing {
     this._camera = null;
     this._size = new THREE.Vector2(1, 1);
     this._materialCache = new Map();
+    this._visibilityCache = new Map();
     this._emissiveMaterials = new Map();
     this._originalRender = renderer.render;
     this._originalSetSize = renderer.setSize;
@@ -197,20 +198,26 @@ export class CinematicPostProcessing {
     );
   }
 
-  _isBloomTarget(object) {
-    return Boolean(
-      object.userData?.emissiveBloom,
-    );
+  _isBloomTarget(object, material) {
+    if (!object.userData?.emissiveBloom) return false;
+    // Coping emission is a material-slot role, not permission to bloom any
+    // unrelated emissive slot sharing the same source mesh.
+    return !object.userData.copingContactZone || material?.userData?.halfpipeRole === 'coping';
   }
 
   _prepareBloomMaterials() {
     this._materialCache.clear();
     this.scene.traverse((object) => {
+      if (object.userData?.bloomExclude) {
+        this._visibilityCache.set(object, object.visible);
+        object.visible = false;
+        return;
+      }
       if (!object?.isMesh || !object.material) return;
       this._materialCache.set(object, object.material);
       const source = object.material;
       const bloomMaterial = (material) => {
-        if (!this._isBloomTarget(object) || !material?.emissive) return this.darkMaterial;
+        if (!this._isBloomTarget(object, material) || !material?.emissive) return this.darkMaterial;
         let glow = this._emissiveMaterials.get(material);
         if (!glow) {
           glow = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false,
@@ -225,6 +232,8 @@ export class CinematicPostProcessing {
   }
 
   _restoreMaterials() {
+    for (const [object, visible] of this._visibilityCache) object.visible = visible;
+    this._visibilityCache.clear();
     for (const [object, material] of this._materialCache) object.material = material;
     this._materialCache.clear();
   }
@@ -245,10 +254,15 @@ export class CinematicPostProcessing {
 
     try {
       this._prepareBloomMaterials();
+      // A visible HDRI belongs in the base image, never the selective glow pass.
+      // Otherwise the sunset becomes an enormous bloom source over the skater.
+      const background = this.scene.background;
       try {
+        this.scene.background = null;
         this.renderer.shadowMap.autoUpdate = false;
         this.bloomComposer.render(0);
       } finally {
+        this.scene.background = background;
         this.renderer.shadowMap.autoUpdate = shadowAutoUpdate;
         this._restoreMaterials();
       }

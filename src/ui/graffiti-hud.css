@@ -1,18 +1,16 @@
-/* Local font: Luckiest Guy, Apache 2.0; see public/fonts/LuckiestGuy-LICENSE.txt. */
-@font-face {
-  font-family: 'Halfpipe Graffiti';
-  src: url('/fonts/LuckiestGuy-Regular.ttf') format('truetype');
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
 .halfpipe-hud {
-  --graffiti-ink: #080f18;
-  --graffiti-cyan: #68e8ff;
-  --graffiti-pink: #ed3bc0;
+  --graffiti-ink: var(--ui-ink, #080f18);
+  --graffiti-cyan: var(--ui-cyan, #68e8ff);
+  --graffiti-pink: var(--ui-pink, #ed3bc0);
   --graffiti-depth: 2px 3px 0 var(--graffiti-ink), 4px 5px 0 var(--graffiti-ink),
     -2px 4px 0 #15b9d4, 4px 7px 0 #bb2692, 5px 8px 0 var(--graffiti-ink);
+  --graffiti-label-depth: 1px 1px 0 #9f5c29, 2px 2px 0 #9f5c29,
+    3px 3px 0 var(--graffiti-ink), 4px 4px 0 var(--graffiti-ink),
+    -1px 3px 0 #15b9d4, 3px 5px 0 #bb2692;
+  --graffiti-number-depth: 1px 1px 0 #9f5c29, 2px 2px 0 #9f5c29,
+    3px 3px 0 #713618, 4px 4px 0 #713618,
+    5px 5px 0 var(--graffiti-ink), 6px 7px 0 var(--graffiti-ink),
+    -2px 4px 0 #15b9d4, 5px 8px 0 #bb2692;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr);
   column-gap: clamp(12px, 1.7vw, 28px);
   padding: calc(clamp(12px, 1.9vw, 30px) * var(--ui-scale))
@@ -29,11 +27,13 @@
   isolation: isolate;
   gap: 0;
   max-width: 100%;
-  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale));
   border: 0;
-  border-radius: 4px 14px 4px 11px;
-  background: linear-gradient(145deg, #071520e8, #0b1c2570);
+  border-radius: 0;
+  background: none;
   box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Static paint marks add the reference's sticker silhouette without image text. */
@@ -63,7 +63,7 @@
 .halfpipe-hud .hud-landing-feedback,
 .halfpipe-hud .hud-action-feedback,
 .halfpipe-hud .hud-status {
-  font-family: 'Halfpipe Graffiti', Impact, 'Arial Black', sans-serif;
+  font-family: var(--ui-font-display, 'Halfpipe Graffiti'), Impact, 'Arial Black', sans-serif;
   font-weight: 400;
   font-style: normal;
   letter-spacing: 0.015em;
@@ -75,11 +75,14 @@
   line-height: 1.06;
   color: #ffdc65;
   -webkit-text-stroke: 3px var(--graffiti-ink);
-  text-shadow: var(--graffiti-depth);
+  text-shadow: var(--graffiti-label-depth);
 }
 
 .halfpipe-hud .hud-time > span {
   color: var(--graffiti-cyan);
+  text-shadow: 1px 1px 0 #18647a, 2px 2px 0 #18647a,
+    3px 3px 0 var(--graffiti-ink), 4px 4px 0 var(--graffiti-ink),
+    -1px 3px 0 #15b9d4, 3px 5px 0 #bb2692;
 }
 
 .halfpipe-hud .hud-block > strong {
@@ -92,18 +95,21 @@
   white-space: nowrap;
   color: #ffce51;
   -webkit-text-stroke: 4px var(--graffiti-ink);
-  text-shadow: var(--graffiti-depth);
+  text-shadow: var(--graffiti-number-depth);
 }
 
 @supports (background-clip: text) or (-webkit-background-clip: text) {
   .halfpipe-hud .hud-block > strong {
-    background: linear-gradient(180deg, #fff7d3 8%, #ffe781 31%, #ffd147 55%, #ff7b31 83%, #ff5930 100%);
+    background: linear-gradient(180deg, #fffbe7 0%, #fff6cf 15%, #ffe781 18%, #ffd147 51%, #ff9238 78%, #f85d26 100%);
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
     text-shadow: none;
-    filter: drop-shadow(2px 3px 0 var(--graffiti-ink))
-      drop-shadow(-2px 2px 0 #15b9d4) drop-shadow(2px 2px 0 #bb2692);
+    /* Hard offset shadows extrude the live glyphs, without a backing panel. */
+    filter: drop-shadow(2px 3px 0 #713618)
+      drop-shadow(2px 2px 0 var(--graffiti-ink))
+      drop-shadow(-1px 1px 0 #15b9d4)
+      drop-shadow(2px 2px 0 #bb2692);
   }
 }
 
@@ -154,6 +160,26 @@
   text-shadow: var(--graffiti-depth);
 }
 
+.halfpipe-hud .hud-trick-feedback.is-long-name .trick-award-name {
+  font-size: .78em;
+  line-height: 1.1;
+}
+
+.halfpipe-hud .hud-trick-feedback .trick-landing-summary {
+  margin: .3em auto 0;
+  padding: .2em .5em;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 3px 8px;
+  background: #07131de8;
+  color: var(--feedback-color);
+  font-size: .48em;
+  line-height: 1.2;
+  -webkit-text-stroke: 1.25px var(--graffiti-ink);
+  text-shadow: 1px 2px 0 var(--graffiti-ink);
+}
+.halfpipe-hud .trick-landing-summary > span { color: inherit; }
+
 .halfpipe-hud .hud-trick-feedback .trick-award-name::before {
   display: none;
 }
@@ -196,13 +222,13 @@
   line-height: 1.18;
   text-wrap: balance;
   overflow-wrap: anywhere;
-  -webkit-text-stroke: 2.5px var(--graffiti-ink);
-  text-shadow: 2px 3px 0 var(--graffiti-ink), 3px 4px 0 #147385;
+  -webkit-text-stroke: 1.5px var(--graffiti-ink);
+  text-shadow: 1px 2px 0 var(--graffiti-ink);
 }
 
-.halfpipe-hud [data-tone='good'] { --feedback-color: #8df66b; }
-.halfpipe-hud [data-tone='bad'] { --feedback-color: #ff6659; }
-.halfpipe-hud [data-tone='ok'] { --feedback-color: #ffe06d; }
+.halfpipe-hud [data-tone='good'] { --feedback-color: var(--ui-good, #8df66b); }
+.halfpipe-hud [data-tone='bad'] { --feedback-color: var(--ui-bad, #ff6659); }
+.halfpipe-hud [data-tone='ok'] { --feedback-color: var(--ui-yellow, #ffe06d); }
 .halfpipe-hud .hud-context [data-tone],
 .halfpipe-hud .hud-trick-feedback[data-tone] .trick-award-name,
 .halfpipe-hud .hud-landing-feedback[data-tone] > span {
@@ -210,7 +236,7 @@
 }
 .halfpipe-hud .hud-landing-feedback[data-tone],
 .halfpipe-hud .hud-action-feedback[data-tone] {
-  text-shadow: 2px 3px 0 var(--graffiti-ink), 3px 4px 0 #147385;
+  text-shadow: 1px 2px 0 var(--graffiti-ink);
 }
 
 @media (max-width: 900px) {
@@ -261,7 +287,7 @@
   .halfpipe-hud .hud-action-feedback,
   .halfpipe-hud .hud-status {
     font-size: min(calc(18px * var(--ui-scale)), 6vw);
-    -webkit-text-stroke: 2px var(--graffiti-ink);
+    -webkit-text-stroke: 1.25px var(--graffiti-ink);
   }
 }
 
@@ -274,10 +300,19 @@
   .halfpipe-hud .hud-landing-feedback,
   .halfpipe-hud .hud-action-feedback,
   .halfpipe-hud .hud-status { font-size: calc(17px * var(--ui-scale)); }
+  .halfpipe-hud .hud-trick-feedback small { margin-top: .2em; padding: .15em .4em; }
+  .halfpipe-hud .hud-trick-feedback .trick-landing-summary { margin-top: .18em; }
 }
 
 .halfpipe-hud.is-high-contrast { filter: none; }
-.halfpipe-hud.is-high-contrast .hud-block,
+.halfpipe-hud.is-high-contrast .hud-block {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 .halfpipe-hud.is-high-contrast .hud-combo,
 .halfpipe-hud.is-high-contrast .hud-landing-feedback,
 .halfpipe-hud.is-high-contrast .hud-action-feedback,
@@ -287,7 +322,8 @@
 .halfpipe-hud.is-high-contrast .hud-block > strong {
   color: #fff1a8;
   background: none;
-  text-shadow: 2px 3px 0 #000;
+  -webkit-text-stroke: 5px #000;
+  text-shadow: 2px 3px 0 #000, 4px 5px 0 #000;
   filter: none;
 }
 .halfpipe-hud.is-high-contrast .trick-award-name,
@@ -298,8 +334,67 @@
   text-shadow: 2px 3px 0 #000;
 }
 
+/* The supplied bitmap letters already contain their bevel, ink and extrusion. */
+#game-stage .halfpipe-hud .hud-block > .graffiti-text,
+#game-stage .halfpipe-hud .hud-trick-feedback .trick-award-name.graffiti-text,
+#game-stage .halfpipe-hud .hud-trick-feedback[data-tone] > span.graffiti-text {
+  background: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  filter: none;
+  letter-spacing: 0;
+}
+
+#game-stage .halfpipe-hud .hud-time > .graffiti-text { text-align: right; }
+#game-stage .halfpipe-hud .trick-award-name.graffiti-text { display: block; }
+
+#game-stage .countdown-overlay,
+#game-stage .countdown-overlay.is-prompt { background: transparent; }
+#game-stage .countdown-label.graffiti-text {
+  max-width: 92vw;
+  background: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  filter: none;
+}
+#game-stage .countdown-overlay.is-prompt .countdown-label.graffiti-text {
+  transform: rotate(-3deg);
+  font-size: clamp(32px, 5.6vw, 84px);
+}
+
+#game-stage .podium-screen h1.graffiti-text,
+#game-stage .podium-score-label strong.graffiti-text,
+#game-stage .results-screen .result-stat .graffiti-text,
+#game-stage .results-screen .standing-row strong.graffiti-text {
+  background: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  filter: none;
+}
+#game-stage .podium-screen h1.graffiti-text { margin: 0 auto; max-width: 94%; }
+#game-stage .podium-score-label,
+#game-stage .podium-score-label.is-player {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+#game-stage .results-screen .result-stat[data-stat='finalScore'],
+#game-stage .results-screen .result-stat[data-stat='bestTrick'] {
+  background: transparent;
+  border: 0;
+}
+#game-stage .results-screen .result-stat[data-stat='finalScore'] > span.graffiti-text {
+  font-size: calc(clamp(16px, 1.4vw, 21px) * var(--menu-ui-scale));
+}
+
 @media (forced-colors: active) {
-  .halfpipe-hud .hud-block > strong {
+  .halfpipe-hud .hud-block {
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+  .halfpipe-hud .hud-block > strong,
+  .halfpipe-hud.is-high-contrast .hud-block > strong {
     background: none;
     color: CanvasText;
     -webkit-text-stroke: 0;

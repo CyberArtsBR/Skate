@@ -38,6 +38,7 @@ export class RenderQualityManager {
     this.shadowLights = new Set();
     this.managedObjects = new Set();
     this.listeners = new Set();
+    this.mapLighting = null;
   }
 
   get preset() {
@@ -60,6 +61,17 @@ export class RenderQualityManager {
     return this.preset.environmentQuality;
   }
 
+  get environmentIntensity() {
+    return this.mapLighting?.environmentIntensity
+      ?? this.preset.environmentIntensity * (this.mapLighting?.environmentFactor ?? 1);
+  }
+
+  setMapLighting(profile = null) {
+    this.mapLighting = profile;
+    this.apply({ rebuildEnvironment: false });
+    return this.snapshot();
+  }
+
   get vfxScale() {
     return this.preset.vfxScale;
   }
@@ -71,7 +83,7 @@ export class RenderQualityManager {
       shadowSize: this._resolveShadowSize(this.shadowSize),
       anisotropy: this.anisotropy,
       environmentQuality: this.environmentQuality,
-      environmentIntensity: this.preset.environmentIntensity,
+      environmentIntensity: this.environmentIntensity,
       frontMetalEnvMapIntensity: this.preset.frontMetalEnvMapIntensity,
       vfxScale: this.vfxScale,
     });
@@ -158,12 +170,17 @@ export class RenderQualityManager {
     const preset = this.preset;
     if (this.renderer) {
       this.renderer.setPixelRatio(this.resolvePixelRatio(globalThis.devicePixelRatio || 1));
-      this.renderer.toneMappingExposure = preset.toneMappingExposure;
+      this.renderer.toneMappingExposure = preset.toneMappingExposure
+        * (this.mapLighting?.exposureFactor ?? 1);
     }
     if (this.scene) {
-      this.scene.environmentIntensity = preset.environmentIntensity;
+      this.scene.environmentIntensity = this.environmentIntensity;
+      if (this.scene.environmentRotation) {
+        this.scene.environmentRotation.y = this.mapLighting?.environmentRotationY ?? 0;
+      }
       if (this.scene.fog && 'density' in this.scene.fog) {
-        this.scene.fog.density = preset.fogDensity;
+        this.scene.fog.density = preset.fogDensity * (this.mapLighting?.fogFactor ?? 1);
+        this.scene.fog.color.setHex(this.mapLighting?.fogColor ?? 0xc4d7d4);
       }
     }
     for (const light of this.shadowLights) this._applyShadowLight(light);
@@ -235,7 +252,7 @@ export class RenderQualityManager {
       sigma: preset.environmentSigma,
     });
     this.scene.environment = texture;
-    this.scene.environmentIntensity = preset.environmentIntensity;
+    this.scene.environmentIntensity = this.environmentIntensity;
   }
 }
 

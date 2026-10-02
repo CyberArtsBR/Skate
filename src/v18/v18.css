@@ -181,3 +181,13 @@
   box-shadow: 0 0 22px rgb(255 197 62 / 30%);
   transform: none;
 }
+
+.full-map-preview { display: grid; place-items: center; background: linear-gradient(145deg, #223442, #455d6b); color: #ffe184; font: 32px var(--ui-font, sans-serif); text-shadow: 2px 3px #081018; }
+
+/* Show the whole rendered arena instead of cropping it into a narrow vista. */
+.hero-select-screen .map-card[data-map-kind="full"] .map-card-preview img {
+  object-fit: contain;
+}
+@media (min-width: 1000px) {
+  .hero-select-screen .map-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}

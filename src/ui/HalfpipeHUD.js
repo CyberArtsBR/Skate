@@ -1,4 +1,6 @@
 import { TrickFeedback } from './TrickFeedback.js';
+import { applyGameUIPreferences } from './UIPreferences.js';
+import { setGraffitiText, disposeGraffitiTextTree, refreshGraffitiTextTree } from './GraffitiText.js';
 import './graffiti-hud.css';
 
 export function resolveDebugMode(search = globalThis.location?.search || '') {
@@ -34,6 +36,11 @@ export class HalfpipeHUD {
     this.scoreElement = this.root.querySelector('[data-score]');
     this.timeElement = this.root.querySelector('[data-time]');
 
+    setGraffitiText(this.root.querySelector('.hud-score > span'), 'SCORE', { palette: 'gold' });
+    setGraffitiText(this.root.querySelector('.hud-time > span'), 'TIME', { palette: 'cyan' });
+    setGraffitiText(this.scoreElement, '0', { palette: 'gold' });
+    setGraffitiText(this.timeElement, '1:15', { palette: 'gold' });
+
     this.feedback = new TrickFeedback(this.root);
     this.setPlayerMode({ highContrast, uiScale, reducedMotion });
     this.setDebugMode(debug);
@@ -41,15 +48,15 @@ export class HalfpipeHUD {
 
   setScore(score) {
     const label = Math.max(0, Math.round(Number(score) || 0)).toLocaleString('en-US');
-    if (this.scoreElement.textContent !== label) this.scoreElement.textContent = label;
+    setGraffitiText(this.scoreElement, label, { palette: 'gold' });
   }
 
   setTime(time) {
     const label = String(time);
-    if (this.timeElement.textContent !== label) this.timeElement.textContent = label;
     const parts = label.split(':').map(Number);
     const seconds = parts.length === 2 ? parts[0] * 60 + parts[1] : Number(label);
     this.root.classList.toggle('is-time-low', seconds <= 10);
+    setGraffitiText(this.timeElement, label, { palette: seconds <= 10 ? 'red' : 'gold', align: 'right' });
   }
 
   setCombo(multiplier = 1) {
@@ -105,6 +112,8 @@ export class HalfpipeHUD {
       uiScale: scale,
       reducedMotion: Boolean(reducedMotion),
     };
+    applyGameUIPreferences(this.root.parentElement, this.playerMode);
+    refreshGraffitiTextTree(this.root.parentElement);
     return { ...this.playerMode };
   }
 
@@ -115,6 +124,7 @@ export class HalfpipeHUD {
 
   dispose() {
     this.feedback.dispose();
+    disposeGraffitiTextTree(this.root);
     this.root.remove();
   }
 }
