@@ -6,7 +6,7 @@ import { MAP_IMAGES } from '../config/mapAssets.js';
 import './v18.css';
 
 const BASE_ENVIRONMENT = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr';
-const CYBER_ENVIRONMENT = '/hdri/cyber-night-shanghai-bund-1k.hdr';
+const CYBER_ENVIRONMENT = '/hdri/shanghai_bund_1k.hdr';
 
 export const HALFPIPE_MAPS = Object.freeze([
   Object.freeze({
@@ -35,11 +35,13 @@ export const HALFPIPE_MAPS = Object.freeze([
   }),
   Object.freeze({
     id: 'the-gym', name: 'The Gym', kind: 'full',
+    thumbnailUrl: MAP_IMAGES.theGymThumbnail,
     modelUrl: '/models/arenas/the-gym.glb',
     environmentUrl: BASE_ENVIRONMENT,
   }),
   Object.freeze({
     id: 'japan', name: 'Japan', kind: 'full',
+    thumbnailUrl: MAP_IMAGES.japanThumbnail,
     modelUrl: '/models/arenas/japan.glb',
     environmentUrl: '/hdri/japan-sunset-1k.exr',
     environmentBackground: true,
@@ -52,6 +54,21 @@ export const HALFPIPE_MAPS = Object.freeze([
     environmentUrl: BASE_ENVIRONMENT,
     position: 'center center',
     coherence: Object.freeze({ brightness: 1, saturation: 1, contrast: 1, gradeOpacity: 0.12 }),
+  }),
+
+  Object.freeze({
+    id: 'skate-park', name: 'Skate Park',
+    imageUrl: MAP_IMAGES.skatePark,
+    environmentUrl: BASE_ENVIRONMENT,
+    position: 'center center',
+    coherence: Object.freeze({ brightness: 1, saturation: 1, contrast: 1, gradeOpacity: 0.12 }),
+  }),
+  Object.freeze({
+    id: 'space', name: 'Space',
+    imageUrl: MAP_IMAGES.space,
+    environmentUrl: CYBER_ENVIRONMENT,
+    position: 'center center',
+    coherence: Object.freeze({ brightness: 1, saturation: 1, contrast: 1, gradeOpacity: 0.08 }),
   }),
 ]);
 
@@ -291,6 +308,8 @@ function ensureMapUI(screen) {
     button.type = 'button';
     button.className = 'map-card';
     button.dataset.mapId = map.id;
+    button.dataset.mapKind = map.kind || 'image';
+    if (map.kind === 'full') button.title = 'Full 3D arena - no image backdrop';
     button.innerHTML = '<span class="map-card-preview"><img alt="" loading="eager" decoding="async" draggable="false"></span><strong></strong>';
     const image = button.querySelector('img');
     if (map.kind === 'full' && !map.thumbnailUrl) {

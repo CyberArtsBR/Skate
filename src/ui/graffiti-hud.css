@@ -4,6 +4,13 @@
   --graffiti-pink: var(--ui-pink, #ed3bc0);
   --graffiti-depth: 2px 3px 0 var(--graffiti-ink), 4px 5px 0 var(--graffiti-ink),
     -2px 4px 0 #15b9d4, 4px 7px 0 #bb2692, 5px 8px 0 var(--graffiti-ink);
+  --graffiti-label-depth: 1px 1px 0 #9f5c29, 2px 2px 0 #9f5c29,
+    3px 3px 0 var(--graffiti-ink), 4px 4px 0 var(--graffiti-ink),
+    -1px 3px 0 #15b9d4, 3px 5px 0 #bb2692;
+  --graffiti-number-depth: 1px 1px 0 #9f5c29, 2px 2px 0 #9f5c29,
+    3px 3px 0 #713618, 4px 4px 0 #713618,
+    5px 5px 0 var(--graffiti-ink), 6px 7px 0 var(--graffiti-ink),
+    -2px 4px 0 #15b9d4, 5px 8px 0 #bb2692;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr);
   column-gap: clamp(12px, 1.7vw, 28px);
   padding: calc(clamp(12px, 1.9vw, 30px) * var(--ui-scale))
@@ -20,11 +27,13 @@
   isolation: isolate;
   gap: 0;
   max-width: 100%;
-  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale));
   border: 0;
-  border-radius: 4px 14px 4px 11px;
-  background: linear-gradient(145deg, #071520e8, #0b1c2570);
+  border-radius: 0;
+  background: none;
   box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Static paint marks add the reference's sticker silhouette without image text. */
@@ -66,11 +75,14 @@
   line-height: 1.06;
   color: #ffdc65;
   -webkit-text-stroke: 3px var(--graffiti-ink);
-  text-shadow: var(--graffiti-depth);
+  text-shadow: var(--graffiti-label-depth);
 }
 
 .halfpipe-hud .hud-time > span {
   color: var(--graffiti-cyan);
+  text-shadow: 1px 1px 0 #18647a, 2px 2px 0 #18647a,
+    3px 3px 0 var(--graffiti-ink), 4px 4px 0 var(--graffiti-ink),
+    -1px 3px 0 #15b9d4, 3px 5px 0 #bb2692;
 }
 
 .halfpipe-hud .hud-block > strong {
@@ -83,18 +95,21 @@
   white-space: nowrap;
   color: #ffce51;
   -webkit-text-stroke: 4px var(--graffiti-ink);
-  text-shadow: var(--graffiti-depth);
+  text-shadow: var(--graffiti-number-depth);
 }
 
 @supports (background-clip: text) or (-webkit-background-clip: text) {
   .halfpipe-hud .hud-block > strong {
-    background: linear-gradient(180deg, #fff7d3 8%, #ffe781 31%, #ffd147 55%, #ff7b31 83%, #ff5930 100%);
+    background: linear-gradient(180deg, #fffbe7 0%, #fff6cf 15%, #ffe781 18%, #ffd147 51%, #ff9238 78%, #f85d26 100%);
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
     text-shadow: none;
-    filter: drop-shadow(2px 3px 0 var(--graffiti-ink))
-      drop-shadow(-2px 2px 0 #15b9d4) drop-shadow(2px 2px 0 #bb2692);
+    /* Hard offset shadows extrude the live glyphs, without a backing panel. */
+    filter: drop-shadow(2px 3px 0 #713618)
+      drop-shadow(2px 2px 0 var(--graffiti-ink))
+      drop-shadow(-1px 1px 0 #15b9d4)
+      drop-shadow(2px 2px 0 #bb2692);
   }
 }
 
@@ -290,7 +305,14 @@
 }
 
 .halfpipe-hud.is-high-contrast { filter: none; }
-.halfpipe-hud.is-high-contrast .hud-block,
+.halfpipe-hud.is-high-contrast .hud-block {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 .halfpipe-hud.is-high-contrast .hud-combo,
 .halfpipe-hud.is-high-contrast .hud-landing-feedback,
 .halfpipe-hud.is-high-contrast .hud-action-feedback,
@@ -300,7 +322,8 @@
 .halfpipe-hud.is-high-contrast .hud-block > strong {
   color: #fff1a8;
   background: none;
-  text-shadow: 2px 3px 0 #000;
+  -webkit-text-stroke: 5px #000;
+  text-shadow: 2px 3px 0 #000, 4px 5px 0 #000;
   filter: none;
 }
 .halfpipe-hud.is-high-contrast .trick-award-name,
@@ -312,7 +335,13 @@
 }
 
 @media (forced-colors: active) {
-  .halfpipe-hud .hud-block > strong {
+  .halfpipe-hud .hud-block {
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+  .halfpipe-hud .hud-block > strong,
+  .halfpipe-hud.is-high-contrast .hud-block > strong {
     background: none;
     color: CanvasText;
     -webkit-text-stroke: 0;

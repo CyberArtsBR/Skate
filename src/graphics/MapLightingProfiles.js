@@ -25,6 +25,22 @@ export const MAP_LIGHTING_PROFILES = Object.freeze({
     environmentFactor: 1, exposureFactor: 1,
     environmentRotationY: 0.35, fogColor: 0xd3c2a8, fogFactor: 0.6,
   }),
+  'skate-park': Object.freeze({
+    skyColor: 0xe0efff, groundColor: 0x82725d,
+    keyColor: 0xfff0d5, fillColor: 0xbad7ec,
+    keyPosition: [12, 20, 14], fillPosition: [-12, 8, -10],
+    hemisphereFactor: 1, keyFactor: 0.98, fillFactor: 1,
+    environmentFactor: 1, exposureFactor: 1,
+    environmentRotationY: 0.35, fogColor: 0xc7dce8, fogFactor: 0.7,
+  }),
+  space: Object.freeze({
+    skyColor: 0xa6bde1, groundColor: 0x40374e,
+    keyColor: 0xffd5a3, fillColor: 0x96b9ed,
+    keyPosition: [14, 12, -6], fillPosition: [-12, 10, 14],
+    hemisphereFactor: 0.65, keyFactor: 0.8, fillFactor: 1.15,
+    environmentFactor: 0.75, exposureFactor: 1,
+    environmentRotationY: -0.4, fogColor: 0x343e60, fogFactor: 0.2,
+  }),
   city: Object.freeze({
     skyColor: 0xdaf0ff, groundColor: 0x6b5140,
     keyColor: 0xffe5bd, fillColor: 0xb7d3e0,

@@ -136,6 +136,12 @@ function createCopingGlowShell(mesh, sourceMaterials, expansion, opacity) {
   );
   shell.name = `${mesh.name || 'coping'}-selective-glow`;
   shell.userData.visualGlowOnly = true;
+  // These expanded, transparent shells are a subtle direct-render fallback.
+  // In the selective pass an untagged shell becomes opaque black, writes
+  // depth in front of its own rail and suppresses all of that rail's bloom.
+  // Hide only the decoration there; the role-tagged source coping remains
+  // the HDR emission source, with the ramp/rider still providing occlusion.
+  shell.userData.bloomExclude = true;
   shell.castShadow = false;
   shell.receiveShadow = false;
   shell.frustumCulled = mesh.frustumCulled;

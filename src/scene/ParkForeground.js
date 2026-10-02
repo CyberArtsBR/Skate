@@ -4,6 +4,8 @@ import { disposeObject3D } from '../core/disposeObject3D.js';
 
 const MAP_FINISHES = Object.freeze({
   'canyon-session': { concrete: 0xa2947e, metal: 0x6c6a61, edge: 0x947050 },
+  'skate-park': { concrete: 0xa79b86, metal: 0x677578, edge: 0x85715b },
+  space: { concrete: 0x686b7a, metal: 0x929bad, edge: 0x41485c },
   city: { concrete: 0x968e7c, metal: 0x5a6260, edge: 0x655743 },
   'tree-house': { concrete: 0x847c67, metal: 0x525a48, edge: 0x705a3d },
   'cyber-night': { concrete: 0x6b7277, metal: 0x454d57, edge: 0x665c54 },
