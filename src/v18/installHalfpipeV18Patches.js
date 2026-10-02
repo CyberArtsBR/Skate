@@ -171,6 +171,7 @@ async function applyMapToRuntime(screen, map) {
   if (state.applyingMap) return false;
   state.applyingMap = true;
   screen.setBusy(true, 'LOADING ' + map.name.toUpperCase() + '...');
+  let loadError = '';
 
   try {
     await foundation.setArenaMap?.(map);
@@ -179,8 +180,10 @@ async function applyMapToRuntime(screen, map) {
 
     const environment = quality.environment;
     if (environment?.setUrl) {
-      await environment.setUrl(map.environmentUrl);
-      quality.apply({ rebuildEnvironment: true });
+      // Reflection loading is optional and must not hold arena confirmation.
+      void environment.setUrl(map.environmentUrl).then(() => {
+        quality.apply({ rebuildEnvironment: true });
+      }).catch(error => console.warn('[Halfpipe] Reflection load failed', error));
     }
 
     foundation.lighting?.setMapProfile?.(map.id);
@@ -193,11 +196,12 @@ async function applyMapToRuntime(screen, map) {
     foundation.setMapPresentation?.(map.id);
     return true;
   } catch (error) {
+    loadError = 'COULD NOT LOAD ' + map.name.toUpperCase() + '. PLEASE TRY AGAIN.';
     console.error('[Halfpipe V18] Map load failed', map.id, error);
     return false;
   } finally {
     state.applyingMap = false;
-    screen.setBusy(false, '');
+    screen.setBusy(false, loadError);
   }
 }
 

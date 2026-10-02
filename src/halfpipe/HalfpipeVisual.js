@@ -11,7 +11,8 @@ const COPING_MATERIAL_NAME = 'Rail_Metal';
 // The shipped GLB replaced the legacy rail material name. Resolve its authored
 // mesh AND parent so an unrelated generic Material.002 is never a contact rail.
 function isCopingMaterial(material, mesh) {
-  if (mesh.parent?.name !== 'halfpipe-coping.002_2') return false;
+  if ((mesh.parent?.userData?.halfpipeSourceNodeName || mesh.parent?.name) !== 'halfpipe-coping.002_2'
+    && mesh.parent?.name !== THREE.PropertyBinding.sanitizeNodeName('halfpipe-coping.002_2')) return false;
   if (material?.name === COPING_MATERIAL_NAME) return true;
   return mesh?.name === 'Object_8'
     && mesh.userData.halfpipeSourceMeshName === 'Object_2'
@@ -219,6 +220,13 @@ export class HalfpipeVisual {
   async load() {
     const gltf = await new GLTFLoader().loadAsync(this.url);
     this.model = gltf.scene;
+    // GLTFLoader sanitizes names for animation bindings. Retain authored names
+    // separately for semantic lookups, without renaming animated nodes.
+    this.model.traverse(object => {
+      const association = gltf.parser?.associations?.get(object);
+      const sourceNode = gltf.parser?.json?.nodes?.[association?.nodes];
+      if (sourceNode?.name) object.userData.halfpipeSourceNodeName = sourceNode.name;
+    });
     this.model.name = 'halfpipe-source-visual';
     const paintMask = await new THREE.TextureLoader()
       .loadAsync('/images/materials/halfpipe-paint-mask.png')
@@ -326,15 +334,22 @@ export class HalfpipeVisual {
     this.root.add(this.model);
     this.root.updateWorldMatrix(true, true);
 
+    let authoredRamp = null;
+    if (this.fullMap) this.model.traverse(object => {
+      if (object.userData.halfpipeSourceNodeName === 'halfpipe.001_Baked_0'
+        || object.name === THREE.PropertyBinding.sanitizeNodeName('halfpipe.001_Baked_0')) {
+        authoredRamp = object;
+      }
+    });
     const alignmentRoot = this.fullMap
-      ? this.model.getObjectByName('halfpipe.001_Baked_0')?.parent?.parent?.parent
+      ? authoredRamp?.parent?.parent?.parent
       : this.root;
     if (!alignmentRoot) throw new Error('Full map is missing its authored halfpipe.');
     const fullBoxBeforeAlignment = visibleBounds(alignmentRoot);
     const fullCenter = fullBoxBeforeAlignment.getCenter(new THREE.Vector3());
     const authoredPositionX = this.model.position.x;
 
-    this.ridingSurface = findRidingSurface(this.model);
+    this.ridingSurface = findRidingSurface(this.fullMap ? authoredRamp : this.model);
     if (!this.ridingSurface) {
       throw new Error('Halfpipe riding surface could not be identified for visual alignment.');
     }
