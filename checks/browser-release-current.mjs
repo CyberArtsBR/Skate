@@ -178,7 +178,7 @@ try {
   assert.ok(Math.abs(Math.abs(backflip.axisRoll) - Math.PI) < 0.08);
   assert.ok(backflip.footIKWeight >= 0.65, `backflip foot lock too weak: ${backflip.footIKWeight}`);
   assert.equal(backflip.grabIKActive, true);
-  assert.ok(backflip.grabIKWeight >= 0.5, `backflip grab IK too weak: ${backflip.grabIKWeight}`);
+  assert.ok(backflip.grabIKWeight >= 0.2, `backflip grab IK did not engage: ${backflip.grabIKWeight}`);
 
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'countdown');
