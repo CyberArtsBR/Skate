@@ -93,13 +93,15 @@ try {
       if (object.userData?.copingContactZone || /local-red-glow/.test(object.name)) {
         nodes.push({ name: object.name, bloom: Boolean(object.userData.emissiveBloom),
           visible: object.visible, material: object.material?.name,
-          depthTest: object.material?.depthTest, color: object.material?.color?.getHexString() });
+          depthTest: object.material?.depthTest, color: object.material?.color?.getHexString(),
+          emission: object.material?.emissiveIntensity });
       }
     });
     return nodes;
   });
-  assert.ok(rail.some(node => /local-red-glow/.test(node.name)), 'localized red halo must exist');
-  assert.ok(rail.every(node => !node.bloom), 'coping must not feed the HDR bloom pass');
+  assert.ok(rail.some(node => node.bloom && node.emission === 3 && node.color === 'ff1728'),
+    'physical coping must emit a strong selective red glow');
+  assert.ok(rail.every(node => !/local-red-glow/.test(node.name)), 'detached halo quads must not return');
 
   // Check small screens and settings through the real HUD update path.
   await page.setViewportSize({ width: 640, height: 400 });
@@ -204,12 +206,17 @@ try {
       game.physics.setRunning(false);
       const halos = [];
       game.halfpipe.root.traverse(node => {
-        if (/local-red-glow/.test(node.name)) halos.push(node.name);
+        if (node.userData.copingContactZone && node.userData.emissiveBloom) halos.push(node.name);
       });
-      return { id: game.activeMap?.id, fullMap: game.halfpipe.fullMap, halos };
+      const replacement = game.halfpipe.replacementRamp;
+      return { id: game.activeMap?.id, fullMap: game.halfpipe.fullMap, halos,
+        usesV2: Boolean(replacement && replacement.parent === game.halfpipe.model),
+        surfaceIsV2: Boolean(replacement?.getObjectById(game.halfpipe.ridingSurface.id)) };
     });
     assert.equal(arena.fullMap, true);
-    assert.equal(arena.halos.length, 2, mapId + ': both rails need red glow');
+    assert.equal(arena.usesV2, true, mapId + ': embedded v1 must be replaced by v2');
+    assert.equal(arena.surfaceIsV2, true, mapId + ': contacts must use v2');
+    assert.equal(arena.halos.length, 1, mapId + ': the authored dual-rail mesh must glow red');
     arenas.push(arena);
     await page.waitForTimeout(200);
     await page.screenshot({ path: path.join(output, mapId + '-red-glow.png') });

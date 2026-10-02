@@ -7,7 +7,7 @@ import { ARCADE_FEEDBACK } from '../src/vfx/ArcadeFeedbackTuning.js';
 
 // Exercise the real shipped rail dimensions and material-slot association.
 // This catches a halo accidentally spanning both sides of the halfpipe.
-const document = await new NodeIO().read('public/models/halfpipe/halfpipe.glb');
+const document = await new NodeIO().read('public/models/halfpipe/halfpipe2.glb');
 const node = document.getRoot().listNodes().find(current => current.getName() === 'Object_8');
 assert.ok(node, 'shipped GLB must contain its semantic coping mesh');
 const primitive = node.getMesh().listPrimitives()[0];

@@ -6,6 +6,7 @@ import { installHalfpipeV16Patches } from '../v16/installHalfpipeV16Patches.js';
 import { installPortalsAssetBase } from './installPortalsAssetBase.js';
 import { installCyberEnvironmentRedirect } from './installCyberEnvironmentRedirect.js';
 import { installHalfpipeV18Patches } from './installHalfpipeV18Patches.js';
+import { installCopingSelectiveBloomFix } from './installCopingSelectiveBloomFix.js';
 
 // V18 starts every fresh game load with all three customization axes on Random.
 // Choices still remain stable while the current page/session is running.
@@ -33,6 +34,7 @@ installHalfpipeV9RuntimePatches();
 installHalfpipeV16Patches();
 installCyberEnvironmentRedirect();
 installHalfpipeV18Patches();
+installCopingSelectiveBloomFix();
 
 // V16 creates the title-screen artwork dynamically and still assigns its
 // historical root-absolute /images/... URL. Three.js' URL modifier cannot

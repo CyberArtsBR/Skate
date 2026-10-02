@@ -179,18 +179,20 @@ try {
   evidence.halos = await page.evaluate(() => {
     const halos = [];
     window.__HALFPIPE_FOUNDATION__.halfpipe.root.traverse(node => {
-      if (!/local-red-glow/.test(node.name)) return;
-      const color = node.material.uniforms.uColor.value;
+      if (!node.userData.copingContactZone) return;
+      const color = node.material.emissive;
       let visible = true; for (let parent = node; parent; parent = parent.parent) visible &&= parent.visible;
       halos.push({ name: node.name, color: [color.r, color.g, color.b], visible,
         bloom: Boolean(node.userData.emissiveBloom), bloomExclude: node.userData.bloomExclude,
-        depthTest: node.material.depthTest, depthWrite: node.material.depthWrite });
+        depthTest: node.material.depthTest, depthWrite: node.material.depthWrite,
+        emission: node.material.emissiveIntensity });
     });
     return halos;
   });
-  assert.equal(evidence.halos.length, 2, 'both rails must have localized red halos');
+  assert.equal(evidence.halos.length, 1, 'the v2 dual-rail mesh must glow red');
   for (const halo of evidence.halos) {
-    assert.ok(halo.visible && halo.depthTest && !halo.depthWrite && !halo.bloom && halo.bloomExclude);
+    assert.ok(halo.visible && halo.depthTest && halo.depthWrite && halo.bloom && !halo.bloomExclude);
+    assert.equal(halo.emission, 3);
     assert.ok(halo.color[0] > halo.color[1] * 4 && halo.color[0] > halo.color[2] * 4, halo.name + ': halo must be red');
   }
   await screenshot('03-nested-graffiti-red-glow.png');
@@ -225,7 +227,7 @@ try {
   evidence.served = served;
   evidence.passed = true;
   await writeFile(path.join(output, 'evidence.json'), JSON.stringify(evidence, null, 2));
-  console.log(`Portals presentation passed at ${evidence.url}: all five palettes, transparent ink, running session and two red halos. Evidence: ${output}`);
+  console.log(`Portals presentation passed at ${evidence.url}: all five palettes, transparent ink, running session and strong red coping. Evidence: ${output}`);
 } catch (error) {
   evidence.passed = false; evidence.failure = error.stack || String(error); evidence.served = served;
   if (page) await screenshot('failure.png').catch(() => {});
