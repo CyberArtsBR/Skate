@@ -31,11 +31,14 @@ function requirePublicAsset(asset, label, minimumBytes = 1024) {
   );
 }
 
+const indexSource = read('index.html');
+const bootstrapSource = read('src/bootstrap.js');
 const mainSource = read('src/main.js');
 const sceneSource = read('src/scene/createScene.js');
 const styleSource = read('src/style.css');
 const chimpionSource = read('src/character/ChimpionLoader.js');
 const simulationSource = read('src/halfpipe/HalfpipeSimulation.js');
+const halfpipeVisualSource = read('src/halfpipe/HalfpipeVisual.js');
 const renderBlueprint = read('render.yaml');
 
 requirePublicAsset(GAME_CONFIG.assets.background, 'Configured production background');
@@ -65,6 +68,39 @@ requireContract(
 requireContract(
   /createBackground\(stage,[\s\S]*?GAME_CONFIG\.assets\.background/.test(mainSource),
   'Main scene must wire the configured background through createBackground.',
+);
+
+// Phase 2 architecture invariants: the document owns a neutral bootstrap and
+// coping behavior lives in HalfpipeVisual instead of a post-load V18 monkey patch.
+requireContract(
+  /src="\/src\/bootstrap\.js"/.test(indexSource),
+  'App shell must enter through the canonical src/bootstrap.js.',
+);
+requireContract(
+  !fs.existsSync(path.join(root, 'src/v18/bootstrap.js')),
+  'Versioned V18 bootstrap must remain retired.',
+);
+requireContract(
+  !fs.existsSync(path.join(root, 'src/v18/installCopingSelectiveBloomFix.js')),
+  'Coping presentation must not regress to a post-load monkey patch.',
+);
+requireContract(
+  !fs.existsSync(path.join(root, 'src/v18/installCyberEnvironmentRedirect.js')),
+  'Dead cyber environment prototype redirect must remain retired.',
+);
+requireContract(
+  !/installCopingSelectiveBloomFix|installCyberEnvironmentRedirect/.test(bootstrapSource),
+  'Canonical bootstrap must not reinstall retired Phase 2 patches.',
+);
+requireContract(
+  /new THREE\.MeshStandardMaterial/.test(halfpipeVisualSource)
+    && /selectiveBloomSource:\s*true/.test(halfpipeVisualSource)
+    && /mesh\.userData\.emissiveBloom\s*=\s*true/.test(halfpipeVisualSource),
+  'HalfpipeVisual must own the physical selective-bloom coping implementation.',
+);
+requireContract(
+  !/createCopingGlow|coping-local-red-glow/.test(halfpipeVisualSource),
+  'Canonical coping must not recreate translucent camera-facing halo geometry.',
 );
 
 requireContract(

@@ -5,8 +5,9 @@ import { prepareCopingVisual } from '../src/halfpipe/HalfpipeVisual.js';
 import { CinematicPostProcessing } from '../src/graphics/CinematicPostProcessing.js';
 import { ARCADE_FEEDBACK } from '../src/vfx/ArcadeFeedbackTuning.js';
 
-// Exercise the real shipped rail dimensions and material-slot association.
-// This catches a halo accidentally spanning both sides of the halfpipe.
+// Exercise the real shipped rail/material association. The canonical coping
+// path must keep a single opaque physical mesh and let selective bloom derive
+// the halo from its emissive material; no camera-facing duplicate geometry.
 const document = await new NodeIO().read('public/models/halfpipe/halfpipe2.glb');
 const node = document.getRoot().listNodes().find(current => current.getName() === 'Object_8');
 assert.ok(node, 'shipped GLB must contain its semantic coping mesh');
@@ -15,7 +16,9 @@ const geometry = new THREE.BufferGeometry();
 geometry.setAttribute('position', new THREE.BufferAttribute(primitive.getAttribute('POSITION').getArray(), 3));
 geometry.setIndex(new THREE.BufferAttribute(primitive.getIndices().getArray(), 1));
 const authoredRail = new THREE.MeshStandardMaterial({ name: primitive.getMaterial().getName() });
-const unrelated = new THREE.MeshStandardMaterial({ name: 'unrelated-ramp-material', emissive: 0xffffff, emissiveIntensity: 4 });
+const unrelated = new THREE.MeshStandardMaterial({
+  name: 'unrelated-ramp-material', emissive: 0xffffff, emissiveIntensity: 4,
+});
 const rail = new THREE.Mesh(geometry, [authoredRail, unrelated]);
 rail.name = THREE.PropertyBinding.sanitizeNodeName(node.getName());
 rail.userData.halfpipeSourceNodeName = node.getName();
@@ -25,32 +28,39 @@ const parent = new THREE.Group();
 parent.name = THREE.PropertyBinding.sanitizeNodeName(node.getParentNode().getName());
 parent.userData.halfpipeSourceNodeName = node.getParentNode().getName();
 parent.add(rail);
-const materials = prepareCopingVisual(rail, [authoredRail, unrelated]);
 
-assert.equal(materials[0].userData.halfpipeRole, 'coping');
-assert.equal(materials[0].color.getHex(), ARCADE_FEEDBACK.copingSourceColor);
-assert.equal(materials[0].toneMapped, false, 'red source must stay independent of scene exposure');
+const materials = prepareCopingVisual(rail, [authoredRail, unrelated]);
+const coping = materials[0];
+
+assert.ok(coping.isMeshStandardMaterial, 'coping must remain a physical PBR material');
+assert.equal(coping.userData.halfpipeRole, 'coping');
+assert.equal(coping.userData.selectiveBloomSource, true);
+assert.equal(coping.color.getHex(), ARCADE_FEEDBACK.copingSourceColor);
+assert.equal(coping.emissive.getHex(), ARCADE_FEEDBACK.copingGlowColor);
+assert.equal(coping.emissiveIntensity, 3);
+assert.equal(coping.transparent, false);
+assert.equal(coping.opacity, 1);
+assert.equal(coping.depthTest, true);
+assert.equal(coping.depthWrite, true);
+assert.equal(coping.toneMapped, true);
 assert.equal(materials[1], unrelated, 'non-coping slots must retain their original material');
 assert.equal(authoredRail.userData.halfpipeRole, undefined, 'source GLB material must not be mutated');
-assert.equal(rail.userData.emissiveBloom, false);
-assert.equal(CinematicPostProcessing.prototype._isBloomTarget(rail, materials[0]), false,
-  'red coping must never enter selective HDR bloom');
-assert.equal(CinematicPostProcessing.prototype._isBloomTarget(rail, materials[1]), false);
+
+assert.equal(rail.userData.copingContactZone, true);
+assert.equal(rail.userData.emissiveBloom, true);
+assert.equal(rail.userData.bloomExclude, false);
+assert.equal(
+  CinematicPostProcessing.prototype._isBloomTarget(rail, coping),
+  true,
+  'authored coping slot must enter selective bloom',
+);
+assert.equal(
+  CinematicPostProcessing.prototype._isBloomTarget(rail, materials[1]),
+  false,
+  'unrelated material slots on the coping mesh must remain excluded from bloom',
+);
 
 const halos = rail.children.filter(child => child.userData.visualGlowOnly);
-assert.equal(halos.length, 2, 'each real rail must have exactly one localized halo');
-for (const halo of halos) {
-  const { uStart, uEnd, uRadius, uSourceRadius } = halo.material.uniforms;
-  assert.ok(uStart.value.x * uEnd.value.x > 0, 'a halo cannot cross the center of the halfpipe');
-  assert.ok(Math.abs(uEnd.value.z - uStart.value.z) > 16, 'halo must follow the full authored rail span');
-  assert.ok(uSourceRadius.value > 0.07 && uSourceRadius.value < 0.1);
-  assert.ok(uRadius.value > uSourceRadius.value && uRadius.value < 0.65,
-    'halo must have a tight finite envelope around the source');
-  assert.equal(halo.material.depthTest, true, 'rider and foreground must occlude the halo');
-  assert.equal(halo.material.depthWrite, false, 'translucent glow must not occlude scene geometry');
-  assert.equal(halo.material.blending, THREE.NormalBlending, 'bright backdrops must not bleach the red to white');
-  assert.equal(halo.userData.bloomExclude, true);
-  assert.equal(halo.castShadow, false);
-}
+assert.equal(halos.length, 0, 'coping must not create duplicate translucent halo geometry');
 
-console.log('Coping red glow: real GLB spans, selective materials, no HDR bloom, and occlusion checks passed.');
+console.log('Coping glow: one opaque emissive physical rail with selective bloom; no duplicate halo geometry.');
