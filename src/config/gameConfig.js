@@ -6,7 +6,7 @@ const RIDER_VISUAL_SCALE = 1.2;
 
 export const GAME_CONFIG = Object.freeze({
   assets: Object.freeze({
-    halfpipe: '/models/halfpipe/halfpipe.glb',
+    halfpipe: '/models/halfpipe/halfpipe2.glb',
     skateboard: '/models/skateboard/skateboard.glb',
     chimpion: '/models/characters/The%20Heretic.glb',
     background: MAP_IMAGES.city,
@@ -18,8 +18,8 @@ export const GAME_CONFIG = Object.freeze({
     shadowMapSize: 2048,
     environmentIntensity: 0.84,
     copingGlow: Object.freeze({
-      // A bounded, depth-tested red halo rendered directly around each rail.
-      // Coping does not feed the HDR bloom pass.
+      // Legacy halo tuning is retained for backwards-compatible source assets.
+      // Runtime V18 uses the physical coping mesh as the selective-bloom source.
       haloWidth: 0.42,
       haloOpacity: 0.72,
     }),
