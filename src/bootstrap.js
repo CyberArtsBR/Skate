@@ -2,7 +2,6 @@ import { installHalfpipeV9GameplayPatches } from './v9/installHalfpipeV9Gameplay
 import { installHalfpipeV9EventPatches } from './v9/installHalfpipeV9EventPatches.js';
 import { installHalfpipeV9RuntimePatches } from './v9/installHalfpipeV9RuntimePatches.js';
 import { installHalfpipeV16Patches } from './v16/installHalfpipeV16Patches.js';
-import { installCyberEnvironmentRedirect } from './v18/installCyberEnvironmentRedirect.js';
 import { installHalfpipeV18Patches } from './v18/installHalfpipeV18Patches.js';
 
 // Compatibility bootstrap while Phase 2 moves versioned behavior into canonical
@@ -18,7 +17,6 @@ installHalfpipeV9GameplayPatches();
 installHalfpipeV9EventPatches();
 installHalfpipeV9RuntimePatches();
 installHalfpipeV16Patches();
-installCyberEnvironmentRedirect();
 installHalfpipeV18Patches();
 
 await import('./main.js');
