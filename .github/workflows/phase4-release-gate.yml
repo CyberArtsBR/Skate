@@ -74,7 +74,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Phase 6 presentation polish
+        run: npm run check:phase6
       - name: Coping glow contract
+        if: always()
         run: npm run check:coping-glow
       - name: Graffiti ramp contract
         if: always()
