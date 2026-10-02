@@ -246,10 +246,15 @@ export class CinematicPostProcessing {
 
     try {
       this._prepareBloomMaterials();
+      // A visible HDRI belongs in the base image, never the selective glow pass.
+      // Otherwise the sunset becomes an enormous bloom source over the skater.
+      const background = this.scene.background;
       try {
+        this.scene.background = null;
         this.renderer.shadowMap.autoUpdate = false;
         this.bloomComposer.render(0);
       } finally {
+        this.scene.background = background;
         this.renderer.shadowMap.autoUpdate = shadowAutoUpdate;
         this._restoreMaterials();
       }
@@ -318,3 +323,4 @@ export class CinematicPostProcessing {
     this.renderer.setPixelRatio = this._originalSetPixelRatio;
   }
 }
+
