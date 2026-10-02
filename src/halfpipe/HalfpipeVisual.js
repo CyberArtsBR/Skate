@@ -204,6 +204,7 @@ export class HalfpipeVisual {
     this.root = new THREE.Group();
     this.root.name = 'halfpipe-visual-root';
     this.model = null;
+    this.animationMixer = null;
     this.hiddenGroundNodes = [];
     this.bounds = new THREE.Box3();
     this.ridingSurface = null;
@@ -326,7 +327,7 @@ export class HalfpipeVisual {
     this.root.updateWorldMatrix(true, true);
 
     const alignmentRoot = this.fullMap
-      ? this.model.getObjectByName('Sketchfab_model')
+      ? this.model.getObjectByName('halfpipe.001_Baked_0')?.parent?.parent?.parent
       : this.root;
     if (!alignmentRoot) throw new Error('Full map is missing its authored halfpipe.');
     const fullBoxBeforeAlignment = visibleBounds(alignmentRoot);
@@ -372,6 +373,10 @@ export class HalfpipeVisual {
     this.root.userData.graphicsQualityManaged = true;
     this._unregisterQuality?.();
     this._unregisterQuality = quality.registerObject(this.model);
+    if (this.fullMap && gltf.animations?.length) {
+      this.animationMixer = new THREE.AnimationMixer(this.model);
+      for (const clip of gltf.animations) this.animationMixer.clipAction(clip).play();
+    }
     return this;
   }
 
@@ -443,7 +448,14 @@ export class HalfpipeVisual {
     );
   }
 
+  updateAnimation(dt) {
+    if (this.root.visible) this.animationMixer?.update(Math.max(0, Math.min(0.1, dt)));
+  }
+
   dispose() {
+    this.animationMixer?.stopAllAction();
+    if (this.animationMixer && this.model) this.animationMixer.uncacheRoot(this.model);
+    this.animationMixer = null;
     this._unregisterQuality?.();
     this._unregisterQuality = null;
     disposeObject3D(this.model);

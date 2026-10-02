@@ -885,6 +885,7 @@ function render(timestamp = 0) {
     : Math.max(0, (timestamp - lastFrameTime) / 1000);
   const frameDelta = Math.min(0.1, presentationDelta);
   lastFrameTime = timestamp;
+  halfpipe?.updateAnimation(frameDelta);
 
   if (simulation && pumpInput) {
     pumpInput.pollGamepad(null, frameDelta);

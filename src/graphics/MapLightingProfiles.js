@@ -9,6 +9,14 @@ export const MAP_LIGHTING_PROFILES = Object.freeze({
     environmentFactor: 0.8, exposureFactor: 0.98,
     environmentRotationY: 0, fogColor: 0x202933, fogFactor: 0.18,
   }),
+  'flying-night': Object.freeze({
+    skyColor: 0x9faed8, groundColor: 0x414157,
+    keyColor: 0xdde7ff, fillColor: 0xa9c9f0,
+    keyPosition: [-12, 18, 12], fillPosition: [12, 10, -8],
+    hemisphereFactor: 0.65, keyFactor: 0.65, fillFactor: 1.1,
+    environmentFactor: 0.8, exposureFactor: 0.98,
+    environmentRotationY: 0.5, fogColor: 0x101626, fogFactor: 0.12,
+  }),
   city: Object.freeze({
     skyColor: 0xdaf0ff, groundColor: 0x6b5140,
     keyColor: 0xffe5bd, fillColor: 0xb7d3e0,

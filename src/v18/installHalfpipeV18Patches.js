@@ -38,6 +38,11 @@ export const HALFPIPE_MAPS = Object.freeze([
     modelUrl: '/models/arenas/the-gym.glb',
     environmentUrl: BASE_ENVIRONMENT,
   }),
+  Object.freeze({
+    id: 'flying-night', name: 'Flying Night', kind: 'full',
+    modelUrl: '/models/arenas/flying-night.glb',
+    environmentUrl: CYBER_ENVIRONMENT,
+  }),
 ]);
 
 const STORAGE = Object.freeze({
