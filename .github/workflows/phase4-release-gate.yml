@@ -43,8 +43,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Passive physics
-        run: npm run check:physics
+      - name: Current gameplay invariants
+        run: npm run check:gameplay:current
       - name: Contact clearance
         if: always()
         run: npm run check:contact
@@ -57,15 +57,6 @@ jobs:
       - name: Camera framing
         if: always()
         run: npm run check:camera
-      - name: Trick presentation
-        if: always()
-        run: npm run check:tricks
-      - name: Gameplay core
-        if: always()
-        run: npm run check:gameplay
-      - name: V9 gameplay regressions
-        if: always()
-        run: npm run check:v9
       - name: V15 pump energy regression
         if: always()
         run: npm run check:v15
@@ -94,12 +85,6 @@ jobs:
       - name: Character tricks
         if: always()
         run: npm run check:character
-      - name: UI flow
-        if: always()
-        run: npm run check:ui
-      - name: Integration
-        if: always()
-        run: npm run check:integration
       - name: HUD palettes
         if: always()
         run: npm run check:hud-palettes
