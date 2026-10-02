@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 
+// Version 2's complete front fascia/glass is wider than its riding surface.
+// Include the full authored structure, not just the playable +/-7.97m lips.
+const RAMP_FRAME = Object.freeze({
+  min: Object.freeze([-10, 0, -8.3]),
+  max: Object.freeze([10, 9.05, 8.3]),
+  inset: 0.06,
+});
+
 function clampDt(dt, maxDt = 0.1) {
   return THREE.MathUtils.clamp(Number(dt) || 0, 0, maxDt);
 }
@@ -30,13 +38,28 @@ export class HalfpipeCamera {
     this.impactElapsed = 0;
     this.impactOffset = new THREE.Vector3();
     this._composedOffset = new THREE.Vector3();
+    this._viewBack = this.basePosition.clone().sub(this.baseTarget).normalize();
+    this._viewRight = new THREE.Vector3().crossVectors(this.camera.up, this._viewBack).normalize();
+    this._viewUp = new THREE.Vector3().crossVectors(this._viewBack, this._viewRight).normalize();
+    this._relativePoint = new THREE.Vector3();
+    this._frameCorners = [];
+    for (const x of [RAMP_FRAME.min[0], RAMP_FRAME.max[0]]) {
+      for (const y of [RAMP_FRAME.min[1], RAMP_FRAME.max[1]]) {
+        for (const z of [RAMP_FRAME.min[2], RAMP_FRAME.max[2]]) {
+          this._frameCorners.push(new THREE.Vector3(x, y, z));
+        }
+      }
+    }
+    this._riderTop = RAMP_FRAME.max[1];
+    this._riderFramePoint = new THREE.Vector3();
+    this.framingRetreat = 0;
 
-    this.camera.lookAt(this.target);
+    this._composeCamera();
   }
 
   resize(width, height) {
     this.camera.aspect = Math.max(1, width) / Math.max(1, height);
-    this.camera.updateProjectionMatrix();
+    this._composeCamera();
   }
 
   setReducedMotion(enabled) {
@@ -78,6 +101,10 @@ export class HalfpipeCamera {
   } = {}, presentationDt = 0) {
     const tracking = this.config.dynamicAirTracking;
     const dt = clampDt(presentationDt);
+    this._riderTop = Math.max(
+      RAMP_FRAME.max[1],
+      (Number(y) || 0) + GAME_CONFIG.rider.targetHeight + 0.25,
+    );
     if (!tracking) {
       this._updateImpact(dt);
       this._composeCamera();
@@ -173,14 +200,45 @@ export class HalfpipeCamera {
     this._composedOffset.set(0, this.verticalShift, 0).add(this.impactOffset);
     this.camera.position.copy(this.basePosition).add(this._composedOffset);
     this.target.copy(this.baseTarget).add(this._composedOffset);
+    this.framingRetreat = this._requiredFramingRetreat();
+    // Dolly on the existing view axis: preserve the low, centered front angle
+    // and fixed FOV while fitting portrait screens and keeping the ramp in view
+    // during high airs. The already-damped vertical follow makes this continuous.
+    this.camera.position.addScaledVector(this._viewBack, this.framingRetreat);
     this.camera.lookAt(this.target);
     this.camera.updateProjectionMatrix();
+  }
+
+  _requiredFramingRetreat() {
+    const safeExtent = 1 - RAMP_FRAME.inset;
+    const verticalExtent = Math.tan(THREE.MathUtils.degToRad(this.config.fov / 2)) * safeExtent;
+    const horizontalExtent = verticalExtent * this.camera.aspect;
+    let retreat = 0;
+    const includePoint = point => {
+      this._relativePoint.copy(point).sub(this.camera.position);
+      const depth = -this._relativePoint.dot(this._viewBack);
+      retreat = Math.max(
+        retreat,
+        Math.abs(this._relativePoint.dot(this._viewRight)) / horizontalExtent - depth,
+        Math.abs(this._relativePoint.dot(this._viewUp)) / verticalExtent - depth,
+        this.config.near - depth,
+      );
+    };
+    for (const point of this._frameCorners) includePoint(point);
+    // The rider skates along the center depth of the pipe. Its highest visible
+    // point must also stay in frame, including the initial tracking anticipation.
+    for (const x of [-GAME_CONFIG.halfpipeProfile.flatHalfWidth - GAME_CONFIG.halfpipeProfile.transitionWidth,
+      GAME_CONFIG.halfpipeProfile.flatHalfWidth + GAME_CONFIG.halfpipeProfile.transitionWidth]) {
+      includePoint(this._riderFramePoint.set(x, this._riderTop, 0));
+    }
+    return retreat;
   }
 
   resetDynamic() {
     this.dynamicActive = false;
     this.dynamicAmount = 0;
     this.verticalShift = 0;
+    this._riderTop = RAMP_FRAME.max[1];
     this._clearImpact();
     this._composeCamera();
     return this.snapshot();
@@ -194,6 +252,7 @@ export class HalfpipeCamera {
       fov: this.camera.fov,
       targetY: this.target.y,
       position: this.camera.position.toArray(),
+      framingRetreat: this.framingRetreat,
       impact: {
         strength: this.impactStrength,
         duration: this.impactDuration,

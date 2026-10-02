@@ -390,7 +390,8 @@ export class HalfpipeVisual {
         // The current shipped GLB splits Object_4 into named material meshes.
         // Retain the legacy audit match, and recognize its actual FRENTE face.
         const isCurrentFront = object.name.startsWith('Object_4_')
-          && sourceMaterials.some(material => /^FRENTE(?:\.\d+)?$/.test(material?.name || ''));
+          && sourceMaterials.some(material => /^FRENTE(?:\.\d+)?$/.test(material?.name || '')
+            && material.metalness > 0);
         let preparedMaterials = sourceMaterials;
 
         if (
@@ -400,6 +401,9 @@ export class HalfpipeVisual {
         ) {
           preparedMaterials = sourceMaterials.map((material) => {
             if (material?.name !== frontMetal.materialName && !/^FRENTE(?:\.\d+)?$/.test(material?.name || '')) return material;
+            // Painted graffiti is an authored dielectric, not the legacy metal
+            // front panel. Do not turn its colorful base texture into a mirror.
+            if (material.map && material.metalness === 0) return material;
 
             // V9 audit maps Material -> source mesh Object_0 -> runtime node
             // Object_4 uniquely. Preserve authored roughness/maps exactly and

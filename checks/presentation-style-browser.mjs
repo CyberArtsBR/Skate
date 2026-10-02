@@ -73,6 +73,33 @@ try {
   await waitForInk('.trick-award-name');
   await waitForInk('[data-trick-feedback] > span');
   await page.waitForTimeout(300);
+  const graffiti = await page.evaluate(() => {
+    const game = window.__HALFPIPE_FOUNDATION__;
+    const Vector3 = game.camera.position.constructor;
+    const fronts = [];
+    game.halfpipe.model.updateWorldMatrix(true, true);
+    game.camera.updateMatrixWorld();
+    game.halfpipe.model.traverse(object => {
+      const material = object.material;
+      if (!object.isMesh || !/^FRENTE(?:\.\d+)?$/.test(material?.name || '')) return;
+      const positions = object.geometry.attributes.position;
+      const projected = [];
+      for (let i = 0; i < positions.count; i++) {
+        projected.push(new Vector3().fromBufferAttribute(positions, i)
+          .applyMatrix4(object.matrixWorld).project(game.camera).toArray());
+      }
+      fronts.push({ name: material.name, metalness: material.metalness,
+        texture: Boolean(material.map), uv: material.map?.channel,
+        reflectiveOverride: Boolean(object.userData.maxReflectiveFront),
+        insideFrame: projected.every(p => Math.abs(p[0]) < 0.98 && Math.abs(p[1]) < 0.98) });
+    });
+    return fronts;
+  });
+  assert.equal(graffiti.length, 1, 'the canonical graffiti front must be present');
+  assert.equal(graffiti[0].metalness, 0, 'paint must remain nonmetallic in the game');
+  assert.ok(graffiti[0].texture && graffiti[0].uv === 1);
+  assert.equal(graffiti[0].reflectiveOverride, false);
+  assert.ok(graffiti[0].insideFrame, 'the complete graffiti front must fit the game camera');
   const hud = {};
   for (const selector of ['.hud-score > span', '[data-score]', '.hud-time > span', '[data-time]',
     '.trick-award-name', '[data-trick-feedback] > span']) {
@@ -222,7 +249,7 @@ try {
     await page.screenshot({ path: path.join(output, mapId + '-red-glow.png') });
   }
   assert.deepEqual(errors, [], 'runtime must not report JS, shader or asset errors');
-  const evidence = { prompt, hud, rail, poses, arenas, screenshots: output, errors };
+  const evidence = { prompt, hud, graffiti, rail, poses, arenas, screenshots: output, errors };
   await writeFile(path.join(output, 'evidence.json'), JSON.stringify(evidence, null, 2));
   console.log(JSON.stringify(evidence, null, 2));
 } finally {

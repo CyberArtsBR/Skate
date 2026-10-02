@@ -126,8 +126,8 @@ export const GAME_CONFIG = Object.freeze({
     fov: 30,
     near: 0.1,
     far: 180,
-    position: Object.freeze([0, 6.0, 24.5]),
-    target: Object.freeze([0, 3.9, 0]),
+    position: Object.freeze([0, 6.0, 32]),
+    target: Object.freeze([0, 4.0, 0]),
     dynamicAirTracking: Object.freeze({
       enterHeight: 7.4,
       exitHeight: 6.8,

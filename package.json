@@ -14,6 +14,7 @@
     "check:contact": "node checks/contact-clearance.mjs",
     "check:visual-contact": "node checks/visual-contact.mjs",
     "check:coping-glow": "node checks/coping-glow.mjs",
+    "check:graffiti-ramp": "node checks/graffiti-ramp.mjs",
     "check:aerial-tuck": "node checks/aerial-tuck.mjs",
     "check:presentation:browser": "node checks/presentation-style-browser.mjs",
     "check:pumping": "node checks/passive-physics.mjs",
