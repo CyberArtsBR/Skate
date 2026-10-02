@@ -46,11 +46,12 @@ export const HALFPIPE_MAPS = Object.freeze([
     backgroundColor: 0xb9d6e9,
   }),
   Object.freeze({
-    id: 'storm-coast', name: 'Storm Coast', kind: 'procedural',
-    imageUrl: '/images/maps/storm-coast.png',
-    thumbnailUrl: '/images/maps/storm-coast.png',
-    environmentUrl: '/hdri/japan-sunset-1k.exr',
-    backgroundColor: 0x253b50,
+    id: 'canyon-session', name: 'Canyon Session',
+    imageUrl: MAP_IMAGES.canyonSession,
+    thumbnailUrl: MAP_IMAGES.canyonSession,
+    environmentUrl: BASE_ENVIRONMENT,
+    position: 'center center',
+    coherence: Object.freeze({ brightness: 1, saturation: 1, contrast: 1, gradeOpacity: 0.12 }),
   }),
 ]);
 
@@ -89,7 +90,9 @@ function ensureState(screen) {
 
   const storedHero = readStored(STORAGE.rider);
   const storedBoard = readStored(STORAGE.board);
-  const storedMap = readStored(STORAGE.map);
+  const previousMap = readStored(STORAGE.map);
+  const storedMap = previousMap === 'storm-coast' ? 'canyon-session' : previousMap;
+  if (storedMap !== previousMap) writeStored(STORAGE.map, storedMap);
   const heroIndex = screen.heroes.findIndex((hero) => hero.id === storedHero);
   const boardIndex = screen.boardColors.findIndex((entry) => entry.id === storedBoard);
   const mapIndex = HALFPIPE_MAPS.findIndex((entry) => entry.id === storedMap);
@@ -184,7 +187,7 @@ async function applyMapToRuntime(screen, map) {
 
   try {
     await foundation.setArenaMap?.(map);
-    if (map.kind !== 'full' && map.kind !== 'procedural') {
+    if (map.kind !== 'full') {
       await foundation.background?.setImage?.(map.imageUrl, map.position);
     }
     foundation.background?.setCoherence?.(map.coherence);

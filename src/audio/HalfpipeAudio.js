@@ -924,8 +924,8 @@ export class HalfpipeAudio {
 
   async setEnvironment(mapId = 'city') {
     const id = String(mapId).toLowerCase();
-    const name = id === 'storm-coast' ? 'storm-coast' : id.includes('cyber') || id.includes('night') ? 'cyber-night'
-      : id.includes('tree') || id.includes('outdoor') || id.includes('california') ? 'tree-house' : 'city';
+    const name = id.includes('cyber') || id.includes('night') ? 'cyber-night'
+      : id.includes('tree') || id.includes('canyon') || id.includes('outdoor') || id.includes('california') ? 'tree-house' : 'city';
     if (name !== this.environment) {
       this.environment = name;
       this.environmentGeneration += 1;

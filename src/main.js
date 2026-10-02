@@ -38,7 +38,6 @@ import { ResultsScreen } from './ui/ResultsScreen.js';
 import { PodiumScreen } from './ui/PodiumScreen.js';
 import { WinnersPodium } from './scene/WinnersPodium.js';
 import { ParkForeground } from './scene/ParkForeground.js';
-import { StormCoastEnvironment } from './scene/StormCoastEnvironment.js';
 import { ContactPresentation, measureBoardContacts } from './presentation/ContactPresentation.js';
 import { HalfpipeVFX } from './vfx/HalfpipeVFX.js';
 import { HalfpipeAudio } from './audio/HalfpipeAudio.js';
@@ -628,7 +627,6 @@ function playControllerHaptics(recommendation) {
 }
 
 const arenaVisuals = new Map();
-let stormCoast = null;
 async function setArenaMap(map) {
   if (!arenaVisuals.has('standard')) arenaVisuals.set('standard', halfpipe);
   const key = map.kind === 'full' ? map.id : 'standard';
@@ -646,15 +644,11 @@ async function setArenaMap(map) {
   contactPresentation.ramp = next;
   window.__HALFPIPE_FOUNDATION__.halfpipe = next;
   const fullMap = map.kind === 'full';
-  const stormMap = map.id === 'storm-coast';
-  if (stormMap && !stormCoast) stormCoast = new StormCoastEnvironment(scene, { ramp: next, quality });
-  stormCoast?.setVisible(stormMap);
-  const opaqueMap = fullMap || stormMap;
-  parkForeground.root.visible = !opaqueMap;
-  ground.ground.visible = !opaqueMap;
-  background.element.hidden = opaqueMap;
-  renderer.setClearAlpha(opaqueMap ? 1 : 0);
-  scene.background = opaqueMap ? new THREE.Color(map.backgroundColor ?? 0x202933) : null;
+  parkForeground.root.visible = !fullMap;
+  ground.ground.visible = !fullMap;
+  background.element.hidden = fullMap;
+  renderer.setClearAlpha(fullMap ? 1 : 0);
+  scene.background = fullMap ? new THREE.Color(map.backgroundColor ?? 0x202933) : null;
 }
 
 function setMapPresentation(mapId) {
@@ -978,12 +972,6 @@ function render(timestamp = 0) {
     winnersPodium.update?.(frameDelta);
     podiumScreen.updateLabels(winnersPodium.getLabelAnchors(), cameraController.camera);
   }
-  if (activePresentationMap === 'storm-coast' && !webglLost) {
-    stormCoast?.update(frameDelta, {
-      riderX: rider?.root.position.x || 0,
-      reducedMotion: gameFlow.settings.reducedCameraMotion,
-    });
-  }
   if (!webglLost) renderer.render(scene, cameraController.camera);
   animationFrame = requestAnimationFrame(render);
 }
@@ -1249,8 +1237,6 @@ function dispose() {
   profileDebug.dispose();
   presentationDebug?.dispose();
   ground.dispose();
-  stormCoast?.dispose();
-  stormCoast = null;
   parkForeground?.dispose();
   lighting.dispose();
   disposeEnvironment();
