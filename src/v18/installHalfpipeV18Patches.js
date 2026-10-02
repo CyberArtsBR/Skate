@@ -39,8 +39,8 @@ export const HALFPIPE_MAPS = Object.freeze([
     environmentUrl: BASE_ENVIRONMENT,
   }),
   Object.freeze({
-    id: 'flying-night', name: 'Flying Night', kind: 'full',
-    modelUrl: '/models/arenas/flying-night.glb',
+    id: 'japan', name: 'Japan', kind: 'full',
+    modelUrl: '/models/arenas/japan.glb',
     environmentUrl: CYBER_ENVIRONMENT,
   }),
 ]);

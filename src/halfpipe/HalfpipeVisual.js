@@ -14,7 +14,8 @@ function isCopingMaterial(material, mesh) {
   if ((mesh.parent?.userData?.halfpipeSourceNodeName || mesh.parent?.name) !== 'halfpipe-coping.002_2'
     && mesh.parent?.name !== THREE.PropertyBinding.sanitizeNodeName('halfpipe-coping.002_2')) return false;
   if (material?.name === COPING_MATERIAL_NAME) return true;
-  return mesh?.name === 'Object_8'
+  return (mesh?.name === 'Object_8'
+    || /^Object_8(?:\.\d+)?$/.test(mesh.userData.halfpipeSourceNodeName || ''))
     && mesh.userData.halfpipeSourceMeshName === 'Object_2'
     && (material?.name === 'Material.002'
       || material?.userData?.halfpipeRole === 'coping');
@@ -145,6 +146,12 @@ function createCopingGlowShell(mesh, sourceMaterials, expansion, opacity) {
 }
 
 function findRidingSurface(root) {
+  let authoredSurface = null;
+  root.traverse(object => {
+    if (/^Object_4(?:\.\d+)?$/.test(object.userData.halfpipeSourceNodeName || '')
+      && hasVisibleMesh(object)) authoredSurface = object;
+  });
+  if (authoredSurface) return authoredSurface;
   for (const name of RIDING_SURFACE_NAMES) {
     const exact = root.getObjectByName(name);
     if (exact && hasVisibleMesh(exact)) return exact;
@@ -247,7 +254,8 @@ export class HalfpipeVisual {
         const sourceMaterials = Array.isArray(object.material)
           ? object.material
           : [object.material];
-        if (!this.fullMap || object.parent?.name === 'Object_4') {
+        if (!this.fullMap || (/^Object_4(?:\.\d+)?$/.test(object.parent?.userData?.halfpipeSourceNodeName || '')
+          || object.parent?.name === 'Object_4')) {
           for (const material of sourceMaterials) prepareRampSurfaceFinish(material, paintMask);
         }
         const frontMetal = GAME_CONFIG.renderer.frontMetal;
