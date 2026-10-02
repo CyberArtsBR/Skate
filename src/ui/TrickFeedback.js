@@ -1,3 +1,5 @@
+import { setGraffitiText, disposeGraffitiTextTree } from './GraffitiText.js';
+
 const LANDING_LABELS = Object.freeze({
   perfect: 'PERFECT LANDING',
   clean: 'CLEAN LANDING',
@@ -39,6 +41,9 @@ export class TrickFeedback {
       + pointsLabel + detailLabel, duration, 'is-trick',
       Number(points) > 0 ? 'good' : 'ok');
     this.trick.classList.toggle('is-long-name', formatTrickName(name).length > 28);
+    setGraffitiText(this.trick.querySelector('.trick-award-name'), formatTrickName(name), { palette: 'green', wrap: true, maxLines: 2 });
+    const awardScore = this.trick.querySelector(':scope > span');
+    if (awardScore) setGraffitiText(awardScore, awardScore.textContent, { palette: 'cyan' });
     this._hide(this.status);
     this._hide(this.landing);
     // Event order can differ by maneuver: join the touchdown and its banked
@@ -109,6 +114,7 @@ export class TrickFeedback {
     for (const element of [this.trick, this.landing, this.status]) {
       if (!element) continue;
       element.hidden = true;
+      disposeGraffitiTextTree(element);
       element.textContent = '';
       element.classList.remove(
         'is-visible',
@@ -154,6 +160,7 @@ export class TrickFeedback {
     const previous = this.timers.get(element);
     if (previous) clearTimeout(previous);
 
+    disposeGraffitiTextTree(element);
     element.innerHTML = html;
     element.dataset.tone = tone;
     element.hidden = false;

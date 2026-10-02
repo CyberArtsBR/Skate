@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ResultsScreen } from './ResultsScreen.js';
+import { setGraffitiText, disposeGraffitiTextTree } from './GraffitiText.js';
 import './podium.css';
 
 // Reuse the results menu's mouse, keyboard and gamepad actions.
@@ -38,9 +39,10 @@ export class PodiumScreen extends ResultsScreen {
     const place = standings.findIndex(entry => entry.isPlayer) + 1;
     const message = place === 1 ? 'Congratulations!' : place === 2 ? 'Nice try' : 'Don’t give up';
     const heading = this.heading;
-    heading.textContent = message;
+    setGraffitiText(heading, message, { palette: place === 1 ? 'green' : place === 2 ? 'gold' : 'red' });
     heading.dataset.place = String(place);
     this.labels.forEach(({label}) => this.layoutObserver?.unobserve(label));
+    disposeGraffitiTextTree(this.grid);
     this.grid.replaceChildren();
     this.connectors.replaceChildren();
     this.grid.classList.remove('is-fallback');
@@ -51,7 +53,7 @@ export class PodiumScreen extends ResultsScreen {
       name.textContent = `${index + 1}. ${entry.isPlayer ? 'YOU · ' : ''}${entry.name}`;
       name.title = name.textContent;
       const score = document.createElement('strong');
-      score.textContent = entry.score.toLocaleString('en-US');
+      setGraffitiText(score, entry.score.toLocaleString('en-US'), { palette: 'gold' });
       score.style.setProperty('--score-glyph-span', String(Math.max(4.6, score.textContent.length * .72)));
       label.append(name, score);
       label.hidden = true;

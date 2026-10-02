@@ -1,3 +1,5 @@
+import { setGraffitiText, disposeGraffitiTextTree } from './GraffitiText.js';
+
 export class CountdownTimer {
   constructor({
     countFrom = 3,
@@ -152,11 +154,16 @@ export class CountdownOverlay {
   }
 
   dispose() {
+    disposeGraffitiTextTree(this.root);
     this.root.remove();
   }
 
   _showLabel(label) {
-    this.label.textContent = label;
+    setGraffitiText(this.label, label, {
+      palette: this.root.classList.contains('is-prompt') ? 'fire' : label === 'GO' ? 'green' : 'gold',
+      wrap: true,
+      maxLines: 2,
+    });
     this.root.hidden = false;
   }
 }

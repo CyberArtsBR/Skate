@@ -18,13 +18,10 @@ export const GAME_CONFIG = Object.freeze({
     shadowMapSize: 2048,
     environmentIntensity: 0.84,
     copingGlow: Object.freeze({
-      // Keep the glow clearly visible but restrained so it never blooms over
-      // the rider or washes out the authored ramp materials.
-      emissiveIntensity: 3.2,
-      innerExpansion: 0.012,
-      innerOpacity: 0.024,
-      outerExpansion: 0.026,
-      outerOpacity: 0.01,
+      // A bounded, depth-tested red halo rendered directly around each rail.
+      // Coping does not feed the HDR bloom pass.
+      haloWidth: 0.42,
+      haloOpacity: 0.72,
     }),
     frontMetal: Object.freeze({
       // V9 asset audit of public/models/halfpipe/halfpipe.glb resolves the

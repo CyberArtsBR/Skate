@@ -3,7 +3,6 @@ import { GAME_CONFIG } from '../config/gameConfig.js';
 import { HeroSelectScreen } from '../ui/HeroSelectScreen.js';
 import { RiderController } from '../character/RiderController.js';
 import { TrickPoseController } from '../character/TrickPoseController.js';
-import { SkatePoseController } from '../character/SkatePoseController.js';
 import { SkateAnimationController } from '../character/SkateAnimationController.js';
 import { BackflipGrabIK } from '../character/BackflipGrabIK.js';
 import './v16.css';
@@ -186,8 +185,9 @@ function patchRiderBackflipAxis() {
 
     this.root.updateWorldMatrix(true, true);
     const grabResult = this.backflipGrabIK.update({
-      active: resultBackflip,
+      active: result.airborne && ['aerial-turn', 'backflip'].includes(result.trickType),
       progress: result.trickProgress,
+      crouchWeight: this.smoothedPose?.aerialCrouch || 0,
     });
     this.root.userData.backflipGrabIK = { ...grabResult };
     this.root.updateWorldMatrix(true, true);
@@ -221,35 +221,6 @@ function patchBackflipPresentation() {
       output.boardRoll = (Number(state.dropInRoll) || 0)
         - direction * (0.010 * envelope + 0.012 * tuck);
       return output;
-    };
-  }
-
-  const skateProto = SkatePoseController.prototype;
-  if (!skateProto.__halfpipeV16BackflipPatched) {
-    skateProto.__halfpipeV16BackflipPatched = true;
-    const originalEvaluate = skateProto.evaluate;
-    skateProto.evaluate = function evaluateV16SkatePose(state = {}) {
-      const pose = originalEvaluate.call(this, state);
-      if (!(state.airborne && state.trickType === 'backflip')) return pose;
-
-      const progress = clamp01(state.trickProgress);
-      const tuck = smoothstep(progress / 0.22)
-        * (1 - smoothstep((progress - 0.72) / 0.28));
-      const open = smoothstep((progress - 0.68) / 0.32);
-
-      pose.compression = Math.max(pose.compression, 0.82 + tuck * 0.16 - open * 0.18);
-      pose.hipFlex = 0.40 + tuck * 0.28 - open * 0.14;
-      pose.kneeFlex = Math.min(1.12, 0.82 + tuck * 0.26 - open * 0.18);
-      pose.ankleFlex = -0.13 + open * 0.035;
-      pose.torsoCounter = 0.12 + tuck * 0.16 - open * 0.05;
-      pose.leftArmBalance = 1.08 + tuck * 0.18 - open * 0.22;
-      pose.rightArmBalance = pose.leftArmBalance;
-      pose.armBalance = pose.leftArmBalance;
-      pose.forearmDrop = 0.36 + tuck * 0.22 - open * 0.12;
-      pose.leftForearmDrop = pose.forearmDrop;
-      pose.rightForearmDrop = pose.forearmDrop;
-      pose.headLook = 0.12 + open * 0.42;
-      return pose;
     };
   }
 

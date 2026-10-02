@@ -1,0 +1,60 @@
+/* The supplied painted glyphs carry their own outline and colored extrusion. */
+.graffiti-text.graffiti-text {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  background: none !important;
+  background-image: none !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: none !important;
+  filter: none !important;
+  white-space: normal;
+}
+
+.graffiti-text > .graffiti-text-art {
+  display: none;
+  max-width: 100%;
+  vertical-align: middle;
+  background: transparent;
+}
+
+.graffiti-text > .graffiti-text-source {
+  font: inherit !important;
+  letter-spacing: inherit !important;
+}
+
+.graffiti-text.is-graffiti-ready {
+  line-height: 0 !important;
+}
+
+.graffiti-text.is-graffiti-ready > .graffiti-text-art {
+  display: inline-block;
+}
+
+.graffiti-text.is-graffiti-ready > .graffiti-text-source {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@media (forced-colors: active) {
+  .graffiti-text.is-graffiti-ready > .graffiti-text-art { display: none; }
+  .graffiti-text.is-graffiti-ready > .graffiti-text-source {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    color: CanvasText !important;
+    line-height: 1.2 !important;
+  }
+}

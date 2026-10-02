@@ -1,4 +1,5 @@
 import './results.css';
+import { setGraffitiText, disposeGraffitiTextTree } from './GraffitiText.js';
 
 const STAT_ROWS = Object.freeze([
   ['finalScore', 'FINAL SCORE'],
@@ -88,11 +89,19 @@ export class ResultsScreen {
     this.root.classList.toggle('is-game-over', Boolean(stats.severeCrash));
     this.root.querySelector('.menu-eyebrow').textContent = stats.severeCrash ? 'HEAD FIRST · RUN OVER' : 'RUN COMPLETE';
     this.root.querySelector('h1').textContent = stats.severeCrash ? 'GAME OVER' : 'RESULTS';
+    disposeGraffitiTextTree(this.grid);
     this.grid.innerHTML = STAT_ROWS.map(([key, label]) => (
       '<div class="result-stat" data-stat="' + key + '"><span>' + label + '</span><strong>'
       + escapeText(key === 'finalScore' ? normalized[key].toLocaleString('en-US') : normalized[key]) + '</strong></div>'
     )).join('');
-    this.root.querySelector('[data-standings]')?.remove();
+    const finalScore = this.grid.querySelector('[data-stat="finalScore"]');
+    setGraffitiText(finalScore.querySelector('span'), 'FINAL SCORE', { palette: 'gold' });
+    setGraffitiText(finalScore.querySelector('strong'), normalized.finalScore.toLocaleString('en-US'), { palette: 'gold' });
+    const bestTrick = this.grid.querySelector('[data-stat="bestTrick"]');
+    setGraffitiText(bestTrick.querySelector('strong'), normalized.bestTrick, { palette: 'green' });
+    const previousStandings = this.root.querySelector('[data-standings]');
+    disposeGraffitiTextTree(previousStandings);
+    previousStandings?.remove();
     this.root.classList.toggle('has-standings', Boolean(standings.length));
     if (standings.length) {
       const ranking = document.createElement('div');
@@ -108,7 +117,7 @@ export class ResultsScreen {
         label.textContent = `${index + 1}. ${entry.isPlayer ? 'YOU · ' : ''}${entry.name}`;
         label.title = label.textContent;
         const score = document.createElement('strong');
-        score.textContent = entry.score.toLocaleString('en-US');
+        setGraffitiText(score, entry.score.toLocaleString('en-US'), { palette: 'gold' });
         row.append(label, score);
         ranking.append(row);
       });
@@ -154,6 +163,7 @@ export class ResultsScreen {
 
   dispose() {
     this.inputTarget?.removeEventListener?.('keydown', this._onKeyDown);
+    disposeGraffitiTextTree(this.root);
     this.root.remove();
   }
 

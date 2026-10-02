@@ -265,6 +265,8 @@ export class RiderRigAdapter {
     rightForearmDrop = forearmDrop,
     armLag = 0,
     torsoSettle = 0,
+    aerialCrouch = 0,
+    torsoForwardLean = 0,
   } = {}) {
     // Every frame starts from authored rest pose. Procedural animation and IK
     // therefore cannot accumulate quaternion drift over time.
@@ -302,16 +304,19 @@ export class RiderRigAdapter {
       Number.isFinite(Number(facingSign)) ? Number(facingSign) : 1, -1, 1,
     );
     const motionDirection = stanceDirection * facingDirection;
-    apply('hips', -hipFlex, 0, torsoSettle * 0.18);
+    const tuck = THREE.MathUtils.clamp(Number(aerialCrouch) || 0, 0, 1);
+    // The avatar faces +Z, the same direction as the knee bend pole. Fold
+    // toward those knees in aerial tricks instead of arching away from them.
+    apply('hips', THREE.MathUtils.lerp(-hipFlex, hipFlex, tuck), 0, torsoSettle * 0.18);
     apply(
       'spine',
-      -0.055 * compression + torsoSettle * 0.28,
+      -0.055 * compression + torsoSettle * 0.28 + torsoForwardLean * 0.55,
       -torsoCounter * 0.35 * motionDirection,
       torsoBalanceZ * 0.36,
     );
     apply(
       'chest',
-      -0.025 * compression + torsoSettle * 0.42,
+      -0.025 * compression + torsoSettle * 0.42 + torsoForwardLean * 0.45,
       -torsoCounter * 0.65 * motionDirection,
       torsoBalanceZ * 0.64,
     );

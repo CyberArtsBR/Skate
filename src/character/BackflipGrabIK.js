@@ -65,18 +65,32 @@ export class BackflipGrabIK {
     };
   }
 
-  _deckTargets() {
-    const halfSpan = THREE.MathUtils.clamp(
-      Number(this.skateboard?.stanceHalfLength) * 0.56 || 0.135,
-      0.10,
-      0.18,
-    );
+  _downwardTargets() {
     const deckY = Number(this.skateboard?.deckSurfaceY) || 0;
     this.skateboard.root.updateWorldMatrix(true, true);
-    targetA.set(-halfSpan, deckY + 0.018, 0);
-    targetB.set(halfSpan, deckY + 0.018, 0);
-    this.skateboard.root.localToWorld(targetA);
-    this.skateboard.root.localToWorld(targetB);
+    for (const [side, target] of [['left', targetA], ['right', targetB]]) {
+      const rig = this.rigAdapter.rig;
+      const upper = rig[`${side}UpperArm`];
+      const forearm = rig[`${side}Forearm`];
+      const hand = rig[`${side}Hand`];
+      if (!upper || !forearm || !hand) continue;
+      const shoulder = upper.getWorldPosition(new THREE.Vector3());
+      const elbow = forearm.getWorldPosition(new THREE.Vector3());
+      const wrist = hand.getWorldPosition(new THREE.Vector3());
+      const reach = shoulder.distanceTo(elbow) + elbow.distanceTo(wrist);
+      const localShoulder = this.skateboard.root.worldToLocal(shoulder);
+      const knee = rig[`${side}Shin`]?.getWorldPosition(new THREE.Vector3());
+      if (knee) this.skateboard.root.worldToLocal(knee);
+      // Reach below each shoulder beside its knee, not across the chest or
+      // toward a shared deck-center point. This scales with each avatar's arms
+      // and remains downward relative to the board even during inversion/yaw.
+      target.set(
+        localShoulder.x * 0.75 + (knee?.x ?? localShoulder.x) * 0.25,
+        Math.max(deckY + 0.035, localShoulder.y - reach * 0.88),
+        localShoulder.z * 0.65 + (knee?.z ?? localShoulder.z) * 0.35 + reach * 0.035,
+      );
+      this.skateboard.root.localToWorld(target);
+    }
     return [targetA, targetB];
   }
 
@@ -87,7 +101,13 @@ export class BackflipGrabIK {
     const shoulder = this.rigAdapter.rig[`${side}Shoulder`];
     if (!upperArm || !forearm || !hand) return 0;
 
-    const pole = forearm.getWorldPosition(new THREE.Vector3());
+    const pole = upperArm.getWorldPosition(new THREE.Vector3());
+    this.skateboard.root.worldToLocal(pole);
+    const lateral = Math.sign(pole.x) || (side === 'left' ? 1 : -1);
+    pole.x += lateral * 0.20;
+    pole.y -= 0.18;
+    pole.z += 0.22;
+    this.skateboard.root.localToWorld(pole);
     rotateJointToward(shoulder, hand, target, weight * 0.5, 0.095);
     this.riderRoot.updateWorldMatrix(true, true);
     solveTwoBone(upperArm, forearm, hand, target, pole, weight);
@@ -96,7 +116,7 @@ export class BackflipGrabIK {
     return Number.isFinite(error) ? error : 0;
   }
 
-  update({ active = false, progress = 0 } = {}) {
+  update({ active = false, progress = 0, crouchWeight = null } = {}) {
     this.result.active = false;
     this.result.weight = 0;
     this.result.leftError = 0;
@@ -118,26 +138,14 @@ export class BackflipGrabIK {
     const t = clamp01(progress);
     const reach = smoothstep(t / 0.18);
     const release = t <= 0.78 ? 1 : 1 - smoothstep((t - 0.78) / 0.22);
-    const weight = clamp01(reach * release);
+    const weight = crouchWeight === null
+      ? clamp01(reach * release)
+      : clamp01(crouchWeight);
     this.result.weight = weight;
     if (weight <= 0.001) return this.result;
 
-    const [a, b] = this._deckTargets();
     this.riderRoot.updateWorldMatrix(true, true);
-
-    let leftTarget = a;
-    let rightTarget = b;
-    if (leftReady && rightReady) {
-      const leftHand = this.rigAdapter.rig.leftHand.getWorldPosition(new THREE.Vector3());
-      const rightHand = this.rigAdapter.rig.rightHand.getWorldPosition(new THREE.Vector3());
-      const direct = leftHand.distanceToSquared(a) + rightHand.distanceToSquared(b);
-      const crossed = leftHand.distanceToSquared(b) + rightHand.distanceToSquared(a);
-      if (crossed < direct) {
-        leftTarget = b;
-        rightTarget = a;
-      }
-    }
-
+    const [leftTarget, rightTarget] = this._downwardTargets();
     if (leftReady) this.result.leftError = this._solveArm('left', leftTarget, weight);
     if (rightReady) this.result.rightError = this._solveArm('right', rightTarget, weight);
     this.result.maxError = Math.max(this.result.leftError, this.result.rightError);

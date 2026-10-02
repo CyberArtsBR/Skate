@@ -31,6 +31,7 @@ export class SkatePoseController {
     const handPlant = state.trickVisualActive && state.trickType === 'hand-plant';
     const kickTurn = state.trickVisualActive && state.trickType === 'kick-turn';
     const backflip = Boolean(air && state.trickType === 'backflip');
+    const aerialTurn = Boolean(air && state.trickType === 'aerial-turn');
     const trickProgress = clamp01(state.trickProgress);
     const plantHold = handPlant
       ? smoothstep(trickProgress / PLANT_PHASES.enterEnd)
@@ -48,6 +49,13 @@ export class SkatePoseController {
       : 0;
     const airTuck = clamp01(state.airTuck);
     const anticipation = clamp01(state.landingAnticipation);
+    // Aerial yaw can contain several 180-degree segments. Hold one compact
+    // silhouette through the flight instead of standing up at every segment.
+    const aerialCrouch = backflip
+      ? clamp01(0.68 + flipTuck * 0.32 - flipOpen * 0.14)
+      : aerialTurn
+        ? 0.94 - anticipation * 0.16
+        : 0;
     const recovery = clamp01(state.recovery);
     const preload = clamp01(state.preloadCompression);
     const secondaryLag = THREE.MathUtils.clamp(
@@ -81,6 +89,9 @@ export class SkatePoseController {
         compression,
         clamp01(0.42 + flipTuck * 0.46 - flipOpen * 0.22),
       );
+    }
+    if (aerialCrouch > 0) {
+      compression = Math.max(compression, 0.62 + aerialCrouch * 0.36);
     }
     compression = clamp01(
       compression
@@ -127,10 +138,10 @@ export class SkatePoseController {
       const supportArm = 0.76 - plantHold * 0.22;
       leftArmBalance = plantHand === 'left' ? supportArm : handPlantFreeArm;
       rightArmBalance = plantHand === 'right' ? supportArm : handPlantFreeArm;
-    } else if (backflip) {
-      const flipArm = 0.72 + flipTuck * 0.38 - flipOpen * 0.20;
-      leftArmBalance = Math.max(leftArmBalance, flipArm);
-      rightArmBalance = Math.max(rightArmBalance, flipArm);
+    } else if (aerialCrouch > 0) {
+      const tuckArm = 1.10 + aerialCrouch * 0.22;
+      leftArmBalance = tuckArm;
+      rightArmBalance = tuckArm;
     } else if (ascendingPrep) {
       // Keep the Phase 3B silhouette strength while Phase 4 makes the preload
       // continuous: arms stay clearly down near the knees for the whole ascent.
@@ -141,8 +152,8 @@ export class SkatePoseController {
 
     const forearmDrop = handPlant
       ? 0.08
-      : backflip
-        ? 0.10 + flipTuck * 0.24 - flipOpen * 0.06
+      : aerialCrouch > 0
+        ? 0.28 + aerialCrouch * 0.18
         : air
           ? 0.05 + anticipation * 0.08
           : ascendingPrep
@@ -153,16 +164,18 @@ export class SkatePoseController {
       stance: this.stance,
       facingSign,
       ascendingPrep,
+      aerialCrouch,
+      torsoForwardLean: aerialCrouch * 0.42,
       compression,
       hipFlex: handPlant
         ? 0.10 + compression * 0.12
-        : backflip
-          ? 0.12 + compression * 0.28 + flipTuck * 0.20 - flipOpen * 0.08
+        : aerialCrouch > 0
+          ? 0.28 + aerialCrouch * 0.36
           : 0.07 + compression * 0.18 + landingRecoil * 0.22,
       kneeFlex: handPlant
         ? 0.48 + compression * 0.28
-        : backflip
-          ? Math.min(1.08, 0.42 + compression * 0.48 + flipTuck * 0.20 - flipOpen * 0.08)
+        : aerialCrouch > 0
+          ? 1.18 + aerialCrouch * 0.76
           : Math.min(
             1.02,
             0.36

@@ -334,6 +334,59 @@
   text-shadow: 2px 3px 0 #000;
 }
 
+/* The supplied bitmap letters already contain their bevel, ink and extrusion. */
+#game-stage .halfpipe-hud .hud-block > .graffiti-text,
+#game-stage .halfpipe-hud .hud-trick-feedback .trick-award-name.graffiti-text,
+#game-stage .halfpipe-hud .hud-trick-feedback[data-tone] > span.graffiti-text {
+  background: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  filter: none;
+  letter-spacing: 0;
+}
+
+#game-stage .halfpipe-hud .hud-time > .graffiti-text { text-align: right; }
+#game-stage .halfpipe-hud .trick-award-name.graffiti-text { display: block; }
+
+#game-stage .countdown-overlay,
+#game-stage .countdown-overlay.is-prompt { background: transparent; }
+#game-stage .countdown-label.graffiti-text {
+  max-width: 92vw;
+  background: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  filter: none;
+}
+#game-stage .countdown-overlay.is-prompt .countdown-label.graffiti-text {
+  transform: rotate(-3deg);
+  font-size: clamp(32px, 5.6vw, 84px);
+}
+
+#game-stage .podium-screen h1.graffiti-text,
+#game-stage .podium-score-label strong.graffiti-text,
+#game-stage .results-screen .result-stat .graffiti-text,
+#game-stage .results-screen .standing-row strong.graffiti-text {
+  background: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  filter: none;
+}
+#game-stage .podium-screen h1.graffiti-text { margin: 0 auto; max-width: 94%; }
+#game-stage .podium-score-label,
+#game-stage .podium-score-label.is-player {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+#game-stage .results-screen .result-stat[data-stat='finalScore'],
+#game-stage .results-screen .result-stat[data-stat='bestTrick'] {
+  background: transparent;
+  border: 0;
+}
+#game-stage .results-screen .result-stat[data-stat='finalScore'] > span.graffiti-text {
+  font-size: calc(clamp(16px, 1.4vw, 21px) * var(--menu-ui-scale));
+}
+
 @media (forced-colors: active) {
   .halfpipe-hud .hud-block {
     background: none;
