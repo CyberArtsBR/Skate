@@ -90,6 +90,7 @@ export class CinematicPostProcessing {
     this._camera = null;
     this._size = new THREE.Vector2(1, 1);
     this._materialCache = new Map();
+    this._visibilityCache = new Map();
     this._emissiveMaterials = new Map();
     this._originalRender = renderer.render;
     this._originalSetSize = renderer.setSize;
@@ -207,6 +208,11 @@ export class CinematicPostProcessing {
   _prepareBloomMaterials() {
     this._materialCache.clear();
     this.scene.traverse((object) => {
+      if (object.userData?.bloomExclude) {
+        this._visibilityCache.set(object, object.visible);
+        object.visible = false;
+        return;
+      }
       if (!object?.isMesh || !object.material) return;
       this._materialCache.set(object, object.material);
       const source = object.material;
@@ -226,6 +232,8 @@ export class CinematicPostProcessing {
   }
 
   _restoreMaterials() {
+    for (const [object, visible] of this._visibilityCache) object.visible = visible;
+    this._visibilityCache.clear();
     for (const [object, material] of this._materialCache) object.material = material;
     this._materialCache.clear();
   }

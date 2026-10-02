@@ -45,6 +45,13 @@ export const HALFPIPE_MAPS = Object.freeze([
     environmentBackground: true,
     backgroundColor: 0xb9d6e9,
   }),
+  Object.freeze({
+    id: 'storm-coast', name: 'Storm Coast', kind: 'procedural',
+    imageUrl: '/images/maps/storm-coast.png',
+    thumbnailUrl: '/images/maps/storm-coast.png',
+    environmentUrl: '/hdri/japan-sunset-1k.exr',
+    backgroundColor: 0x253b50,
+  }),
 ]);
 
 const STORAGE = Object.freeze({
@@ -177,7 +184,9 @@ async function applyMapToRuntime(screen, map) {
 
   try {
     await foundation.setArenaMap?.(map);
-    if (map.kind !== 'full') await foundation.background?.setImage?.(map.imageUrl, map.position);
+    if (map.kind !== 'full' && map.kind !== 'procedural') {
+      await foundation.background?.setImage?.(map.imageUrl, map.position);
+    }
     foundation.background?.setCoherence?.(map.coherence);
 
     const environment = quality.environment;
@@ -281,13 +290,13 @@ function ensureMapUI(screen) {
     button.dataset.mapId = map.id;
     button.innerHTML = '<span class="map-card-preview"><img alt="" loading="eager" decoding="async" draggable="false"></span><strong></strong>';
     const image = button.querySelector('img');
-    if (map.kind === 'full') {
+    if (map.kind === 'full' && !map.thumbnailUrl) {
       image.remove();
       const preview = button.querySelector('.map-card-preview');
       preview.textContent = '3D';
       preview.classList.add('full-map-preview');
       button.title = 'Full 3D arena · no image backdrop';
-    } else image.src = map.imageUrl;
+    } else image.src = map.thumbnailUrl || map.imageUrl;
     image.alt = map.name;
     button.querySelector('strong').textContent = map.name;
     button.addEventListener('click', () => selectMap(screen, index + 1));

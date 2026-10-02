@@ -28,6 +28,7 @@ export const AUDIO_MANIFEST = Object.freeze({
     city: placeholder('city', { loop: true, gain: 0.035 }),
     'tree-house': placeholder('outdoor', { loop: true, gain: 0.055 }),
     'cyber-night': placeholder('night', { loop: true, gain: 0.035 }),
+    'storm-coast': placeholder('storm', { loop: true, gain: 0.065 }),
   }),
   sfx: Object.freeze({
     pumpPerfect: placeholder('pump-perfect', { gain: 0.72 }),

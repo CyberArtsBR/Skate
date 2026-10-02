@@ -1,0 +1,9 @@
+# Storm Coast
+
+New selectable procedural 3D arena around the supplied halfpipe. Downloads/halfpipe.glb is byte-identical to the existing ramp (SHA256 302bf02650241a907622ebe2a270ef7bea0a4d707dbb4ee705db97c2536f63b4), so it is reused without duplicating the asset or changing mathematical physics, controls, riding contact or coping semantics.
+
+Layered headlands, coastal town, ocean, edge props and atmospheric sky are actual scene geometry/shaders. Layer parallax follows rider motion; no camera behavior changes. Rain is bounded and quality-scaled. Reduced-motion disables lightning and parallax. Scenery loads on selection confirmation, stays cached and is hidden on switching maps; its resources and quality registrations are disposed with the game. Weather shaders are excluded from selective bloom; wheel/coping emission stays selective. Quiet procedural rain/wind/surf bed uses the existing ambience bus and map-switch crossfade.
+
+The scene reflects the existing sunset EXR lighting; the sky is procedural, not a JPG backdrop. Existing JPG/full GLB maps remain available. No third-party props or recordings added. Thumbnail public/images/maps/storm-coast.png was generated with built-in image_gen and is promotional artwork, not a gameplay screenshot. Prompt: stylized 3D steel halfpipe overlooking a rainy Pacific coast, layered headlands, palms, warm horizon, distant town lights and lightning; no characters, HUD, text or logos.
+
+Static code/asset review only. No automated tests, playtest, benchmarks or local build. User play-review: verify scenery/parallax and rain in a full round, high airs/hand plants/backflips stay unobstructed, reduced motion removes lightning/parallax, pause/resume and map changes have no weather leakage, sound remains under skate Foley, podium remains readable and frame rate suits the device. No measured performance claim.

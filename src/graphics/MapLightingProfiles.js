@@ -17,6 +17,14 @@ export const MAP_LIGHTING_PROFILES = Object.freeze({
     environmentFactor: 1, environmentIntensity: 1.0, exposureFactor: 1,
     environmentRotationY: 0.5, fogColor: 0xb9d6e9, fogFactor: 0.12,
   }),
+  'storm-coast': Object.freeze({
+    skyColor: 0xc2d6e0, groundColor: 0x566677,
+    keyColor: 0xffd7ab, fillColor: 0xaecce4,
+    keyPosition: [-15, 13, -18], fillPosition: [10, 12, 16],
+    hemisphereFactor: 0.9, keyFactor: 0.62, fillFactor: 1.1,
+    environmentFactor: 0.9, exposureFactor: 1,
+    environmentRotationY: -0.7, fogColor: 0x415567, fogFactor: 0.75,
+  }),
   city: Object.freeze({
     skyColor: 0xdaf0ff, groundColor: 0x6b5140,
     keyColor: 0xffe5bd, fillColor: 0xb7d3e0,

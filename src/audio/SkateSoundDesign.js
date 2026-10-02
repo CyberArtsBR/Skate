@@ -193,7 +193,12 @@ export function createEnvironmentBed(context, kind = 'outdoor') {
       const breeze = 0.65 + 0.22 * Math.sin(t * 0.71 + channel * 0.3)
         + 0.12 * Math.sin(t * 1.47);
       let sample = (low * 1.1 + mid * 0.12) * breeze;
-      if (kind === 'city') {
+      if (kind === 'storm') {
+        const surf = 0.65 + 0.35 * Math.sin(t * 0.44 + channel * 0.35);
+        const gust = 0.7 + 0.2 * Math.sin(t * 0.92) + 0.1 * Math.sin(t * 2.1);
+        // Low ocean wash, soft wind and fine rain texture beneath board Foley.
+        sample = low * (1.5 + surf) + mid * 0.38 * gust + (white - mid) * 0.08;
+      } else if (kind === 'city') {
         const passing = Math.max(0, Math.sin(t * 0.48 - 1)) ** 4;
         sample = low * (1.3 + passing * 1.2) + mid * passing * 0.11;
       } else if (kind === 'night') {
