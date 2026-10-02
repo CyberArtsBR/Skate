@@ -1,0 +1,50 @@
+name: Assemble halfpipe2 asset
+
+on:
+  push:
+    branches:
+      - fix/halfpipe2-coping-glow
+    paths:
+      - 'assets/halfpipe2/**'
+      - '.github/workflows/assemble-halfpipe2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/halfpipe2-coping-glow
+      - name: Assemble GLB
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/models/halfpipe
+          cat assets/halfpipe2/part*.b64 | base64 --decode > public/models/halfpipe/halfpipe2.glb
+          test "$(stat -c%s public/models/halfpipe/halfpipe2.glb)" -eq 104720
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('public/models/halfpipe/halfpipe2.glb')
+          data = p.read_bytes()
+          assert data[:4] == b'glTF', 'invalid GLB magic'
+          assert int.from_bytes(data[4:8], 'little') == 2, 'unexpected GLB version'
+          assert int.from_bytes(data[8:12], 'little') == len(data), 'GLB length mismatch'
+          print(f'validated {len(data)} byte GLB')
+          PY
+      - name: Commit assembled binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- public/models/halfpipe/halfpipe2.glb && git ls-files --error-unmatch public/models/halfpipe/halfpipe2.glb >/dev/null 2>&1; then
+            echo 'halfpipe2.glb already current'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/models/halfpipe/halfpipe2.glb
+          git commit -m 'asset: add halfpipe v2 model [skip ci]'
+          git push origin HEAD:fix/halfpipe2-coping-glow
