@@ -41,7 +41,7 @@
     "check:integration": "node checks/phase4-integration.mjs",
     "check:integration:legacy": "node checks/phase4-integration.mjs",
     "check:phase4": "node checks/run-npm-suite.mjs check:gameplay:legacy check:character check:ui:legacy check:integration:legacy",
-    "check:syntax": "node --check src/main.js && node --check src/v9/bootstrap.js && node --check src/v9/installHalfpipeV9GameplayPatches.js && node --check src/v9/installHalfpipeV9EventPatches.js && node --check src/v9/installHalfpipeV9RuntimePatches.js && node --check src/v16/installHalfpipeV16Patches.js && node --check src/v18/bootstrap.js && node --check src/v18/installHalfpipeV18Patches.js && node --check src/v18/installCopingSelectiveBloomFix.js && node --check checks/browser-release-current.mjs && node --check checks/release-contracts-current.mjs && node --check checks/gameplay-current.mjs",
+    "check:syntax": "node --check src/bootstrap.js && node --check src/main.js && node --check src/halfpipe/HalfpipeVisual.js && node --check src/v9/bootstrap.js && node --check src/v9/installHalfpipeV9GameplayPatches.js && node --check src/v9/installHalfpipeV9EventPatches.js && node --check src/v9/installHalfpipeV9RuntimePatches.js && node --check src/v16/installHalfpipeV16Patches.js && node --check src/v18/installHalfpipeV18Patches.js && node --check checks/browser-release-current.mjs && node --check checks/release-contracts-current.mjs && node --check checks/gameplay-current.mjs",
     "check:contracts": "node checks/foundation-invariants.mjs && node checks/phase4-contracts.mjs && node checks/release-contracts-current.mjs",
     "check:static": "npm run check:syntax && npm run check:contracts",
     "check:browser:release": "npm run check:browser",
