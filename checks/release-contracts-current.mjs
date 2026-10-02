@@ -38,6 +38,8 @@ const sceneSource = read('src/scene/createScene.js');
 const styleSource = read('src/style.css');
 const chimpionSource = read('src/character/ChimpionLoader.js');
 const simulationSource = read('src/halfpipe/HalfpipeSimulation.js');
+const motionSolverSource = read('src/halfpipe/HalfpipeMotionSolver.js');
+const runStatisticsSource = read('src/halfpipe/RunStatistics.js');
 const halfpipeVisualSource = read('src/halfpipe/HalfpipeVisual.js');
 const renderBlueprint = read('render.yaml');
 
@@ -128,6 +130,34 @@ requireContract(
 requireContract(
   !/HalfpipeVisual|ridingSurface/.test(simulationSource),
   'Gameplay physics must not derive collision authority from presentation geometry.',
+);
+
+// Phase 3 starts by creating pure decomposition boundaries around the monolith.
+// HalfpipeSimulation remains authoritative until each responsibility is delegated
+// behind equivalence checks; the extracted modules may not acquire presentation
+// or browser dependencies while that migration happens.
+requireContract(
+  /export class HalfpipeMotionSolver/.test(motionSolverSource)
+    && /sampleIncreasingX\(/.test(motionSolverSource)
+    && /wallFraction\(/.test(motionSolverSource)
+    && /computeLaunchVelocity\(/.test(motionSolverSource),
+  'Phase 3 must retain the explicit HalfpipeMotionSolver motion boundary.',
+);
+requireContract(
+  !/\bthis\.state\b/.test(motionSolverSource),
+  'HalfpipeMotionSolver must stay pure and must not own authoritative simulation state.',
+);
+requireContract(
+  !/HalfpipeVisual|RiderController|document\.|window\.|createScene/.test(motionSolverSource),
+  'HalfpipeMotionSolver must remain independent of presentation and browser runtime code.',
+);
+requireContract(
+  /export function snapshotRunStatistics/.test(runStatisticsSource),
+  'Phase 3 must retain the pure RunStatistics boundary.',
+);
+requireContract(
+  !/HalfpipeVisual|RiderController|document\.|window\.|createScene/.test(runStatisticsSource),
+  'RunStatistics must remain independent of presentation and browser runtime code.',
 );
 
 requireContract(
