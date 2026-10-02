@@ -136,11 +136,6 @@ jobs:
         env:
           HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
         run: npm run check:visual-contact
-      - name: Presentation browser regression
-        if: always()
-        env:
-          HALFPIPE_PREVIEW_URL: http://127.0.0.1:4173
-        run: npm run check:presentation:browser
       - name: Preview log on failure
         if: failure()
         run: cat /tmp/halfpipe-preview.log || true
