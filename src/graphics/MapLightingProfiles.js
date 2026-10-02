@@ -14,7 +14,7 @@ export const MAP_LIGHTING_PROFILES = Object.freeze({
     keyColor: 0xffd0a0, fillColor: 0xc4cee7,
     keyPosition: [-12, 18, 12], fillPosition: [12, 10, -8],
     hemisphereFactor: 1.05, keyFactor: 0.95, fillFactor: 1.2,
-    environmentFactor: 1, exposureFactor: 1,
+    environmentFactor: 1, environmentIntensity: 1.0, exposureFactor: 1,
     environmentRotationY: 0.5, fogColor: 0xb9d6e9, fogFactor: 0.12,
   }),
   city: Object.freeze({

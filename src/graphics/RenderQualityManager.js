@@ -62,7 +62,8 @@ export class RenderQualityManager {
   }
 
   get environmentIntensity() {
-    return this.preset.environmentIntensity * (this.mapLighting?.environmentFactor ?? 1);
+    return this.mapLighting?.environmentIntensity
+      ?? this.preset.environmentIntensity * (this.mapLighting?.environmentFactor ?? 1);
   }
 
   setMapLighting(profile = null) {
