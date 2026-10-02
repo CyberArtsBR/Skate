@@ -1,8 +1,14 @@
 import * as THREE from 'three';
 import { HalfpipeVisual } from '../halfpipe/HalfpipeVisual.js';
+import { GAME_CONFIG } from '../config/gameConfig.js';
 import { ARCADE_FEEDBACK } from '../vfx/ArcadeFeedbackTuning.js';
 
 const INSTALL_KEY = Symbol.for('chimpions.halfpipe.coping-selective-bloom-fix');
+const COPING_PARENT_PATTERN = /^halfpipe-coping\.002_2(?:\.\d+)?$/i;
+const COPING_SOURCE_MESH_PATTERN = /^Object_2(?:\.\d+)?$/i;
+const COPING_RUNTIME_MESH_PATTERN = /^Object_8(?:\.\d+)?$/i;
+const V2_COPING_MATERIAL_PATTERN = /^Material\.003(?:\.\d+)?$/i;
+const FRONT_MATERIAL_PATTERN = /^FRENTE(?:\.\d+)?$/i;
 
 function disposeMaterial(material) {
   if (!material) return;
@@ -29,11 +35,24 @@ function removeLegacyCopingHalos(root) {
   }
 }
 
+function isV2CopingObject(object) {
+  if (!object?.isMesh) return false;
+  const parentName = object.parent?.userData?.halfpipeSourceNodeName
+    || object.parent?.name
+    || '';
+  const sourceMeshName = object.userData?.halfpipeSourceMeshName || '';
+  const runtimeName = object.name || '';
+  return COPING_PARENT_PATTERN.test(parentName)
+    && COPING_SOURCE_MESH_PATTERN.test(sourceMeshName)
+    && COPING_RUNTIME_MESH_PATTERN.test(runtimeName);
+}
+
 function isPreparedCopingMaterial(material) {
   return Boolean(
     material?.userData?.halfpipeRole === 'coping'
     || /red-glow-source$/i.test(material?.name || '')
-    || /^Rail_Metal(?:$|-)/.test(material?.name || ''),
+    || /^Rail_Metal(?:$|-)/.test(material?.name || '')
+    || V2_COPING_MATERIAL_PATTERN.test(material?.name || ''),
   );
 }
 
@@ -42,9 +61,11 @@ function createPhysicalCopingMaterial(source) {
     name: `${source?.name || 'Rail_Metal'}-physical-emissive`,
     color: ARCADE_FEEDBACK.copingSourceColor,
     emissive: ARCADE_FEEDBACK.copingGlowColor,
-    emissiveIntensity: 1.15,
+    // Stronger than the first no-ghost pass. The glow now comes only from this
+    // physical rail through selective bloom, never from a second halo mesh.
+    emissiveIntensity: 2.75,
     metalness: 0.58,
-    roughness: 0.28,
+    roughness: 0.24,
     side: source?.side ?? THREE.FrontSide,
     transparent: false,
     opacity: 1,
@@ -61,6 +82,28 @@ function createPhysicalCopingMaterial(source) {
   return material;
 }
 
+function prepareV2FrontMetal(visual) {
+  const frontMetal = GAME_CONFIG.renderer.frontMetal;
+  visual.model?.traverse?.((object) => {
+    if (!object?.isMesh || !object.material) return;
+    const source = Array.isArray(object.material) ? object.material : [object.material];
+    if (!source.some(material => FRONT_MATERIAL_PATTERN.test(material?.name || ''))) return;
+
+    const prepared = source.map((material) => {
+      if (!FRONT_MATERIAL_PATTERN.test(material?.name || '')) return material;
+      const reflective = material.clone();
+      reflective.name = `${material.name}-max-reflective-v2`;
+      if ('metalness' in reflective) reflective.metalness = frontMetal.metalness;
+      if ('envMapIntensity' in reflective) reflective.envMapIntensity = frontMetal.envMapIntensity;
+      reflective.needsUpdate = true;
+      return reflective;
+    });
+    object.material = Array.isArray(object.material) ? prepared : prepared[0];
+    object.userData.maxReflectiveFront = true;
+    object.userData.frontMetalMatch = 'v2:FRENTE';
+  });
+}
+
 function convertCopingToSelectiveBloom(visual) {
   if (!visual?.model) return visual;
 
@@ -68,13 +111,13 @@ function convertCopingToSelectiveBloom(visual) {
   // around each rail. During vertical camera tracking those independent quads
   // could separate from the physical coping and read as red ghost trails.
   removeLegacyCopingHalos(visual.model);
+  prepareV2FrontMetal(visual);
 
   visual.model.traverse((object) => {
-    if (!object?.isMesh || !object.userData?.copingContactZone || !object.material) return;
+    const isCopingObject = object?.userData?.copingContactZone || isV2CopingObject(object);
+    if (!object?.isMesh || !isCopingObject || !object.material) return;
 
-    // CinematicPostProcessing already supports per-material selective bloom.
-    // Mark only the authored coping mesh as eligible; its non-coping slots are
-    // automatically replaced with black during the bloom-only render pass.
+    object.userData.copingContactZone = true;
     object.userData.emissiveBloom = true;
     object.userData.bloomExclude = false;
 
@@ -93,8 +136,9 @@ function convertCopingToSelectiveBloom(visual) {
     for (const source of replaced) source?.dispose?.();
   });
 
-  // Geometry is unchanged, but refresh authored coping contact bounds after the
-  // presentation-only material swap so gameplay/contact helpers stay current.
+  // Refresh authored coping contact bounds after the presentation-only material
+  // swap. V2 uses suffixed Blender/GLTF names but the physical rail geometry is
+  // still the contact source.
   visual._measureCopingContacts?.();
   return visual;
 }
