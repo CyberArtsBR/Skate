@@ -110,10 +110,11 @@ export class RiderFootIK {
     this.chimpionRoot.position.add(correction);
     this.chimpionRoot.updateWorldMatrix(true, true);
     // Pelvis follows board-up, even inverted; only the character is corrected.
-    const aerialTuck = state.airborne
-      && ['aerial-turn', 'backflip'].includes(state.trickType);
+    const deepTuck = (state.airborne
+      && ['aerial-turn', 'backflip'].includes(state.trickType))
+      || (state.trickVisualActive && state.trickType === 'hand-plant');
     const flex = THREE.MathUtils.clamp(
-      Number(state.kneeFlex) || 0.55, 0.25, aerialTuck ? 2.0 : 1.25,
+      Number(state.kneeFlex) || 0.55, 0.25, deepTuck ? 2.0 : 1.25,
     );
     let shift = Infinity;
     for (const side of sides) {

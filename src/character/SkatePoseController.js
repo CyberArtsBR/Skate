@@ -51,7 +51,11 @@ export class SkatePoseController {
     const anticipation = clamp01(state.landingAnticipation);
     // Aerial yaw can contain several 180-degree segments. Hold one compact
     // silhouette through the flight instead of standing up at every segment.
-    const aerialCrouch = backflip
+    // Handplants share the compact aerial pose, blended with the planted phase.
+    // The supporting arm is still solved separately against the coping.
+    const aerialCrouch = handPlant
+      ? plantHold * 0.94
+      : backflip
       ? clamp01(0.68 + flipTuck * 0.32 - flipOpen * 0.14)
       : aerialTurn
         ? 0.94 - anticipation * 0.16
@@ -100,7 +104,7 @@ export class SkatePoseController {
       + bail * 0.16
       + recovery * 0.06,
     );
-    if (handPlant) compression = 0.46 + plantHold * 0.16;
+    if (handPlant) compression = THREE.MathUtils.lerp(0.46, 0.9584, plantHold);
 
     const asymmetry = sketchy * 0.18 * wallSide * facingSign;
     const bailLean = bail * wallSide * facingSign;
@@ -119,7 +123,7 @@ export class SkatePoseController {
     const neutralArm = 0.58;
     const airArm = neutralArm + 0.24 * (1 - anticipation) + 0.08 * airTuck;
     const landArm = landing * (0.08 + heavy * 0.18);
-    const handPlantFreeArm = 0.92 + plantHold * 0.16;
+    const handPlantFreeArm = THREE.MathUtils.lerp(0.92, 1.3068, plantHold);
     let leftArmBalance = air ? airArm : neutralArm + landArm;
     let rightArmBalance = leftArmBalance;
     if (sketchy > 0) {
@@ -133,7 +137,7 @@ export class SkatePoseController {
       rightArmBalance += bailArmReaction - bailLean * 0.12;
     }
     if (handPlant) {
-      // The near arm anticipates support; the other opens as a counterbalance.
+      // The near arm anticipates support; the free arm folds down with the tuck.
       // This identity is latched before inversion, including fakie approaches.
       const supportArm = 0.76 - plantHold * 0.22;
       leftArmBalance = plantHand === 'left' ? supportArm : handPlantFreeArm;
@@ -168,12 +172,12 @@ export class SkatePoseController {
       torsoForwardLean: aerialCrouch * 0.42,
       compression,
       hipFlex: handPlant
-        ? 0.10 + compression * 0.12
+        ? THREE.MathUtils.lerp(0.10 + 0.46 * 0.12, 0.28 + 0.94 * 0.36, plantHold)
         : aerialCrouch > 0
           ? 0.28 + aerialCrouch * 0.36
           : 0.07 + compression * 0.18 + landingRecoil * 0.22,
       kneeFlex: handPlant
-        ? 0.48 + compression * 0.28
+        ? THREE.MathUtils.lerp(0.48 + 0.46 * 0.28, 1.18 + 0.94 * 0.76, plantHold)
         : aerialCrouch > 0
           ? 1.18 + aerialCrouch * 0.76
           : Math.min(
@@ -217,10 +221,10 @@ export class SkatePoseController {
       rightArmBalance,
       forearmDrop,
       leftForearmDrop: handPlant
-        ? (plantHand === 'left' ? 0.07 : 0.20 + plantHold * 0.12)
+        ? (plantHand === 'left' ? 0.07 : THREE.MathUtils.lerp(0.20, 0.28 + 0.94 * 0.18, plantHold))
         : forearmDrop + Math.max(0, asymmetry) * 0.3,
       rightForearmDrop: handPlant
-        ? (plantHand === 'right' ? 0.07 : 0.20 + plantHold * 0.12)
+        ? (plantHand === 'right' ? 0.07 : THREE.MathUtils.lerp(0.20, 0.28 + 0.94 * 0.18, plantHold))
         : forearmDrop + Math.max(0, -asymmetry) * 0.3,
       armLag: secondaryLag,
       torsoSettle: recovery * 0.08 - heavy * 0.11 - bail * 0.08,
