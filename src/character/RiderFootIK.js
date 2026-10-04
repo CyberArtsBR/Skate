@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { solveTwoBone, matchWorldRotation } from './TwoBoneIK.js';
+import { resolveSkateUploadProfile } from './UnrealSkateUploadProfile.js';
 
 const sides = ['left', 'right'];
 const position = new THREE.Vector3(), hip = new THREE.Vector3(), knee = new THREE.Vector3();
@@ -15,6 +16,9 @@ export class RiderFootIK {
   constructor({ rigAdapter, riderRoot, skateboard, chimpionRoot, stance = 'regular' }) {
     Object.assign(this, { rigAdapter, riderRoot, skateboard, chimpionRoot, stance });
     this.enabled = Boolean(rigAdapter.capabilities.leftLeg && rigAdapter.capabilities.rightLeg);
+    this.uploadProfile = resolveSkateUploadProfile(rigAdapter);
+    this.unrealProfile = Boolean(this.uploadProfile);
+    chimpionRoot.userData.uploadRigProfile = this.uploadProfile?.id || 'legacy';
     this.targets = {};
     this.calibration = {};
     this.soleProbes = { left: [], right: [] };
@@ -58,11 +62,26 @@ export class RiderFootIK {
       });
       const center = bounds.isEmpty() ? new THREE.Vector3() : bounds.getCenter(new THREE.Vector3());
       const soleDepth = bounds.isEmpty() ? 0.06 : Math.max(0.015, -bounds.min.y);
+      const rotation = inverseBoardRotation.clone().multiply(foot.getWorldQuaternion(new THREE.Quaternion()));
+      let headingCorrection = 0;
+      if (this.uploadProfile?.straightenToeHeading) {
+        const toe = this.rigAdapter.bones.find(bone => belongsToFoot(bone, foot)
+          && /^(ball|toe)(_|$)/i.test(bone.name.split(':').pop()));
+        if (toe) {
+          const heading = this.skateboard.root.worldToLocal(toe.getWorldPosition(new THREE.Vector3())).sub(restAnkle);
+          if (heading.x * heading.x + heading.z * heading.z > 1e-8) {
+            headingCorrection = -Math.atan2(heading.x, heading.z);
+            const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), headingCorrection);
+            rotation.premultiply(yaw);
+            center.applyQuaternion(yaw);
+          }
+        }
+      }
       const frontSign = this.stance === 'goofy' ? -1 : 1;
       const sign = side === 'left' ? frontSign : -frontSign;
       const target = new THREE.Object3D();
       target.name = `${side}-foot-deck-target`;
-      target.position.set(sign * this.skateboard.stanceHalfLength - center.x,
+      target.position.set(sign * this.skateboard.stanceHalfLength * (this.uploadProfile?.stanceWidthScale ?? 1) - center.x,
         this.skateboard.deckSurfaceY + soleDepth + 0.003,
         (side === 'left' ? 1 : -1) * this.skateboard.footLateralOffset - center.z);
       target.userData.footDeckTarget = true;
@@ -70,7 +89,7 @@ export class RiderFootIK {
       this.skateboard.root.add(target);
       this.targets[side] = target;
       this.calibration[side] = { soleDepth,
-        rotation: inverseBoardRotation.clone().multiply(foot.getWorldQuaternion(new THREE.Quaternion())) };
+        rotation, headingCorrection };
       // One low sole vertex per small X/Z cell captures heel/toe skin blends.
       // At runtime we skin only these probes, never scan the complete mesh.
       const cells = new Map();
