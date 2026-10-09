@@ -2,74 +2,24 @@ import { publicAssetUrl } from './publicAssetUrl.js';
 
 export const RIDER_ROSTER = Object.freeze([
   Object.freeze({
-    id: 'archon',
-    name: 'The Archon',
-    tribe: 'Old World Cult',
-    modelUrl: publicAssetUrl('models/characters/The_Archon.glb'),
-    portraitUrl: publicAssetUrl('images/characters/archon.gif'),
-  }),
-  Object.freeze({
-    id: 'heretic',
-    name: 'The Heretic',
-    tribe: 'Planeswalkers',
-    modelUrl: publicAssetUrl('models/characters/The_Heretic.glb'),
+    id: 'heretic', name: 'The Heretic', tribe: 'Planeswalkers',
+    modelUrl: publicAssetUrl('models/characters/heretic_new.glb'),
     portraitUrl: publicAssetUrl('images/characters/heretic.gif'),
   }),
   Object.freeze({
-    id: 'commodore',
-    name: 'The Commodore',
-    tribe: 'Proletariat',
-    modelUrl: publicAssetUrl('models/characters/The_Commodore.glb'),
-    portraitUrl: publicAssetUrl('images/characters/commodore.gif'),
-  }),
-  Object.freeze({
-    id: 'pioneer',
-    name: 'The Pioneer',
-    tribe: 'Future War Pack',
-    modelUrl: publicAssetUrl('models/characters/The_Pioneer.glb'),
-    portraitUrl: publicAssetUrl('images/characters/pioneer.gif'),
-  }),
-  Object.freeze({
-    id: 'punk',
-    name: 'The Punk',
-    tribe: 'Proletariat',
-    modelUrl: publicAssetUrl('models/characters/The_Punk.glb'),
-    portraitUrl: publicAssetUrl('images/characters/punk.gif'),
-  }),
-  Object.freeze({
-    id: 'street-fighter',
-    name: 'The Street Fighter',
-    tribe: 'Old World Cult',
-    modelUrl: publicAssetUrl('models/characters/The_Street_Fighter.glb'),
-    portraitUrl: publicAssetUrl('images/characters/street-fighter.gif'),
-  }),
-  Object.freeze({
-    id: 'bosun',
-    name: 'The Bosun',
-    tribe: 'Old World Cult',
-    modelUrl: publicAssetUrl('models/characters/The_Bosun.glb'),
-    portraitUrl: publicAssetUrl('images/characters/bosun.gif'),
-  }),
-  Object.freeze({
-    id: 'adolescent',
-    name: 'The Adolescent',
-    tribe: 'Proletariat',
-    modelUrl: publicAssetUrl('models/characters/The_Adolescent.glb'),
+    id: 'adolescent', name: 'The Adolescent', tribe: 'Proletariat',
+    modelUrl: publicAssetUrl('models/characters/adolescent_new.glb'),
     portraitUrl: publicAssetUrl('images/characters/adolescent.gif'),
   }),
   Object.freeze({
-    id: 'angsty',
-    name: 'The Angsty',
-    tribe: 'Proletariat',
-    modelUrl: publicAssetUrl('models/characters/The_Angsty.glb'),
-    portraitUrl: publicAssetUrl('images/characters/angsty.gif'),
+    id: 'archon', name: 'The Archon', tribe: 'Old World Cult',
+    modelUrl: publicAssetUrl('models/characters/anchor_new.glb'),
+    portraitUrl: publicAssetUrl('images/characters/archon.gif'),
   }),
   Object.freeze({
-    id: 'apologetic',
-    name: 'The Apologetic',
-    tribe: 'Proletariat',
-    modelUrl: publicAssetUrl('models/characters/The_Apologetic.glb'),
-    portraitUrl: publicAssetUrl('images/characters/apologetic.gif'),
+    id: 'tuxr', name: 'Tuxr', tribe: 'Chimpions',
+    modelUrl: publicAssetUrl('models/characters/tuxr_new.glb'),
+    portraitUrl: null,
   }),
 ]);
 
@@ -86,7 +36,7 @@ export const SKATEBOARD_COLORS = Object.freeze([
 ]);
 
 export function riderById(id) {
-  return RIDER_ROSTER.find((entry) => entry.id === id) || RIDER_ROSTER[1];
+  return RIDER_ROSTER.find((entry) => entry.id === id) || RIDER_ROSTER[0];
 }
 
 export function skateboardColorById(id) {
