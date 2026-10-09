@@ -6,10 +6,10 @@ import { installHalfpipeV16Patches } from './v16/installHalfpipeV16Patches.js';
 import { installPortalsAssetBase } from './v18/installPortalsAssetBase.js';
 import { installHalfpipeV18Patches } from './v18/installHalfpipeV18Patches.js';
 
-// The canonical bootstrap starts every fresh game load with all three customization axes on Random.
+// The four-character roster starts on Heretic; board and map can still start on Random.
 // Choices still remain stable while the current page/session is running.
 try {
-  globalThis.localStorage?.setItem('chimpions-halfpipe.v18.rider-selection', 'random');
+  globalThis.localStorage?.setItem('chimpions-halfpipe.v18.rider-selection', 'heretic');
   globalThis.localStorage?.setItem('chimpions-halfpipe.v18.board-selection', 'random');
   globalThis.localStorage?.setItem('chimpions-halfpipe.v18.map-selection', 'random');
 } catch {}

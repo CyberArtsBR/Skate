@@ -73,7 +73,7 @@ try {
 
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => window.__HALFPIPE_FOUNDATION__.flow.state === 'character-select');
-  await page.waitForFunction(() => document.querySelectorAll('.hero-card').length >= 11);
+  await page.waitForFunction(() => document.querySelectorAll('.hero-card').length === 4);
 
   const selection = await page.evaluate(() => {
     const mapIds = Array.from(document.querySelectorAll('.map-card'), (node) => node.dataset.mapId || '');
@@ -89,14 +89,14 @@ try {
     };
   });
 
-  assert.equal(selection.heroCards, 11, 'Random + 10 production riders must be visible');
-  assert.equal(selection.heroImages, 10, 'only production riders should use animated thumbnails');
+  assert.equal(selection.heroCards, 4, 'Exactly four uploaded riders must be visible');
+  assert.equal(selection.heroImages, 3, 'The three legacy names retain portraits; Tuxr uses a monogram');
   assert.equal(selection.boardSwatches, 10, 'Random + 9 skateboard colors must be visible');
   assert.ok(selection.mapCards >= 2, 'map UI must expose Random plus production maps');
   assert.equal(new Set(selection.mapIds).size, selection.mapIds.length, 'map IDs must be unique');
   assert.ok(selection.mapIds.includes('random'), 'Random map option must remain available');
   assert.ok(selection.mapIds.includes('city'), 'City map must remain available');
-  assert.equal(selection.randomHero, true);
+  assert.equal(selection.randomHero, false);
   assert.equal(selection.randomBoard, true);
   assert.equal(selection.randomMap, true);
 
