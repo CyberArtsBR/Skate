@@ -183,20 +183,8 @@ for (const [id, file] of FILES) {
   };
 }
 
-// The reference rotations describe the original Heretic GLB. New rider uploads
-// may have different bind poses; runtime retargeting handles those differences.
-const heretic = resolved.heretic;
-for (const slot of []) {
-  const expectedValues = HERETIC_REFERENCE_MODEL_ROTATIONS[slot];
-  assert.ok(expectedValues, `Heretic reference is missing ${slot}`);
-  const expected = new THREE.Quaternion(...expectedValues).normalize();
-  const actual = worldQuaternion(heretic.rig[slot]);
-  assert.ok(
-    angleDegrees(expected, actual) < 0.001,
-    `Heretic reference quaternion drifted for ${slot}`,
-  );
-}
-
+// The new Heretic GLB need not share the original reference bind pose.
+// Validate semantic slots and retargeting for all four replacement rigs.
 // Validate the retarget basis against every actual GLB with an intentionally
 // asymmetric sample rotation. This is the same conjugation used at runtime.
 const sampleDelta = new THREE.Quaternion().setFromEuler(
