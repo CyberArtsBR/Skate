@@ -51,10 +51,12 @@
     "check:release:browser": "node checks/run-npm-suite.mjs check:browser check:visual-contact",
     "check:release": "node tools/run-release.mjs",
     "check:security": "npm audit --audit-level=high",
-    "prebuild": "npm run verify:characters",
+    "prebuild": "npm run verify:characters && npm run check:portals-assets",
     "predev": "npm run verify:characters",
     "verify:characters": "node tools/verify-chimpion-roster.mjs",
-    "check:rigs": "node checks/rig-compatibility.mjs"
+    "check:rigs": "node checks/rig-compatibility.mjs",
+    "check:portals-assets": "node tools/check-portals-assets.mjs",
+    "check:portals-presentation": "node checks/portals-presentation-browser.mjs"
   },
   "dependencies": {
     "three": "0.180.0"

@@ -147,7 +147,7 @@ function ensureState(screen) {
   const mapIndex = HALFPIPE_MAPS.findIndex((entry) => entry.id === storedMap);
 
   screen.__v18SelectionState = {
-    heroMode: heroIndex >= 0 ? 'explicit' : 'random',
+    heroMode: 'explicit',
     boardMode: boardIndex >= 0 ? 'explicit' : 'random',
     mapMode: mapIndex >= 0 ? 'explicit' : 'random',
     mapIndex: Math.max(0, mapIndex),
@@ -157,7 +157,7 @@ function ensureState(screen) {
     applyingMap: false,
   };
 
-  if (heroIndex >= 0) screen.selectedHeroIndex = heroIndex;
+  screen.selectedHeroIndex = Math.max(0, heroIndex);
   if (boardIndex >= 0) screen.selectedBoardIndex = boardIndex;
   return screen.__v18SelectionState;
 }
@@ -392,9 +392,7 @@ function patchHeroSelect() {
     ensureState(this);
     originalRender.call(this);
 
-    if (!this.heroRoot.querySelector('[data-hero-id="random"]')) {
-      this.heroRoot.prepend(createRandomHeroCard(this));
-    }
+    // Exactly four production rider choices: no Random hero card.
     if (!this.swatchRoot.querySelector('[data-board-color-id="random"]')) {
       this.swatchRoot.prepend(createRandomBoardSwatch(this));
     }

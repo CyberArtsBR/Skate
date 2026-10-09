@@ -12,5 +12,7 @@ const mapVersions = Object.fromEntries(mapFiles.map((file) => [
 ]));
 
 export default defineConfig({
+  // Portals mounts the package below a host route rather than at the origin root.
+  base: './',
   define: { __HALFPIPE_MAP_VERSIONS__: JSON.stringify(mapVersions) },
 });

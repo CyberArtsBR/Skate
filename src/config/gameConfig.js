@@ -1,4 +1,5 @@
 import { MAP_IMAGES } from './mapAssets.js';
+import { publicAssetUrl } from './publicAssetUrl.js';
 
 // Scale both authored visuals before their deck/sole/contact measurements are
 // built, preserving rider-to-board proportions without scaling gameplay space.
@@ -6,9 +7,9 @@ const RIDER_VISUAL_SCALE = 1.2;
 
 export const GAME_CONFIG = Object.freeze({
   assets: Object.freeze({
-    halfpipe: '/models/halfpipe/halfpipe2.glb',
-    skateboard: '/models/skateboard/skateboard.glb',
-    chimpion: '/models/characters/The%20Heretic.glb',
+    halfpipe: publicAssetUrl('models/halfpipe/halfpipe2.glb'),
+    skateboard: publicAssetUrl('models/skateboard/skateboard.glb'),
+    chimpion: publicAssetUrl('models/characters/heretic_new.glb'),
     background: MAP_IMAGES.city,
     environment: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr',
   }),

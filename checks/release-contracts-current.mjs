@@ -75,7 +75,7 @@ requireContract(
 // Phase 2 architecture invariants: the document owns a neutral bootstrap and
 // coping behavior lives in HalfpipeVisual instead of a post-load V18 monkey patch.
 requireContract(
-  /src="\/src\/bootstrap\.js"/.test(indexSource),
+  /src="(?:\/|\.\/)src\/bootstrap\.js"/.test(indexSource),
   'App shell must enter through the canonical src/bootstrap.js.',
 );
 requireContract(

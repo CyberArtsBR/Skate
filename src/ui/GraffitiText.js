@@ -1,4 +1,5 @@
 import { GRAFFITI_ATLAS } from './graffiti-atlas.js';
+import { publicAssetUrl } from '../config/publicAssetUrl.js';
 import './graffiti-text.css';
 
 const states = new WeakMap();
@@ -18,7 +19,7 @@ function loadAtlas(palette) {
       image.onload = () => resolve(image);
       image.onerror = () => reject(new Error(`Could not load graffiti alphabet ${palette}`));
     });
-    image.src = `${import.meta.env.BASE_URL}fonts/graffiti/${GRAFFITI_ATLAS[palette].file}`;
+    image.src = publicAssetUrl(`fonts/graffiti/${GRAFFITI_ATLAS[palette].file}`);
     imageCache.set(palette, promise);
   }
   return imageCache.get(palette);

@@ -331,4 +331,3 @@ export class CinematicPostProcessing {
     this.renderer.setPixelRatio = this._originalSetPixelRatio;
   }
 }
-

@@ -1,3 +1,5 @@
+import { publicAssetUrl } from '../config/publicAssetUrl.js';
+
 const generatedBed = (kind, options = {}) => Object.freeze({
   url: null,
   optional: true,
@@ -6,10 +8,10 @@ const generatedBed = (kind, options = {}) => Object.freeze({
   ...options,
 });
 
-const PIXEL_RAMPAGE = '/audio/music/Pixel%20Rampage.mp3';
-const SKATE_ROLL = '/audio/skate/raw-street-roll.wav';
-const SKATE_IMPACT = '/audio/skate/raw-street-impact.wav';
-const SKATE_TAKEOFF = '/audio/skate/raw-street-takeoff.wav';
+const PIXEL_RAMPAGE = publicAssetUrl('audio/music/Pixel_Rampage.mp3');
+const SKATE_ROLL = publicAssetUrl('audio/skate/raw-street-roll.wav');
+const SKATE_IMPACT = publicAssetUrl('audio/skate/raw-street-impact.wav');
+const SKATE_TAKEOFF = publicAssetUrl('audio/skate/raw-street-takeoff.wav');
 const recorded = (url, options = {}) => Object.freeze({ url, ...options });
 
 export const AUDIO_MANIFEST = Object.freeze({
@@ -72,7 +74,7 @@ export const AUDIO_MANIFEST = Object.freeze({
 });
 
 export const AUDIO_ASSET_REQUIREMENTS = Object.freeze([
-  'Primary menu/gameplay/results theme: public/audio/music/Pixel Rampage.mp3',
+  'Primary menu/gameplay/results theme: public/audio/music/Pixel_Rampage.mp3',
   'Recorded physical palette: raw-street-roll.wav, raw-street-impact.wav, raw-street-takeoff.wav',
   'Optional future dedicated crowd cheer/arena walla recordings may replace the generated crowd layer',
   'Optional future map-specific field ambience recordings may replace generated environment beds without changing runtime routing',

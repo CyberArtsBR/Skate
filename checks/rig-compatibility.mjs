@@ -2,23 +2,16 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import * as THREE from 'three';
 import { NodeIO } from '@gltf-transform/core';
+import { RIDER_ROSTER } from '../src/config/riderRoster.js';
 import {
   HERETIC_REFERENCE_MODEL_ROTATIONS,
   SLOT_ALIASES,
 } from '../src/character/RiderRigAdapter.js';
 
-const FILES = Object.freeze([
-  ['archon', 'The Archon.glb'],
-  ['heretic', 'The Heretic.glb'],
-  ['commodore', 'The Commodore.glb'],
-  ['pioneer', 'The Pioneer.glb'],
-  ['punk', 'The Punk.glb'],
-  ['street-fighter', 'The Street Fighter.glb'],
-  ['bosun', 'The Bosun.glb'],
-  ['adolescent', 'The Adolescent.glb'],
-  ['angsty', 'The Angsty.glb'],
-  ['apologetic', 'The Apologetic.glb'],
-]);
+const FILES = Object.freeze(RIDER_ROSTER.map(rider => [
+  rider.id,
+  path.basename(decodeURIComponent(new URL(rider.modelUrl, 'http://localhost').pathname)),
+]));
 
 const REQUIRED_POSE_SLOTS = Object.freeze([
   'hips',
@@ -167,7 +160,7 @@ for (const [id, file] of FILES) {
   }
 
   for (const slot of REQUIRED_POSE_SLOTS) {
-    assert.ok(rig[slot], `${id} is missing required semantic slot ${slot}`);
+    assert.ok(rig[slot], `${id} is missing required semantic slot ${slot}. Available nodes: ${nodes.map(node => node.getName()).join(', ')}`);
   }
 
   assert.ok(
@@ -190,18 +183,8 @@ for (const [id, file] of FILES) {
   };
 }
 
-const heretic = resolved.heretic;
-for (const slot of REQUIRED_POSE_SLOTS) {
-  const expectedValues = HERETIC_REFERENCE_MODEL_ROTATIONS[slot];
-  assert.ok(expectedValues, `Heretic reference is missing ${slot}`);
-  const expected = new THREE.Quaternion(...expectedValues).normalize();
-  const actual = worldQuaternion(heretic.rig[slot]);
-  assert.ok(
-    angleDegrees(expected, actual) < 0.001,
-    `Heretic reference quaternion drifted for ${slot}`,
-  );
-}
-
+// The new Heretic GLB need not share the original reference bind pose.
+// Validate semantic slots and retargeting for all four replacement rigs.
 // Validate the retarget basis against every actual GLB with an intentionally
 // asymmetric sample rotation. This is the same conjugation used at runtime.
 const sampleDelta = new THREE.Quaternion().setFromEuler(
@@ -242,5 +225,5 @@ console.log(JSON.stringify({
   ),
   reference: 'The Heretic',
   semanticPoseSlots: REQUIRED_POSE_SLOTS.length,
-  result: '10-rider rig compatibility passed',
+  result: `${FILES.length}-rider rig compatibility passed`,
 }, null, 2));

@@ -92,3 +92,11 @@ The direct `phase4-integration.mjs` assertion that the release runner execute
 `check:gameplay` also fails identically on that unchanged baseline (line 37).
 Visual and numerical contact checks passed; this correction does not change
 the authoritative physics or repair the older release-runner contract.
+
+## Portals synchronization and production
+
+The presentation commit `24f613d` was fast-forwarded into `main` and pushed to GitHub. Render automatically deployed that exact commit to `https://chimpions-halfpipe.onrender.com` and reported it live. The production presentation browser check passed, including Tree House, The Gym and Japan, with HTTP 200 and no JavaScript, shader or asset errors. Its evidence is separate from local captures in `artifacts/presentation-production/`.
+
+This Portals branch merges `main` into `portals/fresh-v2`, preserving the existing underscored character/music filenames and bundle-root asset resolution. The new DOM font images use `publicAssetUrl`, since Three.js loader URL modifiers do not intercept DOM images. Audio uses the latest main manifest behavior with Portals-compatible paths; the environment retains both the existing URL helper and main's EXR loader. The default Portals Vite base is now `./`, so `npm run build` generates relative entry URLs without requiring shell-specific passthrough arguments.
+
+The aerial-tuck and rig checks resolve filenames from the runtime roster. The nested-host check is available as `npm run check:portals-presentation` after a build: it serves assets below `/portal-game/` while the document is at `/host/preview` with no trailing slash, and checks all five font palettes, transparency, boot/title artwork, a running session, asset paths and both red halos. Evidence is saved in `artifacts/portals-presentation/`.

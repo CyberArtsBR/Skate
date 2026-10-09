@@ -3,17 +3,15 @@ import path from 'node:path';
 import * as THREE from 'three';
 import { NodeIO } from '@gltf-transform/core';
 import { GAME_CONFIG } from '../src/config/gameConfig.js';
+import { RIDER_ROSTER } from '../src/config/riderRoster.js';
 import { RiderRigAdapter } from '../src/character/RiderRigAdapter.js';
 import { RiderFootIK } from '../src/character/RiderFootIK.js';
 import { SkatePoseController } from '../src/character/SkatePoseController.js';
 import { BackflipGrabIK } from '../src/character/BackflipGrabIK.js';
 
-const files = [
-  'The Archon.glb', 'The Heretic.glb', 'The Commodore.glb',
-  'The Pioneer.glb', 'The Punk.glb', 'The Street Fighter.glb',
-  'The Bosun.glb', 'The Adolescent.glb', 'The Angsty.glb',
-  'The Apologetic.glb',
-];
+const files = RIDER_ROSTER.map(rider => path.basename(
+  decodeURIComponent(new URL(rider.modelUrl, 'http://localhost').pathname),
+));
 const io = new NodeIO();
 const results = [];
 

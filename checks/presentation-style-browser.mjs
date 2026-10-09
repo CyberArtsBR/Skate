@@ -4,7 +4,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const url = process.env.HALFPIPE_PREVIEW_URL || 'http://localhost:5173';
-const output = path.resolve('artifacts/presentation-style');
+const output = path.resolve(process.env.HALFPIPE_PRESENTATION_OUTPUT || 'artifacts/presentation-style');
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
