@@ -1,7 +1,7 @@
 import { publicAssetUrl } from './config/publicAssetUrl.js';
 import { installHalfpipeV9GameplayPatches } from './v9/installHalfpipeV9GameplayPatches.js';
-import { installHalfpipeV9EventPatches } from '../v9/installHalfpipeV9EventPatches.js';
-import { installHalfpipeV9RuntimePatches } from '../v9/installHalfpipeV9RuntimePatches.js';
+import { installHalfpipeV9EventPatches } from './v9/installHalfpipeV9EventPatches.js';
+import { installHalfpipeV9RuntimePatches } from './v9/installHalfpipeV9RuntimePatches.js';
 import { installHalfpipeV16Patches } from './v16/installHalfpipeV16Patches.js';
 import { installPortalsAssetBase } from './v18/installPortalsAssetBase.js';
 import { installHalfpipeV18Patches } from './v18/installHalfpipeV18Patches.js';
