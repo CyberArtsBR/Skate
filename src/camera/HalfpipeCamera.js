@@ -10,11 +10,21 @@ function damp(current, target, response, dt) {
   return THREE.MathUtils.lerp(current, target, t);
 }
 
+function viewportFov(config, aspect) {
+  const cover = config.viewportCover;
+  if (!cover) return config.fov;
+  const scale = cover.scale * Math.max(1, aspect / cover.referenceAspect);
+  return THREE.MathUtils.radToDeg(2 * Math.atan(
+    Math.tan(THREE.MathUtils.degToRad(config.fov) / 2) / scale,
+  ));
+}
+
 export class HalfpipeCamera {
   constructor({ reducedMotion = false } = {}) {
     const config = GAME_CONFIG.camera;
     this.config = config;
     this.camera = new THREE.PerspectiveCamera(config.fov, 16 / 9, config.near, config.far);
+    this.viewportFov = viewportFov(config, this.camera.aspect);
     this.camera.name = 'halfpipe-camera';
     this.camera.position.fromArray(config.position);
     this.basePosition = new THREE.Vector3().fromArray(config.position);
@@ -30,12 +40,16 @@ export class HalfpipeCamera {
     this.impactElapsed = 0;
     this.impactOffset = new THREE.Vector3();
     this._composedOffset = new THREE.Vector3();
-
-    this.camera.lookAt(this.target);
+    this._composeCamera();
   }
 
   resize(width, height) {
     this.camera.aspect = Math.max(1, width) / Math.max(1, height);
+    // Resolve an undistorted, uniform cover only when the viewport changes.
+    // This lens then stays locked during every aerial/impact at this size.
+    // Never move X/Z or derive the cover from rider height.
+    this.viewportFov = viewportFov(this.config, this.camera.aspect);
+    this.camera.fov = this.viewportFov;
     this.camera.updateProjectionMatrix();
   }
 
@@ -154,9 +168,9 @@ export class HalfpipeCamera {
     const oscillation = Math.sin(progress * Math.PI * 3.25);
     const offset = this.impactStrength * envelope * oscillation;
 
-    // Position and target receive the same offset, preserving the base viewing
-    // direction. The small Z component reads as impact without becoming a zoom.
-    this.impactOffset.set(0, offset * 0.7, offset * 0.22);
+    // Impacts are vertical only, just like the aerial follow. X/Z and FOV stay
+    // fixed so even repeated landings cannot introduce a dolly or zoom-out.
+    this.impactOffset.set(0, offset * 0.7, 0);
 
     if (progress >= 1) this._clearImpact();
   }
@@ -169,10 +183,13 @@ export class HalfpipeCamera {
   }
 
   _composeCamera() {
-    this.camera.fov = this.config.fov;
+    this.camera.fov = this.viewportFov;
     this._composedOffset.set(0, this.verticalShift, 0).add(this.impactOffset);
     this.camera.position.copy(this.basePosition).add(this._composedOffset);
     this.target.copy(this.baseTarget).add(this._composedOffset);
+    // Follow the rider only by translating camera and target together in Y.
+    // Keep the fixed front angle and depth instead of trying to fit the ramp
+    // floor and an aerial rider into the same frame by retreating.
     this.camera.lookAt(this.target);
     this.camera.updateProjectionMatrix();
   }

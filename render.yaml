@@ -5,4 +5,4 @@ services:
     branch: main
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass

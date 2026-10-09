@@ -1,14 +1,12 @@
-import { publicAssetUrl } from '../config/publicAssetUrl.js';
-import { installHalfpipeV9GameplayPatches } from '../v9/installHalfpipeV9GameplayPatches.js';
+import { publicAssetUrl } from './config/publicAssetUrl.js';
+import { installHalfpipeV9GameplayPatches } from './v9/installHalfpipeV9GameplayPatches.js';
 import { installHalfpipeV9EventPatches } from '../v9/installHalfpipeV9EventPatches.js';
 import { installHalfpipeV9RuntimePatches } from '../v9/installHalfpipeV9RuntimePatches.js';
-import { installHalfpipeV16Patches } from '../v16/installHalfpipeV16Patches.js';
-import { installPortalsAssetBase } from './installPortalsAssetBase.js';
-import { installCyberEnvironmentRedirect } from './installCyberEnvironmentRedirect.js';
-import { installHalfpipeV18Patches } from './installHalfpipeV18Patches.js';
-import { installCopingSelectiveBloomFix } from './installCopingSelectiveBloomFix.js';
+import { installHalfpipeV16Patches } from './v16/installHalfpipeV16Patches.js';
+import { installPortalsAssetBase } from './v18/installPortalsAssetBase.js';
+import { installHalfpipeV18Patches } from './v18/installHalfpipeV18Patches.js';
 
-// V18 starts every fresh game load with all three customization axes on Random.
+// The canonical bootstrap starts every fresh game load with all three customization axes on Random.
 // Choices still remain stable while the current page/session is running.
 try {
   globalThis.localStorage?.setItem('chimpions-halfpipe.v18.rider-selection', 'random');
@@ -32,9 +30,7 @@ installHalfpipeV9GameplayPatches();
 installHalfpipeV9EventPatches();
 installHalfpipeV9RuntimePatches();
 installHalfpipeV16Patches();
-installCyberEnvironmentRedirect();
 installHalfpipeV18Patches();
-installCopingSelectiveBloomFix();
 
 // V16 creates the title-screen artwork dynamically and still assigns its
 // historical root-absolute /images/... URL. Three.js' URL modifier cannot
@@ -60,7 +56,7 @@ if (!repairTitleArtwork() && globalThis.MutationObserver) {
   titleArtworkObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
 
-await import('../main.js');
+await import('./main.js');
 
 // The title screen is normally created during main.js module evaluation. Run
 // one final synchronous repair in case it appeared between observer callbacks.

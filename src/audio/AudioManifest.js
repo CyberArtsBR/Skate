@@ -1,71 +1,84 @@
 import { publicAssetUrl } from '../config/publicAssetUrl.js';
 
-const placeholder = (kind, options = {}) => Object.freeze({
+const generatedBed = (kind, options = {}) => Object.freeze({
   url: null,
   optional: true,
   placeholder: kind,
+  generated: true,
   ...options,
 });
 
 const PIXEL_RAMPAGE = publicAssetUrl('audio/music/Pixel_Rampage.mp3');
+const SKATE_ROLL = publicAssetUrl('audio/skate/raw-street-roll.wav');
+const SKATE_IMPACT = publicAssetUrl('audio/skate/raw-street-impact.wav');
+const SKATE_TAKEOFF = publicAssetUrl('audio/skate/raw-street-takeoff.wav');
+const recorded = (url, options = {}) => Object.freeze({ url, ...options });
 
 export const AUDIO_MANIFEST = Object.freeze({
-  version: 6,
+  version: 7,
   music: Object.freeze({
-    // User-supplied Halfpipe theme. Browsers may require the first user gesture
-    // before audible playback; once audio is unlocked this is the menu/theme
-    // track and gameplay restarts it from the beginning for each new run.
     menu: Object.freeze({ url: PIXEL_RAMPAGE, loop: true, gain: 0.48 }),
     gameplay: Object.freeze({ url: PIXEL_RAMPAGE, loop: true, gain: 0.72 }),
     results: Object.freeze({ url: PIXEL_RAMPAGE, loop: true, gain: 0.50 }),
   }),
   continuous: Object.freeze({
-    wheelRoll: Object.freeze({ url: publicAssetUrl('audio/skate/raw-street-roll.wav'), loop: true, gain: 1 }),
-    rampTexture: placeholder('procedural-dry-trucks', { loop: true, gain: 1 }),
-    wind: placeholder('procedural-wind', { loop: true, gain: 1 }),
+    wheelRoll: recorded(SKATE_ROLL, { loop: true, gain: 1 }),
+    rampTexture: generatedBed('procedural-dry-trucks', { loop: true, gain: 1 }),
+    wind: generatedBed('procedural-wind', { loop: true, gain: 1 }),
   }),
   ambience: Object.freeze({
-    outdoor: placeholder('outdoor', { loop: true, gain: 0.055 }),
-    california: placeholder('outdoor', { loop: true, gain: 0.055 }),
-    city: placeholder('city', { loop: true, gain: 0.035 }),
-    'tree-house': placeholder('outdoor', { loop: true, gain: 0.055 }),
-    'cyber-night': placeholder('night', { loop: true, gain: 0.035 }),
+    gym: generatedBed('gym', { loop: true, gain: 0.034 }),
+    japan: generatedBed('japan', { loop: true, gain: 0.042 }),
+    canyon: generatedBed('canyon', { loop: true, gain: 0.050 }),
+    park: generatedBed('park', { loop: true, gain: 0.046 }),
+    space: generatedBed('space', { loop: true, gain: 0.024 }),
+    city: generatedBed('city', { loop: true, gain: 0.035 }),
+    forest: generatedBed('forest', { loop: true, gain: 0.050 }),
+    cyber: generatedBed('cyber', { loop: true, gain: 0.030 }),
+    outdoor: generatedBed('park', { loop: true, gain: 0.046 }),
+    california: generatedBed('park', { loop: true, gain: 0.046 }),
+    'tree-house': generatedBed('forest', { loop: true, gain: 0.050 }),
+    'cyber-night': generatedBed('cyber', { loop: true, gain: 0.030 }),
   }),
   sfx: Object.freeze({
-    pumpPerfect: placeholder('pump-perfect', { gain: 0.72 }),
-    pumpGood: placeholder('pump-good', { gain: 0.58 }),
-    pumpWeak: placeholder('pump-weak', { gain: 0.34 }),
-    copingHit: placeholder('metal-hit', { gain: 0.64 }),
-    kickTurn: placeholder('metal-scrape', { gain: 0.76 }),
-    handPlant: placeholder('handplant-accent', { gain: 0.82 }),
-    takeoff: Object.freeze({ url: publicAssetUrl('audio/skate/raw-street-takeoff.wav'), gain: 0.7 }),
-    deckImpact: Object.freeze({ url: publicAssetUrl('audio/skate/raw-street-impact.wav'), gain: 1 }),
-    landingPerfect: placeholder('landing-perfect', { gain: 0.72 }),
-    landingClean: placeholder('landing-clean', { gain: 0.66 }),
-    landingSketchy: placeholder('landing-sketchy', { gain: 0.74 }),
-    landingHeavy: placeholder('landing-heavy', { gain: 0.86 }),
-    bailBoard: placeholder('crash-board', { gain: 0.9 }),
-    bailBody: placeholder('crash-body', { gain: 0.84 }),
-    crowdOh: placeholder('crowd-oooh', { gain: 0.86 }),
-    bailRecovery: placeholder('recovery-accent', { gain: 0.4 }),
-    scoreConfirm: placeholder('score-confirm', { gain: 0.42 }),
-    comboTick: placeholder('combo-tick', { gain: 0.34 }),
-    countdown: placeholder('countdown', { gain: 0.5 }),
-    countdownGo: placeholder('countdown-go', { gain: 0.72 }),
-    timerWarning: placeholder('timer-warning', { gain: 0.42 }),
-    sessionEnd: placeholder('session-end', { gain: 0.66 }),
+    // Reuse the dry recorded skate sources as a coherent physical palette.
+    // Pitch/gain variation is applied by HalfpipeAudio so repeated cues do not
+    // sound like identical sample retriggers.
+    pumpPerfect: recorded(SKATE_TAKEOFF, { gain: 0.20, rate: 1.30 }),
+    pumpGood: recorded(SKATE_TAKEOFF, { gain: 0.14, rate: 1.12 }),
+    pumpWeak: recorded(SKATE_TAKEOFF, { gain: 0.08, rate: 0.94 }),
+    copingHit: recorded(SKATE_IMPACT, { gain: 0.46, rate: 1.20 }),
+    kickTurn: recorded(SKATE_IMPACT, { gain: 0.40, rate: 1.08 }),
+    handPlant: recorded(SKATE_IMPACT, { gain: 0.32, rate: 0.92 }),
+    takeoff: recorded(SKATE_TAKEOFF, { gain: 0.70 }),
+    deckImpact: recorded(SKATE_IMPACT, { gain: 1 }),
+    landingPerfect: recorded(SKATE_IMPACT, { gain: 0.38, rate: 1.16 }),
+    landingClean: recorded(SKATE_IMPACT, { gain: 0.52, rate: 1.04 }),
+    landingSketchy: recorded(SKATE_IMPACT, { gain: 0.68, rate: 0.94 }),
+    landingHeavy: recorded(SKATE_IMPACT, { gain: 0.84, rate: 0.84 }),
+    bailBoard: recorded(SKATE_IMPACT, { gain: 0.68, rate: 0.82 }),
+    bailBody: recorded(SKATE_IMPACT, { gain: 0.46, rate: 0.72 }),
+    bailRecovery: recorded(SKATE_ROLL, { gain: 0.20, rate: 0.82 }),
+    scoreConfirm: recorded(SKATE_TAKEOFF, { gain: 0.17, rate: 1.42 }),
+    comboTick: recorded(SKATE_TAKEOFF, { gain: 0.12, rate: 1.58 }),
+    countdown: recorded(SKATE_TAKEOFF, { gain: 0.13, rate: 0.78 }),
+    countdownGo: recorded(SKATE_TAKEOFF, { gain: 0.24, rate: 1.16 }),
+    timerWarning: recorded(SKATE_TAKEOFF, { gain: 0.11, rate: 1.48 }),
+    sessionEnd: recorded(SKATE_IMPACT, { gain: 0.28, rate: 0.76 }),
+    // Crowd is intentionally synthesized as a restrained arena bed until a
+    // dedicated licensed crowd recording is supplied; it is never used as a
+    // body-impact or fail alarm.
+    crowdCheer: generatedBed('crowd-cheer', { gain: 0.22 }),
+    crowdOh: generatedBed('crowd-oh', { gain: 0.14 }),
   }),
 });
 
 export const AUDIO_ASSET_REQUIREMENTS = Object.freeze([
   'Primary menu/gameplay/results theme: public/audio/music/Pixel_Rampage.mp3',
-  'Optional California outdoor ambience loop',
-  'Optional distant-city ambience loop',
-  'Optional restrained crowd ambience loop',
-  'Preferred wheel-roll loop: 6-10 seconds, dry, seamless, no hard attack or baked fade, clean board-on-wood/concrete texture',
-  'Optional coping metal hit/scrape one-shots',
-  'Optional landing impact family: perfect, clean, sketchy, heavy',
-  'Bails use board/wheel stumble only; no body slam or emergency cue',
+  'Recorded physical palette: raw-street-roll.wav, raw-street-impact.wav, raw-street-takeoff.wav',
+  'Optional future dedicated crowd cheer/arena walla recordings may replace the generated crowd layer',
+  'Optional future map-specific field ambience recordings may replace generated environment beds without changing runtime routing',
+  'Bails remain board/wheel stumble only; no body slam or emergency cue',
 ]);
 
 export function createAudioManifest(overrides = {}) {

@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
+import * as THREE from 'three';
+import { NodeIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { HalfpipeCamera } from '../src/camera/HalfpipeCamera.js';
 import { GAME_CONFIG } from '../src/config/gameConfig.js';
 
 const camera = new HalfpipeCamera();
 const base = camera.snapshot();
+const expectedBaseFov = THREE.MathUtils.radToDeg(2 * Math.atan(
+  Math.tan(THREE.MathUtils.degToRad(GAME_CONFIG.camera.fov) / 2)
+    / GAME_CONFIG.camera.viewportCover.scale,
+));
 
 assert.equal(base.dynamicActive, false);
-assert.equal(base.fov, GAME_CONFIG.camera.fov);
+assert.equal(base.fov, expectedBaseFov);
 assert.equal(base.targetY, GAME_CONFIG.camera.target[1]);
 assert.equal(base.verticalShift, 0);
 
@@ -22,20 +30,24 @@ assert.ok(
 );
 assert.equal(
   high.fov,
-  GAME_CONFIG.camera.fov,
+  base.fov,
   'high-air tracking must never widen or narrow the FOV',
 );
 assert.ok(
   high.position[1] > base.position[1] + 2,
   `camera body should follow the rider upward: ${high.position[1]}`,
 );
-assert.ok(
-  Math.abs(
-    (high.position[1] - base.position[1])
-      - (high.targetY - base.targetY)
-  ) < 1e-6,
-  'camera and target must rise together to preserve the fixed viewing angle',
-);
+const baseDirection = new THREE.Vector3().fromArray(GAME_CONFIG.camera.target)
+  .sub(new THREE.Vector3().fromArray(GAME_CONFIG.camera.position)).normalize();
+const frontPitchDegrees = THREE.MathUtils.radToDeg(Math.asin(-baseDirection.y));
+assert.ok(Math.abs(frontPitchDegrees - 2) < .001,
+  `fixed low front angle must match the reference: ${frontPitchDegrees}`);
+const highDirection = camera.target.clone().sub(camera.camera.position).normalize();
+assert.ok(baseDirection.distanceTo(highDirection) < 1e-6,
+  'vertical tracking must preserve the fixed viewing angle');
+assert.equal(high.position[0], base.position[0], 'air tracking must not pan sideways');
+assert.equal(high.position[2], base.position[2], 'air tracking must never dolly or zoom out');
+assert.equal(Object.hasOwn(high, 'framingRetreat'), false, 'dynamic framing retreat must be removed');
 
 for (let index = 0; index < 180; index += 1) {
   camera.updateForRider({ y: 6.4, airborne: true }, 1 / 120);
@@ -45,7 +57,7 @@ const descending = camera.snapshot();
 assert.equal(descending.dynamicActive, false);
 assert.equal(
   descending.fov,
-  GAME_CONFIG.camera.fov,
+  base.fov,
   'descending must keep the original FOV',
 );
 assert.ok(
@@ -58,10 +70,169 @@ assert.ok(
 );
 
 const reset = camera.resetDynamic();
-assert.equal(reset.fov, GAME_CONFIG.camera.fov);
+assert.equal(reset.fov, base.fov);
 assert.equal(reset.targetY, GAME_CONFIG.camera.target[1]);
 assert.equal(reset.position[1], GAME_CONFIG.camera.position[1]);
 assert.equal(reset.dynamicAmount, 0);
 assert.equal(reset.verticalShift, 0);
 
-console.log(JSON.stringify({ base, high, descending, reset }, null, 2));
+// Project the actual active GLB, not only the narrower playable surface. The
+// runtime aligns the visible source's bottom and depth center to the origin.
+const assetPath = fileURLToPath(new URL(`../public${GAME_CONFIG.assets.halfpipe}`, import.meta.url));
+const document = await new NodeIO().registerExtensions(ALL_EXTENSIONS).read(assetPath);
+const vertices = [];
+const frontVertices = [];
+const copingVertices = [];
+const bounds = new THREE.Box3();
+for (const node of document.getRoot().listNodes()) {
+  if (!node.getMesh() || /ground/i.test(node.getName())) continue;
+  const matrix = new THREE.Matrix4().fromArray(node.getWorldMatrix());
+  for (const primitive of node.getMesh().listPrimitives()) {
+    const positions = primitive.getAttribute('POSITION')?.getArray();
+    if (!positions) continue;
+    for (let offset = 0; offset < positions.length; offset += 3) {
+      const point = new THREE.Vector3().fromArray(positions, offset).applyMatrix4(matrix);
+      bounds.expandByPoint(point);
+      vertices.push(point);
+      if (node.getName() === 'Object_8') copingVertices.push(point);
+      if (/^FRENTE(?:\.\d+)?$/.test(primitive.getMaterial()?.getName() || '')) {
+        frontVertices.push(point);
+      }
+    }
+  }
+}
+assert.ok(vertices.length > 0, 'camera check must inspect actual ramp geometry');
+const depthCenter = bounds.getCenter(new THREE.Vector3()).z;
+for (const point of vertices) {
+  point.y -= bounds.min.y;
+  point.z -= depthCenter;
+}
+const frontZ = Math.max(...frontVertices.map(point => point.z));
+const frontFace = frontVertices.filter(point => Math.abs(point.z - frontZ) < .001);
+assert.ok(frontFace.length > 0, 'camera check must inspect the actual graffiti front plane');
+camera.camera.updateMatrixWorld(true);
+const projectedStructure = vertices.map(point => point.clone().project(camera.camera));
+const projectedFront = frontFace.map(point => point.clone().project(camera.camera));
+const desktopFrame = {
+  structureLeft: Math.min(...projectedStructure.map(point => point.x)),
+  structureRight: Math.max(...projectedStructure.map(point => point.x)),
+  frontLeft: Math.min(...projectedFront.map(point => point.x)),
+  frontRight: Math.max(...projectedFront.map(point => point.x)),
+  bottom: Math.min(...projectedStructure.map(point => point.y)),
+  top: Math.max(...projectedStructure.map(point => point.y)),
+};
+const copingBounds = new THREE.Box3().setFromPoints(copingVertices);
+assert.ok(!copingBounds.isEmpty(), 'camera check must inspect both authored coping spans');
+const copingY = copingBounds.getCenter(new THREE.Vector3()).y;
+const frontCoping = new THREE.Vector3(copingBounds.max.x, copingY, copingBounds.max.z)
+  .project(camera.camera);
+const backCoping = new THREE.Vector3(copingBounds.max.x, copingY, copingBounds.min.z)
+  .project(camera.camera);
+const copingPerspective = {
+  frontX: frontCoping.x,
+  backX: backCoping.x,
+  backToFrontRatio: Math.abs(backCoping.x / frontCoping.x),
+  frontY: frontCoping.y,
+  backY: backCoping.y,
+};
+assert.ok(Math.abs(copingPerspective.backToFrontRatio - .46) < .01,
+  `fixed lens must match the reference's stronger front/back coping perspective: ${copingPerspective.backToFrontRatio}`);
+assert.ok(copingPerspective.frontY > copingPerspective.backY,
+  'the low front angle must put the near coping above the far coping, like the reference');
+assert.ok(desktopFrame.frontLeft < -1.02 && desktopFrame.frontRight > 1.02,
+  'painted frontage must overscan both sides instead of leaving even a thin gap');
+assert.ok(desktopFrame.bottom < -1.02,
+  `ramp frontage needs bottom slack for landing impacts: ${desktopFrame.bottom}`);
+assert.ok(desktopFrame.top < 1, 'top of the structure must remain visible');
+
+// The limiting outer side is the bottom, not the much wider-looking top.
+// Check every authored side point, then repeat for every viewport below.
+const outerX = Math.max(...frontFace.map(point => Math.abs(point.x)));
+const sidePoints = frontFace.filter(point => Math.abs(Math.abs(point.x) - outerX) < .001);
+assert.ok(sidePoints.length >= 4, 'inspect both painted outer front edges');
+for (const point of sidePoints) {
+  const projected = point.clone().project(camera.camera);
+  assert.ok(Math.abs(projected.x) > 1.02,
+    `every height of the side edge must overscan, including the bottom: ${projected.x}`);
+}
+assert.ok(new THREE.Vector3(0, -.1, frontZ).project(camera.camera).y < -1,
+  'the area immediately underneath the ramp must be below the desktop view');
+
+// The layout resolves a uniform optical cover once per viewport. Native aspect
+// is not stretched; after layout the lens and physical X/Z are locked for every
+// aerial and impact. Keeping the floor during a high air is not a goal.
+const viewports = [[1920, 1080], [2879, 1613], [2879, 1216], [2560, 1080],
+  [640, 400], [800, 600], [720, 720], [360, 640]];
+const frames = [];
+for (const [width, height] of viewports) {
+  const controller = new HalfpipeCamera();
+  const initialPosition = controller.camera.position.toArray();
+  controller.resize(width, height);
+  assert.deepEqual(controller.camera.position.toArray(), initialPosition,
+    'viewport resize must not dolly or change camera position');
+  const layoutFov = controller.camera.fov;
+  assert.ok(layoutFov <= expectedBaseFov, 'wide viewports need cover instead of side gaps');
+  controller.camera.updateMatrixWorld(true);
+  for (const point of sidePoints) {
+    const projected = point.clone().project(controller.camera);
+    assert.ok(Math.abs(projected.x) > 1.02,
+      `${width}x${height}: the complete painted side edge must cover the screen`);
+  }
+  for (const state of [
+    { y: 0, airborne: false },
+    { y: 6.62, airborne: false },
+    { y: 10.8, airborne: true, verticalVelocity: 15 },
+    { y: 22, airborne: true, verticalVelocity: 0 },
+    { y: 6.4, airborne: true, verticalVelocity: -8 },
+    { y: 0, airborne: false },
+  ]) {
+    for (let index = 0; index < 180; index += 1) {
+      controller.updateForRider(state, 1 / 120);
+      assert.equal(controller.camera.position.x, GAME_CONFIG.camera.position[0]);
+      assert.equal(controller.camera.position.z, GAME_CONFIG.camera.position[2],
+        'no frame of an aerial or landing may move the camera backward');
+      assert.equal(controller.camera.fov, layoutFov, 'flight must never change the viewport lens');
+    }
+    controller.addImpact({ strength: 0.45, duration: 0.18 });
+    controller.updateForRider(state, 0.03);
+    controller.camera.updateMatrixWorld(true);
+    let extentX = 0;
+    let extentY = 0;
+    for (const point of vertices) {
+      const projected = point.clone().project(controller.camera);
+      extentX = Math.max(extentX, Math.abs(projected.x));
+      extentY = Math.max(extentY, Math.abs(projected.y));
+      assert.ok(projected.z >= -1 && projected.z <= 1, 'ramp must stay between near/far planes');
+    }
+    const top = state.y + GAME_CONFIG.rider.targetHeight + .25;
+    for (const x of [-7.97, 7.97]) {
+      const projected = new THREE.Vector3(x, top, 0).project(controller.camera);
+      assert.ok(Math.abs(projected.y) <= 1.01,
+        `${width}x${height}, y=${state.y}: vertical follow must keep the aerial rider in frame`);
+      if (width / height >= 16 / 9) {
+        assert.ok(Math.abs(projected.x) <= 1,
+          `${width}x${height}, y=${state.y}: landscape aerial rider must remain in frame`);
+      }
+    }
+    assert.ok(baseDirection.distanceTo(controller.target.clone()
+      .sub(controller.camera.position).normalize()) < 1e-6,
+      'all viewports and aerial heights must preserve the centered front angle');
+    const snapshot = controller.snapshot();
+    assert.equal(snapshot.position[0], initialPosition[0]);
+    assert.equal(snapshot.position[2], initialPosition[2],
+      'maximum landing impact must not add depth motion');
+    assert.equal(snapshot.impact.offset[2], 0, 'impact offset must remain strictly vertical');
+    assert.ok(Math.abs((snapshot.position[1] - GAME_CONFIG.camera.position[1])
+      - (snapshot.targetY - GAME_CONFIG.camera.target[1])) < 1e-6,
+    'camera and target must follow by the exact same Y amount');
+    frames.push({ width, height, riderY: state.y, extentX, extentY,
+      cameraPosition: snapshot.position });
+  }
+  controller.resetDynamic();
+  assert.equal(controller.snapshot().verticalShift, 0);
+}
+
+console.log(JSON.stringify({ base, high, descending, reset, assetPath,
+  geometryVertices: vertices.length, desktopFrame, copingPerspective,
+  frontPitchDegrees,
+  frames }, null, 2));

@@ -6,9 +6,9 @@ Implemented locally on 2 October 2026 over `main` at `9bec11c`.
 
 The five alphabet sheets supplied by the owner are rendered as bitmap glyphs. The light sheet backing is removed during asset preparation, leaving the original painted letters, outlines, bevels and drips on transparency. No replacement typeface is used for the requested display text.
 
-- SCORE and score numbers: gold.
-- TIME label: cyan/purple; time numbers: gold, changing to red in the final ten seconds.
-- Trick name: green; trick points: cyan/purple.
+- SCORE and score numbers: yellow/red (`fire`).
+- TIME label and time numbers: yellow/red (`fire`), including the final ten seconds.
+- Trick name and trick points: green (`green`), per the latest owner request.
 - Press to Start: yellow-to-red.
 - Congratulations: green; other podium messages retain their gold/red rank distinction.
 - Final score, best trick and podium score numbers also use the supplied artwork.
@@ -19,7 +19,7 @@ The cyan sheet contains `%` in place of `9`. Its missing nine uses the silhouett
 
 ## Coping
 
-The coping is a red source with a finite, smooth red halo on each actual authored rail. It is excluded from HDR bloom; wheels retain their existing bloom. Halo meshes are visual-only and depth tested. The authoritative riding surface, contact bounds and physics remain independent of this effect.
+The final runtime coping uses the authored physical rail mesh with red selective bloom (emissive intensity 3). The detached local halo quads are removed by the runtime patch to avoid trails. Wheels retain their existing bloom. The authoritative riding surface, contact bounds and physics remain independent of this effect.
 
 ## Aerial turns and backflip
 
@@ -32,7 +32,11 @@ Focused checks are available as:
 ```text
 npm run check:coping-glow
 npm run check:aerial-tuck
+npm run check:camera
+npm run check:hud-palettes
+npm run check:map-lighting
 npm run check:presentation:browser
+npm run check:ramp-edges:browser
 ```
 
 The browser check requires a running local Vite server (default `http://localhost:5173`, overridable with `HALFPIPE_PREVIEW_URL`). It exercises the real title, selection, start prompt, HUD updates, low timer, responsive/high-contrast UI, rendered character poses, results, winners podium and full 3D arenas. Captures and numerical evidence are saved under `artifacts/presentation-style/`.
@@ -40,6 +44,54 @@ The browser check requires a running local Vite server (default `http://localhos
 The ten-rider geometric test checks the actual shipped skeletons at different facing angles and inverted backflip poses. It passed on all ten riders; the largest measured foot-target error was 0.00000353 m. The final browser check passed on Tree House, The Gym and Japan, confirming transparent lettering, responsive/high-contrast layout, hands below shoulders and sub-millimeter foot-target error, with no JavaScript, shader or asset errors. The final HUD, start prompt, podium, small-screen, aerial-turn/backflip and arena captures were also visually reviewed. The production build and `git diff --check` passed. Numerical IK accuracy alone does not establish the quality of a skinned animation.
 
 Two older gameplay checks already fail on unmodified `9bec11c`: `trick-presentation.mjs` at line 165 (Hand Plant eligibility below the coping), and `v9-gameplay-regressions.mjs` at line 192 (pumping amplitude recovery). The same failures were reproduced using a separate `git archive HEAD src checks` snapshot under `artifacts/head-baseline-9bec11c-air-pose/`. These presentation changes do not repair those earlier gameplay assertions.
+
+The camera/HUD/light browser check for the earlier `5ed1bf4` correction passed
+on Space, The Gym and Japan. It verified global side/bottom mesh extents,
+fixed X/Z/FOV and constant apparent scale through 10/14/18/22 m aerial tracking,
+the requested six font palettes, and the composed Gym lights on all eight maps.
+Japan's sunset background remains a separate texture at its original rotation.
+Those historical passes did not prove full-height fascia coverage: the global
+horizontal extent came from the upper edge, while the lower outer edge remained
+inside the viewport and exposed thin background gutters.
+
+## Side-gutter camera correction
+
+The reference camera angle remains 2 degrees, with physical X/Z unchanged and
+vertical-only camera/target following. The reference lens is 43.750442 degrees;
+`viewportCover` uses reference aspect 16:9 and scale 1.045, producing an effective
+42.034138-degree vertical FOV at 16:9. The uniform cover crop also compensates for
+wider viewport ratios without stretching the scene or adding geometry masks.
+The effective lens is recomputed only on resize and stays locked during every
+flight; no airborne dolly, retreat or rider-dependent lens change is introduced.
+The Y-follow cap is 14 m, preserving high-air visibility with the tighter wide
+projection. Lighting, HUD palettes, ramp geometry and physics are unchanged by
+this side-gutter correction.
+
+The new `npm run check:ramp-edges:browser` checks horizontal slices through the
+actual projected graffiti-fascia triangles, including the narrower lower outer
+edge and a rasterization margin. Its five viewport sizes are 1600 x 900,
+2879 x 1613, 2879 x 1216, 2560 x 1080 and 640 x 400. It also checks fixed
+X/Z and viewport-locked lens/apparent scale through aerial following. Evidence
+and captures are written to `artifacts/ramp-edge-cover/`. The check passed on the
+production build at all five sizes with no browser errors. The minimum measured
+side overscan was 0.0237 NDC, exceeding the 0.015 rasterization margin. X/Z, FOV,
+orientation and apparent scale remain fixed at 10/18/22 m in each viewport.
+The 2879 x 1613 and 2879 x 1216 base captures were visually reviewed, confirming
+paint reaches both viewport edges without outside-fascia background gutters.
+
+The full presentation browser check also passed on the final production build,
+including the green trick name and green trick points, with no JavaScript,
+shader or asset errors.
+
+`check:static` still reports two pre-existing release-contract mismatches:
+its old approved-background path and single-material coping regex. Both were
+reproduced unchanged on `9c10fe3` in a local git-archive baseline before this
+correction; the contracts were not weakened to hide them. The focused asset,
+camera, HUD, lighting and aerial checks pass independently.
+The direct `phase4-integration.mjs` assertion that the release runner execute
+`check:gameplay` also fails identically on that unchanged baseline (line 37).
+Visual and numerical contact checks passed; this correction does not change
+the authoritative physics or repair the older release-runner contract.
 
 ## Portals synchronization and production
 
