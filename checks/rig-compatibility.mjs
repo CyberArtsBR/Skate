@@ -160,7 +160,7 @@ for (const [id, file] of FILES) {
   }
 
   for (const slot of REQUIRED_POSE_SLOTS) {
-    assert.ok(rig[slot], `${id} is missing required semantic slot ${slot}`);
+    assert.ok(rig[slot], `${id} is missing required semantic slot ${slot}. Available nodes: ${nodes.map(node => node.getName()).join(', ')}`);
   }
 
   assert.ok(

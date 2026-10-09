@@ -32,7 +32,7 @@ assert.equal(presentationState.speedNormalized, 0.5);
 for (const file of [
   'public/models/halfpipe/halfpipe.glb',
   'public/models/skateboard/skateboard.glb',
-  'public/models/characters/The Heretic.glb',
+  'public/models/characters/heretic_new.glb',
 ]) {
   assert.ok(fs.statSync(file).size > 1024, `${file} must contain a non-empty GLB`);
 }

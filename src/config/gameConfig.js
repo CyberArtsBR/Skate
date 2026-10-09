@@ -9,7 +9,7 @@ export const GAME_CONFIG = Object.freeze({
   assets: Object.freeze({
     halfpipe: publicAssetUrl('models/halfpipe/halfpipe2.glb'),
     skateboard: publicAssetUrl('models/skateboard/skateboard.glb'),
-    chimpion: publicAssetUrl('models/characters/The_Heretic.glb'),
+    chimpion: publicAssetUrl('models/characters/heretic_new.glb'),
     background: MAP_IMAGES.city,
     environment: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/piazza_martin_lutero_1k.hdr',
   }),

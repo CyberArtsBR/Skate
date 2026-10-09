@@ -27,6 +27,10 @@ export function publicAssetUrl(pathname) {
 
   const clean = value.replace(/^\.\//, '').replace(/^\/+/, '');
 
+  // Node-based release checks use root-relative asset paths, as in the
+  // original runtime. Browser builds still resolve assets from their bundle.
+  if (typeof window === 'undefined') return '/' + clean;
+
   if (IS_PRODUCTION) {
     const bundleRoot = productionBundleRoot();
     if (bundleRoot) return new URL(clean, bundleRoot).href;
